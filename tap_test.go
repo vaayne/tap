@@ -2,11 +2,30 @@ package tap
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
+func testSitesDir(t *testing.T) string {
+	t.Helper()
+	dir := os.Getenv("TAP_SITES_DIR")
+	if dir == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			t.Skip("cannot determine home dir")
+		}
+		dir = filepath.Join(home, ".config", "tap", "sites")
+	}
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		t.Skipf("sites dir %s does not exist, run 'tap site sync' first", dir)
+	}
+	return dir
+}
+
 func TestNew(t *testing.T) {
-	client, err := New(WithSitesDir("./sites"))
+	dir := testSitesDir(t)
+	client, err := New(WithSitesDir(dir))
 	if err != nil {
 		t.Fatalf("New failed: %v", err)
 	}
@@ -39,7 +58,8 @@ func TestNew_NoSitesDir(t *testing.T) {
 }
 
 func TestRunScript_NotFound(t *testing.T) {
-	client, err := New(WithSitesDir("./sites"))
+	dir := testSitesDir(t)
+	client, err := New(WithSitesDir(dir))
 	if err != nil {
 		t.Fatalf("New failed: %v", err)
 	}
@@ -52,7 +72,8 @@ func TestRunScript_NotFound(t *testing.T) {
 }
 
 func TestRunScript_MissingRequiredArg(t *testing.T) {
-	client, err := New(WithSitesDir("./sites"))
+	dir := testSitesDir(t)
+	client, err := New(WithSitesDir(dir))
 	if err != nil {
 		t.Fatalf("New failed: %v", err)
 	}

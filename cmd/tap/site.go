@@ -9,7 +9,6 @@ import (
 
 	"github.com/urfave/cli/v3"
 	"github.com/vaayne/tap"
-	"github.com/vaayne/tap/script"
 )
 
 func siteCmd() *cli.Command {
@@ -29,6 +28,7 @@ func siteCmd() *cli.Command {
 			siteListCmd(),
 			siteInfoCmd(),
 			siteSearchCmd(),
+			siteSyncCmd(),
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			configureLogging(cmd)
@@ -192,7 +192,7 @@ func siteInfoCmd() *cli.Command {
 func siteSearchCmd() *cli.Command {
 	return &cli.Command{
 		Name:      "search",
-		Usage:     "Search scripts by name or description",
+		Usage:     "Search scripts online by name or description",
 		ArgsUsage: "<query>",
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			configureLogging(cmd)
@@ -200,41 +200,44 @@ func siteSearchCmd() *cli.Command {
 				return fmt.Errorf("search query required")
 			}
 
-			client, err := newClient(cmd)
+			query := strings.Join(cmd.Args().Slice(), " ")
+			color := useColor(cmd)
+
+			result, err := searchOnline(query)
 			if err != nil {
 				return err
 			}
-			defer func() { _ = client.Close() }()
 
-			query := strings.ToLower(strings.Join(cmd.Args().Slice(), " "))
-			scripts := client.ListScripts()
-			color := useColor(cmd)
-
-			var matches []*script.Script
-			for _, s := range scripts {
-				name := strings.ToLower(s.Meta.Name)
-				desc := strings.ToLower(s.Meta.Description)
-				domain := strings.ToLower(s.Meta.Domain)
-				if strings.Contains(name, query) || strings.Contains(desc, query) || strings.Contains(domain, query) {
-					matches = append(matches, s)
-				}
-			}
-
-			if len(matches) == 0 {
+			if len(result.Scripts) == 0 {
 				fmt.Printf("No scripts matching %q\n", query)
 				return nil
 			}
 
-			for _, s := range matches {
-				argHints := formatArgHints(s, color)
+			for _, s := range result.Scripts {
+				argHints := formatOnlineArgHints(s, color)
 				fmt.Printf("  %-30s %s%s\n",
-					green(color, s.Meta.Name),
-					s.Meta.Description,
+					green(color, s.Name),
+					s.Description,
 					argHints,
 				)
 			}
-			fmt.Printf("\n%s\n", dim(color, fmt.Sprintf("%d result(s)", len(matches))))
+			fmt.Printf("\n%s\n", dim(color, fmt.Sprintf("%d result(s)", len(result.Scripts))))
 			return nil
+		},
+	}
+}
+
+func siteSyncCmd() *cli.Command {
+	return &cli.Command{
+		Name:  "sync",
+		Usage: "Sync scripts from the remote catalog",
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			configureLogging(cmd)
+			dir := cmd.String("sites-dir")
+			if dir == "" {
+				dir = defaultSitesDir()
+			}
+			return syncScripts(dir, cmd.Bool("verbose"))
 		},
 	}
 }

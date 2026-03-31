@@ -48,7 +48,7 @@ func globalFlags() []cli.Flag {
 		&cli.StringFlag{
 			Name:    "sites-dir",
 			Usage:   "Directory containing site scripts",
-			Value:   "./sites",
+			Value:   defaultSitesDir(),
 			Sources: cli.EnvVars("TAP_SITES_DIR"),
 		},
 		&cli.StringFlag{
@@ -98,9 +98,17 @@ func globalFlags() []cli.Flag {
 func newClient(cmd *cli.Command) (*tap.Client, error) {
 	var opts []tap.Option
 
-	if dir := cmd.String("sites-dir"); dir != "" {
-		opts = append(opts, tap.WithSitesDir(dir))
+	dir := cmd.String("sites-dir")
+	if dir == "" {
+		dir = defaultSitesDir()
 	}
+
+	// Auto-sync if no local scripts exist
+	if err := ensureScripts(dir, cmd.Bool("verbose")); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: auto-sync failed: %v\n", err)
+	}
+
+	opts = append(opts, tap.WithSitesDir(dir))
 	if url := cmd.String("ws-url"); url != "" {
 		opts = append(opts, tap.WithWSURL(url))
 	}

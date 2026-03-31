@@ -24,6 +24,8 @@ Requires Go 1.22+ and Google Chrome (or Chromium) for browser fallback.
 
 ### Site Scripts
 
+Scripts are automatically downloaded from [tap.vaayne.com](https://tap.vaayne.com) and cached in `$XDG_CONFIG_HOME/tap/sites/` (default `~/.config/tap/sites/`). The cache auto-refreshes every 24 hours.
+
 ```bash
 # List all available scripts
 tap site list
@@ -35,6 +37,12 @@ tap site bilibili/search keyword=编程 order=click
 
 # Pipe to jq
 tap site hackernews/top | jq '.stories[:3]'
+
+# Search scripts online
+tap site search bilibili
+
+# Manually sync/update scripts
+tap site sync
 ```
 
 ### Fetch Content
@@ -118,7 +126,7 @@ All config via environment variables, `.env` file, or CLI flags:
 
 | Variable | Flag | Description | Default |
 |---|---|---|---|
-| `TAP_SITES_DIR` | `--sites-dir` | Directory containing site scripts | `./sites` |
+| `TAP_SITES_DIR` | `--sites-dir` | Directory containing site scripts | `~/.config/tap/sites` |
 | `TAP_WS_URL` | `--ws-url` | Remote CDP WebSocket URL | _(local Chrome)_ |
 | `TAP_PROFILE_DIR` | `--profile-dir` | Chrome profile for persistent cookies | `~/.cache/tap/chrome-profile-$USER` |
 
@@ -134,7 +142,7 @@ tap site v2ex/hot
 
 ## Writing Scripts
 
-Scripts live in `sites/` organized by site name:
+Scripts live in the [tap-sites](https://github.com/vaayne/tap-sites) catalog, organized by site name:
 
 ```javascript
 /* @meta
@@ -185,9 +193,9 @@ github.com/vaayne/tap/
 ├── script/
 │   ├── parser.go       # Script @meta parser
 │   └── registry.go     # Script directory scanner + index
-├── cmd/tap/
-│   └── main.go         # CLI binary (urfave/cli)
-└── sites/              # 100+ community site scripts
+└── cmd/tap/
+    ├── main.go         # CLI binary (urfave/cli)
+    └── sync.go         # Remote script sync + search
 ```
 
 ## Roadmap

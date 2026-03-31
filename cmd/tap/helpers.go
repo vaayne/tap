@@ -55,3 +55,20 @@ func scriptNames(client *tap.Client) []string {
 	}
 	return names
 }
+
+// formatOnlineArgHints formats argument hints for search results from the online API.
+func formatOnlineArgHints(s searchResult, color bool) string {
+	if len(s.Args) == 0 {
+		return ""
+	}
+	var parts []string
+	for name, def := range s.Args {
+		if def.Required {
+			parts = append(parts, yellow(color, name+"*"))
+		} else {
+			parts = append(parts, dim(color, name))
+		}
+	}
+	sort.Strings(parts)
+	return " [" + strings.Join(parts, ", ") + "]"
+}
