@@ -120,9 +120,16 @@ func runScript(script *Script, args map[string]string) (any, error) {
 	// Wrap: (async function(args) { ... })({...args...})
 	js := fmt.Sprintf("(%s)(%s)", script.Body, string(argsJSON))
 
+	// Navigate to the script's domain so fetch() has proper origin and cookies
+	navURL := "about:blank"
+	if script.Meta.Domain != "" {
+		navURL = "https://" + script.Meta.Domain
+	}
+
 	var result any
 	if err := chromedp.Run(ctx,
-		chromedp.Navigate("about:blank"),
+		chromedp.Navigate(navURL),
+		chromedp.WaitReady("body"),
 		chromedp.Evaluate(js, &result, func(p *runtime.EvaluateParams) *runtime.EvaluateParams {
 			return p.WithReturnByValue(true).WithAwaitPromise(true)
 		}),
