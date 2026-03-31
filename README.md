@@ -1,121 +1,156 @@
-# cdp
+# 🚰 Tap
 
-A CLI tool that runs JavaScript scripts to fetch data from websites. Scripts execute with a two-tier strategy: first via QuickJS (fast, no browser), then falling back to a real browser via Chrome DevTools Protocol when needed.
+Tap into any website from your terminal.
+
+A Go library and CLI toolkit that runs JavaScript scripts against real websites — fast via QuickJS, with full browser fallback when needed. Also extracts clean content from any URL via [go-defuddle](https://github.com/vaayne/go-defuddle).
 
 ## Install
 
+### CLI
+
 ```bash
-go install
+go install github.com/vaayne/tap/cmd/tap@latest
+```
+
+### Library
+
+```bash
+go get github.com/vaayne/tap
 ```
 
 Requires Go 1.22+ and Google Chrome (or Chromium) for browser fallback.
 
-## Quick Start
+## CLI Usage
+
+### Site Scripts
 
 ```bash
 # List all available scripts
-cdp list
+tap site list
 
-# Run a script
-cdp v2ex/hot
+# Run a script (QuickJS first, browser fallback)
+tap site v2ex/hot
+tap site twitter/search query=claude
+tap site bilibili/search keyword=编程 order=click
 
-# Run a script with arguments
-cdp twitter/search query=claude
-cdp bilibili/search keyword=编程 order=click
-cdp boss/search query=golang city=上海
+# Pipe to jq
+tap site hackernews/top | jq '.stories[:3]'
+```
+
+### Fetch Content
+
+```bash
+# Extract clean markdown from any URL
+tap fetch https://example.com/article
+
+# Output as JSON with full metadata
+tap fetch --json https://example.com/article
+```
+
+## Library Usage
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+
+    "github.com/vaayne/tap"
+    "github.com/vaayne/tap/fetch"
+)
+
+func main() {
+    client, err := tap.New(
+        tap.WithSitesDir("./sites"),
+    )
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer client.Close()
+
+    // Run a site script
+    result, err := client.RunScript(context.Background(), "v2ex/hot", nil)
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Println(result)
+
+    // Fetch clean content from a URL
+    content, err := client.Fetch(context.Background(), "https://example.com", &fetch.Options{
+        Markdown: true,
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Println(content.Markdown)
+}
 ```
 
 ## How It Works
 
-Every script goes through a two-tier execution strategy:
+Every site script runs through a two-tier execution engine:
 
 ```
-┌──────────────┐     ┌───────────────┐     ┌───────────────┐
-│  Parse script │──>│  Try QuickJS   │──X──>│ Fall back to  │
-│  (@meta + fn) │    │  (Go fetch())  │     │ CDP browser   │
-└──────────────┘     └───────────────┘     └───────────────┘
-                           │                      │
-                        Success                Success
-                           │                      │
-                           v                      v
-                        JSON output           JSON output
+┌─────────────┐     ┌─────────────┐
+│   QuickJS   │──X──>│   Chrome    │
+│  Go fetch() │     │   via CDP   │
+└─────────────┘     └─────────────┘
+  Fast, no browser    Full browser
+  Works for APIs      Cookies, DOM, auth
 ```
 
-1. **QuickJS** — Runs the script in an embedded JS engine ([fastschema/qjs](https://github.com/fastschema/qjs)) with a Go-backed `fetch()` polyfill via `net/http`. Fast, no browser overhead. Works for scripts that call simple APIs.
-2. **CDP Browser** — If QuickJS fails (missing Web APIs like `URLSearchParams`, CORS, needs cookies/auth), falls back to a real Chrome browser. Navigates to the script's domain first for proper origin and cookie access.
+- **QuickJS** — Runs scripts in an embedded JS engine ([fastschema/qjs](https://github.com/fastschema/qjs)) with a Go-backed `fetch()` polyfill. Fast, no browser overhead.
+- **Chrome (CDP)** — If QuickJS fails (missing Web APIs, CORS, needs cookies), falls back to headless Chrome via Chrome DevTools Protocol. Navigates to the script's domain for proper origin and cookie access.
 
-```
-# QuickJS succeeds (fast path)
-Running: v2ex/hot — 获取 V2EX 最热主题
-{"count": 10, "topics": [...]}
-
-# QuickJS fails, falls back to browser
-Running: bilibili/search — Search Bilibili videos by keyword
-QuickJS failed: ReferenceError: URLSearchParams is not defined, falling back to browser
-{"count": 20, "videos": [...]}
-```
-
-## Browser Modes
-
-### Local Chrome (default)
-
-When no `CDP_WS_URL` is set, `cdp` launches a local headless Chrome. A persistent profile directory is used by default so cookies and storage survive across runs:
-
-```
-~/.cache/cdp/chrome-profile-<username>
-```
-
-Override with:
-
-```bash
-export CDP_PROFILE_DIR=/path/to/profile
-```
-
-### Remote Browser
-
-Connect to a remote CDP endpoint (e.g., [Lightpanda](https://lightpanda.io), [Browserless](https://browserless.io)):
-
-```bash
-export CDP_WS_URL=wss://your-remote-browser/ws
-cdp v2ex/hot
-```
+For `tap fetch`, content is fetched via Go HTTP and parsed with [go-defuddle](https://github.com/vaayne/go-defuddle) to extract clean HTML/Markdown.
 
 ## Configuration
 
-All config is via environment variables or `.env` file:
+All config via environment variables, `.env` file, or CLI flags:
 
-| Variable | Description | Default |
-|---|---|---|
-| `CDP_WS_URL` | Remote CDP WebSocket URL. If set, local Chrome is not launched. | _(unset — uses local Chrome)_ |
-| `CDP_PROFILE_DIR` | Chrome user data directory for persistent cookies/storage. | `~/.cache/cdp/chrome-profile-$USER` |
+| Variable | Flag | Description | Default |
+|---|---|---|---|
+| `TAP_SITES_DIR` | `--sites-dir` | Directory containing site scripts | `./sites` |
+| `TAP_WS_URL` | `--ws-url` | Remote CDP WebSocket URL | _(local Chrome)_ |
+| `TAP_PROFILE_DIR` | `--profile-dir` | Chrome profile for persistent cookies | `~/.cache/tap/chrome-profile-$USER` |
 
-## Scripts
+### Browser Modes
 
-Scripts live in `sites/` organized by site name. Each script has a `@meta` header and an async function body:
+**Local Chrome (default)** — launches headless Chrome with a persistent profile so cookies survive across runs.
+
+**Remote browser** — connect to a remote CDP endpoint:
+```bash
+export TAP_WS_URL=wss://your-remote-browser/ws
+tap site v2ex/hot
+```
+
+## Writing Scripts
+
+Scripts live in `sites/` organized by site name:
 
 ```javascript
 /* @meta
 {
-  "name": "twitter/search",
-  "description": "Search tweets",
-  "domain": "x.com",
+  "name": "site/action",
+  "description": "What this script does",
+  "domain": "example.com",
   "args": {
-    "query": {"required": true, "description": "Search query"},
-    "count": {"required": false, "description": "Number of results (default 20)"}
-  },
-  "readOnly": true
+    "query": {"required": true, "description": "Search query"}
+  }
 }
 */
 
 async function(args) {
-  const resp = await fetch('https://api.example.com/search?q=' + args.query);
+  const resp = await fetch('https://api.example.com?q=' + args.query);
   return await resp.json();
 }
 ```
 
 ### Available Sites
 
-Over 100 scripts across 30+ sites including:
+100+ scripts across 30+ sites:
 
 - **Search**: Google, Bing, Baidu, DuckDuckGo
 - **Social**: Twitter, Weibo, Reddit, 小红书, 即刻
@@ -125,23 +160,36 @@ Over 100 scripts across 30+ sites including:
 - **Finance**: 雪球, 东方财富, Yahoo Finance
 - **Knowledge**: Wikipedia, 知乎, Douban, arXiv
 
-Run `cdp list` for the full list.
+Run `tap site list` for the full list.
 
 ## Project Structure
 
 ```
-├── main.go        # CLI entry point, arg parsing, orchestration
-├── browser.go     # Browser context (local Chrome / remote CDP)
-├── qjsrunner.go   # QuickJS runner with Go fetch() polyfill
-├── meta.go        # Script parser (@meta + function body)
-├── registry.go    # Script discovery and indexing
-├── sites/         # JavaScript scripts organized by site
-│   ├── twitter/
-│   ├── github/
-│   ├── bilibili/
-│   └── ...
-└── .env           # Environment variables (gitignored)
+github.com/vaayne/tap/
+├── tap.go              # Client API — unified entry point
+├── options.go          # Functional options (WithSitesDir, WithWSURL, ...)
+├── engine/
+│   ├── engine.go       # Engine interface + fallback orchestrator
+│   ├── quickjs.go      # QuickJS engine with Go fetch() polyfill
+│   └── browser.go      # Chrome CDP engine (local/remote)
+├── fetch/
+│   └── fetch.go        # URL → clean content via go-defuddle
+├── script/
+│   ├── parser.go       # Script @meta parser
+│   └── registry.go     # Script directory scanner + index
+├── cmd/tap/
+│   └── main.go         # CLI binary (urfave/cli)
+└── sites/              # 100+ community site scripts
 ```
+
+## Roadmap
+
+- [x] Site scripts with QuickJS + browser fallback
+- [x] `tap fetch <url>` — clean content extraction
+- [ ] `tap screenshot <url>` — page screenshots
+- [ ] `tap pdf <url>` — save as PDF
+- [ ] `tap eval <js> --url <url>` — run arbitrary JS on a page
+- [ ] `tap fill <script>` — form automation
 
 ## License
 
