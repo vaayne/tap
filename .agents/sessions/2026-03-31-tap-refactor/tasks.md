@@ -21,11 +21,11 @@
 
 ## Phase 4: Top-level client API
 
-- [ ] 4.1 — Create Client struct with New(), Close() (`tap.go`)
-- [ ] 4.2 — Create functional options (`options.go`)
-- [ ] 4.3 — Implement Client.RunScript() (`tap.go`)
-- [ ] 4.4 — Implement Client.Fetch() (`tap.go`)
-- [ ] 4.5 — Integration test (`tap_test.go`)
+- [x] 4.1 — Create Client struct with New(), Close() (`tap.go`)
+- [x] 4.2 — Create functional options (`options.go`)
+- [x] 4.3 — Implement Client.RunScript() (`tap.go`)
+- [x] 4.4 — Implement Client.Fetch() (`tap.go`)
+- [x] 4.5 — Integration test (`tap_test.go`)
 
 ## Phase 5: CLI with urfave/cli
 

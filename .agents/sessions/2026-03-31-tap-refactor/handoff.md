@@ -90,3 +90,32 @@
 - Fetcher holds a defuddle.Parser (expensive to create, reuse across calls)
 - Default Options enables Markdown output
 - Client.Fetch() in Phase 4 will wrap this package
+
+## Phase 4: Top-level client API
+
+**Status:** complete
+
+**Tasks completed:**
+
+- 4.1+4.2: Created `tap.go` with Client struct (New, Close, RunScript, Fetch, ListScripts, GetScript) and `options.go` with functional options (WithSitesDir, WithWSURL, WithProfileDir)
+- 4.3: Client.RunScript wires registry + engine orchestrator with arg validation
+- 4.4: Client.Fetch wraps fetch package
+- 4.5: Integration tests — 5 tests covering New, ListScripts, RunScript errors, Fetch
+
+**Files changed:**
+
+- `tap.go` — Client struct with all methods
+- `options.go` — functional options
+- `tap_test.go` — integration tests
+- `.old/` — moved old root-level files out (was blocking package conflict)
+
+**Commits:**
+
+- `f4f4639` — ✨ feat: add top-level Client API with options
+- `1fac912` — ✅ test: add Client integration tests
+
+**Decisions & context for next phase:**
+
+- Old files moved to `.old/` (will be deleted in Phase 6)
+- Client wires QuickJS → Browser engine chain automatically
+- CLI in Phase 5 just creates a Client with options from env/flags
