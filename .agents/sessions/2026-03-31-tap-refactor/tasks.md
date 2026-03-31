@@ -16,8 +16,8 @@
 
 ## Phase 3: Fetch package with go-defuddle
 
-- [ ] 3.1 — Create fetch package with Result type + Fetch function (`fetch/fetch.go`)
-- [ ] 3.2 — Unit test with sample HTML (`fetch/fetch_test.go`)
+- [x] 3.1 — Create fetch package with Result type + Fetch function (`fetch/fetch.go`)
+- [x] 3.2 — Unit test with sample HTML (`fetch/fetch_test.go`)
 
 ## Phase 4: Top-level client API
 

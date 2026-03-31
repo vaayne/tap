@@ -65,3 +65,28 @@
 - `BrowserConfig` holds WSURL + ProfileDir — will be wired from Client options in Phase 4
 - Default profile dir is `~/.cache/tap/chrome-profile-$USER`
 - Engine interface uses `context.Context` for cancellation support
+
+## Phase 3: Fetch package with go-defuddle
+
+**Status:** complete
+
+**Tasks completed:**
+
+- 3.1: Created `fetch/fetch.go` with Fetcher, Result type, Options, HTTP fetch + defuddle parsing
+- 3.2: Added tests — real URL fetch (example.com) and invalid URL error handling
+
+**Files changed:**
+
+- `fetch/fetch.go` — Fetcher with New/Close/Fetch, Result type, HTML fetching
+- `fetch/fetch_test.go` — integration test with real URL + error case
+
+**Commits:**
+
+- `e744992` — ✨ feat: add fetch package with go-defuddle content extraction
+- `88bcd5e` — ✅ test: add fetch package tests
+
+**Decisions & context for next phase:**
+
+- Fetcher holds a defuddle.Parser (expensive to create, reuse across calls)
+- Default Options enables Markdown output
+- Client.Fetch() in Phase 4 will wrap this package
