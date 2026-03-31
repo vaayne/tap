@@ -57,9 +57,15 @@ func main() {
 
 	log.Printf("Running: %s — %s", script.Meta.Name, script.Meta.Description)
 
-	result, err := runScript(script, args)
+	// Step 1: Try QuickJS (fast, no browser)
+	result, err := runScriptQJS(script, args)
 	if err != nil {
-		log.Fatalf("Failed to run script: %v", err)
+		log.Printf("QuickJS failed: %v, falling back to browser", err)
+		// Step 2: Fall back to CDP browser
+		result, err = runScript(script, args)
+		if err != nil {
+			log.Fatalf("Failed to run script: %v", err)
+		}
 	}
 
 	out, err := json.MarshalIndent(result, "", "  ")
