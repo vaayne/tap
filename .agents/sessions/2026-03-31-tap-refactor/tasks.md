@@ -37,9 +37,9 @@
 
 ## Phase 6: Cleanup & docs
 
-- [ ] 6.1 — Remove old root-level Go files
-- [ ] 6.2 — Update README.md
-- [ ] 6.3 — Update .gitignore, add .env.example
-- [ ] 6.4 — Add LICENSE (MIT)
-- [ ] 6.5 — Final build + smoke test
-- [ ] 6.6 — Push to github.com/vaayne/tap
+- [x] 6.1 — Remove old root-level Go files
+- [x] 6.2 — Update README.md
+- [x] 6.3 — Update .gitignore, add .env.example
+- [x] 6.4 — Add LICENSE (MIT)
+- [x] 6.5 — Final build + smoke test
+- [x] 6.6 — Push to github.com/vaayne/tap

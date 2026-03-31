@@ -145,3 +145,22 @@
 
 - All commands smoke-tested and working
 - Ready for cleanup: remove `.old/`, update README, add LICENSE
+
+## Phase 6: Cleanup & docs
+
+**Status:** complete
+
+**Tasks completed:**
+
+- 6.1: Removed old root-level Go files (.old/)
+- 6.2: Updated README with library + CLI usage, architecture diagram, roadmap
+- 6.3: Added .env.example, fixed .gitignore to allow it
+- 6.4: Added MIT LICENSE
+- 6.5: Full build + all tests passing + smoke test
+- 6.6: Pushed to github.com/vaayne/tap
+
+**Commits:**
+
+- `e80cf67` — 🗑️ chore: remove old root-level Go files
+- `3a1b049` — 📝 docs: update README for tap library + CLI
+- `c316cde` — 📝 docs: add .env.example and MIT LICENSE
