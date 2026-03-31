@@ -147,7 +147,7 @@ func syncScripts(dir string, verbose bool) error {
 	if err != nil {
 		return fmt.Errorf("fetch manifest: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("fetch manifest: HTTP %d", resp.StatusCode)
@@ -229,7 +229,7 @@ func downloadScript(client *http.Client, dir, name string) error {
 	if err != nil {
 		return fmt.Errorf("fetch %s: %w", name, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("fetch %s: HTTP %d", name, resp.StatusCode)
@@ -297,7 +297,7 @@ func searchOnline(query string) (*searchResponse, error) {
 	if err != nil {
 		return nil, fmt.Errorf("search: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("search: HTTP %d", resp.StatusCode)
