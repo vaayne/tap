@@ -90,21 +90,27 @@ func main() {
 
 ## How It Works
 
-Every site script runs through a two-tier execution engine:
+Both `tap site` and `tap fetch` share a common transport layer with two-tier network access:
 
 ```
-┌─────────────┐     ┌─────────────┐
-│   QuickJS   │──X──>│   Chrome    │
-│  Go fetch() │     │   via CDP   │
-└─────────────┘     └─────────────┘
-  Fast, no browser    Full browser
-  Works for APIs      Cookies, DOM, auth
+                    ┌─────────────────────────────────┐
+                    │       Shared Transport Layer     │
+                    │  Level 1: HTTP  │  Level 2: CDP  │
+                    └────────┬────────┴───────┬────────┘
+                             │                │
+              ┌──────────────┴──┐    ┌────────┴──────────┐
+              │    tap site     │    │    tap fetch       │
+              │  QuickJS → CDP  │    │  HTTP → CDP        │
+              │  → structured   │    │  → defuddle        │
+              │    JSON         │    │  → markdown/HTML   │
+              └─────────────────┘    └───────────────────┘
 ```
 
-- **QuickJS** — Runs scripts in an embedded JS engine ([fastschema/qjs](https://github.com/fastschema/qjs)) with a Go-backed `fetch()` polyfill. Fast, no browser overhead.
-- **Chrome (CDP)** — If QuickJS fails (missing Web APIs, CORS, needs cookies), falls back to headless Chrome via Chrome DevTools Protocol. Navigates to the script's domain for proper origin and cookie access.
+**Transport layer** — Shared HTTP client and headless Chrome (CDP) browser, configured once and used by all consumers.
 
-For `tap fetch`, content is fetched via Go HTTP and parsed with [go-defuddle](https://github.com/vaayne/go-defuddle) to extract clean HTML/Markdown.
+**Site scripts** — Predefined recipes that know the optimal path to fetch structured data. Tries [QuickJS](https://github.com/fastschema/qjs) (fast, Go-backed `fetch()`) first, falls back to Chrome via CDP for pages needing cookies, DOM, or auth.
+
+**Fetch** — Generic content extraction from any URL. Tries direct HTTP first, falls back to browser for JS-rendered pages. Parses with [go-defuddle](https://github.com/vaayne/go-defuddle) to extract clean HTML/Markdown.
 
 ## Configuration
 
@@ -168,12 +174,14 @@ Run `tap site list` for the full list.
 github.com/vaayne/tap/
 ├── tap.go              # Client API — unified entry point
 ├── options.go          # Functional options (WithSitesDir, WithWSURL, ...)
+├── transport/
+│   └── transport.go    # Shared network layer (HTTP + CDP browser)
 ├── engine/
 │   ├── engine.go       # Engine interface + fallback orchestrator
 │   ├── quickjs.go      # QuickJS engine with Go fetch() polyfill
-│   └── browser.go      # Chrome CDP engine (local/remote)
+│   └── browser.go      # Chrome CDP engine (delegates to transport)
 ├── fetch/
-│   └── fetch.go        # URL → clean content via go-defuddle
+│   └── fetch.go        # URL → clean content via go-defuddle (HTTP → browser fallback)
 ├── script/
 │   ├── parser.go       # Script @meta parser
 │   └── registry.go     # Script directory scanner + index
