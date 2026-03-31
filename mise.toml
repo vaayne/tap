@@ -1,0 +1,36 @@
+[tools]
+go = "1.26"
+goreleaser = "latest"
+
+[tasks.build]
+description = "Build the tap binary"
+run = "go build -o bin/tap ./cmd/tap"
+
+[tasks.test]
+description = "Run tests"
+run = "go test ./..."
+
+[tasks.lint]
+description = "Run go vet"
+run = "go vet ./..."
+
+[tasks.fmt]
+description = "Format code"
+run = "gofmt -w ."
+
+[tasks.run]
+description = "Build and run tap"
+depends = ["build"]
+run = "./bin/tap {{arg(name='args', var=true)}}"
+
+[tasks.clean]
+description = "Remove build artifacts"
+run = "rm -rf bin/"
+
+[tasks.release]
+description = "Build a snapshot release with goreleaser"
+run = "goreleaser release --snapshot --clean"
+
+[tasks.tidy]
+description = "Tidy go modules"
+run = "go mod tidy"
