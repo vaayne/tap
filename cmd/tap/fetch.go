@@ -32,7 +32,7 @@ func fetchCmd() *cli.Command {
 			if err != nil {
 				return err
 			}
-			defer client.Close()
+			defer func() { _ = client.Close() }()
 
 			opts := &fetch.Options{
 				Markdown:   true,

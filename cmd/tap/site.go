@@ -44,7 +44,7 @@ func siteCmd() *cli.Command {
 			if err != nil {
 				return err
 			}
-			defer client.Close()
+			defer func() { _ = client.Close() }()
 
 			if cmd.Bool("verbose") {
 				mode := "auto (QuickJS → Browser)"
@@ -74,7 +74,7 @@ func siteListCmd() *cli.Command {
 			if err != nil {
 				return err
 			}
-			defer client.Close()
+			defer func() { _ = client.Close() }()
 
 			scripts := client.ListScripts()
 			if len(scripts) == 0 {
@@ -133,7 +133,7 @@ func siteInfoCmd() *cli.Command {
 			if err != nil {
 				return err
 			}
-			defer client.Close()
+			defer func() { _ = client.Close() }()
 
 			name := cmd.Args().First()
 			s, ok := client.GetScript(name)
@@ -204,7 +204,7 @@ func siteSearchCmd() *cli.Command {
 			if err != nil {
 				return err
 			}
-			defer client.Close()
+			defer func() { _ = client.Close() }()
 
 			query := strings.ToLower(strings.Join(cmd.Args().Slice(), " "))
 			scripts := client.ListScripts()

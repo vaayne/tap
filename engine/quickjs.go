@@ -112,7 +112,7 @@ func injectFetch(ctx *qjs.Context, tp *transport.Transport) {
 
 			req, err := http.NewRequest(method, url, bodyReader)
 			if err != nil {
-				this.Promise().Reject(c.NewError(errors.New(err.Error())))
+				_ = this.Promise().Reject(c.NewError(errors.New(err.Error())))
 				return
 			}
 
@@ -124,14 +124,14 @@ func injectFetch(ctx *qjs.Context, tp *transport.Transport) {
 
 			resp, err := tp.Do(context.Background(), req)
 			if err != nil {
-				this.Promise().Reject(c.NewError(errors.New(err.Error())))
+				_ = this.Promise().Reject(c.NewError(errors.New(err.Error())))
 				return
 			}
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			respBody, err := io.ReadAll(resp.Body)
 			if err != nil {
-				this.Promise().Reject(c.NewError(errors.New(err.Error())))
+				_ = this.Promise().Reject(c.NewError(errors.New(err.Error())))
 				return
 			}
 
@@ -141,11 +141,11 @@ func injectFetch(ctx *qjs.Context, tp *transport.Transport) {
 			respObj.SetPropertyStr("statusText", c.NewString(resp.Status))
 			respObj.SetPropertyStr("_body", c.NewString(string(respBody)))
 
-			this.Promise().Resolve(respObj)
+			_ = this.Promise().Resolve(respObj)
 		}()
 	})
 
-	ctx.Eval("fetch-polyfill.js", qjs.Code(`
+	_, _ = ctx.Eval("fetch-polyfill.js", qjs.Code(`
 		const _rawFetch = fetch;
 		globalThis.fetch = async function(url, opts) {
 			const resp = await _rawFetch(url, opts);

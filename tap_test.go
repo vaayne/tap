@@ -10,7 +10,7 @@ func TestNew(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New failed: %v", err)
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	scripts := client.ListScripts()
 	if len(scripts) == 0 {
@@ -31,7 +31,7 @@ func TestNew_NoSitesDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New failed: %v", err)
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	if client.ListScripts() != nil {
 		t.Error("expected nil scripts without sites dir")
@@ -43,7 +43,7 @@ func TestRunScript_NotFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New failed: %v", err)
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	_, err = client.RunScript(context.Background(), "nonexistent/script", nil)
 	if err == nil {
@@ -56,7 +56,7 @@ func TestRunScript_MissingRequiredArg(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New failed: %v", err)
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	// twitter/search requires "query"
 	_, err = client.RunScript(context.Background(), "twitter/search", nil)
@@ -70,7 +70,7 @@ func TestFetch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New failed: %v", err)
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	result, err := client.Fetch(context.Background(), "https://example.com", nil)
 	if err != nil {

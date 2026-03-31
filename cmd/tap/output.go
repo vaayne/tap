@@ -55,13 +55,6 @@ func yellow(color bool, s string) string {
 	return "\033[33m" + s + "\033[0m"
 }
 
-func cyan(color bool, s string) string {
-	if !color {
-		return s
-	}
-	return "\033[36m" + s + "\033[0m"
-}
-
 func printResult(cmd *cli.Command, result any) error {
 	format := cmd.String("format")
 	switch format {

@@ -93,10 +93,10 @@ func (c *Client) Close() error {
 		c.fetcher.Close()
 	}
 	for _, e := range c.engines {
-		e.Close()
+		_ = e.Close()
 	}
 	if c.transport != nil {
-		c.transport.Close()
+		_ = c.transport.Close()
 	}
 	return nil
 }

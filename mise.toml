@@ -1,6 +1,7 @@
 [tools]
-go = "1.26"
+go = "latest"
 goreleaser = "latest"
+"github:golangci/golangci-lint" = "latest"
 
 [tasks.build]
 description = "Build the tap binary"
@@ -11,8 +12,8 @@ description = "Run tests"
 run = "go test ./..."
 
 [tasks.lint]
-description = "Run go vet"
-run = "go vet ./..."
+description = "Run golangci-lint"
+run = "golangci-lint run"
 
 [tasks.fmt]
 description = "Format code"
