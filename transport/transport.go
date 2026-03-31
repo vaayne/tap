@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/chromedp"
 )
@@ -99,11 +100,26 @@ func (t *Transport) BrowseEval(ctx context.Context, url string, js string) (any,
 	bctx, cancel := t.newBrowserContext(ctx)
 	defer cancel()
 
+	// Preserve the native fetch before page scripts can override it.
+	// Some sites (e.g. GitHub) replace window.fetch with a custom
+	// implementation that blocks cross-origin requests.
+	preserveNativeFetch := `window.__nativeFetch = window.fetch.bind(window);`
+
+	// Wrap the user script so that `fetch` resolves to the preserved native version.
+	wrappedJS := fmt.Sprintf(
+		`(function(){ const fetch = window.__nativeFetch || window.fetch; return %s; })()`,
+		js,
+	)
+
 	var result any
 	if err := chromedp.Run(bctx,
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			_, err := page.AddScriptToEvaluateOnNewDocument(preserveNativeFetch).Do(ctx)
+			return err
+		}),
 		chromedp.Navigate(url),
 		chromedp.WaitReady("body"),
-		chromedp.Evaluate(js, &result, func(p *runtime.EvaluateParams) *runtime.EvaluateParams {
+		chromedp.Evaluate(wrappedJS, &result, func(p *runtime.EvaluateParams) *runtime.EvaluateParams {
 			return p.WithReturnByValue(true).WithAwaitPromise(true)
 		}),
 	); err != nil {
@@ -126,6 +142,7 @@ func (t *Transport) newBrowserContext(parent context.Context) (context.Context, 
 		chromedp.Flag("disable-gpu", true),
 		chromedp.Flag("no-first-run", true),
 		chromedp.Flag("no-default-browser-check", true),
+		chromedp.Flag("disable-web-security", true),
 	)
 
 	profileDir := t.config.ProfileDir
