@@ -15,7 +15,7 @@ func testSitesDir(t *testing.T) string {
 		if err != nil {
 			t.Skip("cannot determine home dir")
 		}
-		dir = filepath.Join(home, ".config", "tap", "sites")
+		dir = filepath.Join(home, ".cache", "tap", "sites")
 	}
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		t.Skipf("sites dir %s does not exist, run 'tap site sync' first", dir)

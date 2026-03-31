@@ -24,7 +24,7 @@ Requires Go 1.22+ and Google Chrome (or Chromium) for browser fallback.
 
 ### Site Scripts
 
-Scripts are automatically downloaded from [tap.vaayne.com](https://tap.vaayne.com) and cached in `$XDG_CONFIG_HOME/tap/sites/` (default `~/.config/tap/sites/`). The cache auto-refreshes every 24 hours.
+Scripts are automatically downloaded from [tap.vaayne.com](https://tap.vaayne.com) and cached in `$XDG_CACHE_HOME/tap/sites/` (default `~/.cache/tap/sites/`). The cache auto-refreshes every 24 hours.
 
 ```bash
 # List all available scripts

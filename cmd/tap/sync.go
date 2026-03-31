@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 )
@@ -26,19 +25,16 @@ const (
 )
 
 // defaultSitesDir returns the default cache directory for site scripts.
-// Uses $XDG_CONFIG_HOME/tap/sites, falling back to ~/.config/tap/sites.
+// Uses $XDG_CACHE_HOME/tap/sites, falling back to ~/.cache/tap/sites.
 func defaultSitesDir() string {
-	if dir := os.Getenv("XDG_CONFIG_HOME"); dir != "" {
+	if dir := os.Getenv("XDG_CACHE_HOME"); dir != "" {
 		return filepath.Join(dir, "tap", "sites")
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		home = "."
 	}
-	if runtime.GOOS == "darwin" {
-		return filepath.Join(home, ".config", "tap", "sites")
-	}
-	return filepath.Join(home, ".config", "tap", "sites")
+	return filepath.Join(home, ".cache", "tap", "sites")
 }
 
 // syncManifestItem represents a single script in the remote manifest.
