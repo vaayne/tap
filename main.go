@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -109,18 +108,7 @@ func parseArgs(raw []string) map[string]string {
 }
 
 func runScript(script *Script, args map[string]string) (any, error) {
-	wsURL := os.Getenv("CDP_WS_URL")
-	if wsURL == "" {
-		return nil, fmt.Errorf("CDP_WS_URL not set")
-	}
-
-	ctx, cancel := chromedp.NewRemoteAllocator(context.Background(),
-		wsURL,
-		chromedp.NoModifyURL,
-	)
-	defer cancel()
-
-	ctx, cancel = chromedp.NewContext(ctx)
+	ctx, cancel := newBrowserContext()
 	defer cancel()
 
 	// Serialize args to JSON for the JS side
