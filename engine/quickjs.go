@@ -11,14 +11,17 @@ import (
 
 	"github.com/fastschema/qjs"
 	"github.com/vaayne/tap/script"
+	"github.com/vaayne/tap/transport"
 )
 
 // QuickJS executes scripts in an embedded QuickJS runtime with a Go-backed fetch().
-type QuickJS struct{}
+type QuickJS struct {
+	transport *transport.Transport
+}
 
-// NewQuickJS creates a new QuickJS engine.
-func NewQuickJS() *QuickJS {
-	return &QuickJS{}
+// NewQuickJS creates a new QuickJS engine backed by the given transport.
+func NewQuickJS(tp *transport.Transport) *QuickJS {
+	return &QuickJS{transport: tp}
 }
 
 func (q *QuickJS) Name() string { return "QuickJS" }
@@ -32,7 +35,7 @@ func (q *QuickJS) Run(_ context.Context, s *script.Script, args map[string]strin
 	defer rt.Close()
 	ctx := rt.Context()
 
-	injectFetch(ctx)
+	injectFetch(ctx, q.transport)
 
 	argsJSON, err := json.Marshal(args)
 	if err != nil {
@@ -70,8 +73,8 @@ func stringify(ctx *qjs.Context, val *qjs.Value) string {
 	return result.String()
 }
 
-// injectFetch adds a fetch() function backed by Go's net/http.
-func injectFetch(ctx *qjs.Context) {
+// injectFetch adds a fetch() function backed by the shared transport's HTTP client.
+func injectFetch(ctx *qjs.Context, tp *transport.Transport) {
 	ctx.SetAsyncFunc("fetch", func(this *qjs.This) {
 		c := this.Context()
 
@@ -119,7 +122,7 @@ func injectFetch(ctx *qjs.Context) {
 				req.Header.Set(k, v)
 			}
 
-			resp, err := http.DefaultClient.Do(req)
+			resp, err := tp.Do(context.Background(), req)
 			if err != nil {
 				this.Promise().Reject(c.NewError(errors.New(err.Error())))
 				return

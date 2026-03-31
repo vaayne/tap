@@ -3,10 +3,13 @@ package fetch
 import (
 	"context"
 	"testing"
+
+	"github.com/vaayne/tap/transport"
 )
 
 func TestFetch_ParseHTML(t *testing.T) {
-	f, err := New()
+	tp := transport.New(transport.Config{})
+	f, err := New(tp)
 	if err != nil {
 		t.Fatalf("New failed: %v", err)
 	}
@@ -24,7 +27,8 @@ func TestFetch_ParseHTML(t *testing.T) {
 }
 
 func TestFetch_InvalidURL(t *testing.T) {
-	f, err := New()
+	tp := transport.New(transport.Config{})
+	f, err := New(tp)
 	if err != nil {
 		t.Fatalf("New failed: %v", err)
 	}

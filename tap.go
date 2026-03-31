@@ -1,7 +1,8 @@
 // Package tap provides a unified API for interacting with web pages.
 //
 // Tap can run site scripts (with QuickJS → Browser fallback) and fetch
-// clean content from URLs via go-defuddle.
+// clean content from URLs via go-defuddle. Both share a common transport
+// layer for HTTP and browser-based network access.
 //
 // Basic usage:
 //
@@ -25,14 +26,16 @@ import (
 	"github.com/vaayne/tap/engine"
 	"github.com/vaayne/tap/fetch"
 	"github.com/vaayne/tap/script"
+	"github.com/vaayne/tap/transport"
 )
 
 // Client is the main entry point for the tap library.
 type Client struct {
-	registry *script.Registry
-	engines  []engine.Engine
-	fetcher  *fetch.Fetcher
-	opts     options
+	registry  *script.Registry
+	engines   []engine.Engine
+	fetcher   *fetch.Fetcher
+	transport *transport.Transport
+	opts      options
 }
 
 // New creates a new Client with the given options.
@@ -51,24 +54,27 @@ func New(optFns ...Option) (*Client, error) {
 		}
 	}
 
-	fetcher, err := fetch.New()
+	tp := transport.New(transport.Config{
+		WSURL:      opts.wsURL,
+		ProfileDir: opts.profileDir,
+	})
+
+	fetcher, err := fetch.New(tp)
 	if err != nil {
 		return nil, fmt.Errorf("new fetcher: %w", err)
 	}
 
 	engines := []engine.Engine{
-		engine.NewQuickJS(),
-		engine.NewBrowser(engine.BrowserConfig{
-			WSURL:      opts.wsURL,
-			ProfileDir: opts.profileDir,
-		}),
+		engine.NewQuickJS(tp),
+		engine.NewBrowser(tp),
 	}
 
 	return &Client{
-		registry: reg,
-		engines:  engines,
-		fetcher:  fetcher,
-		opts:     opts,
+		registry:  reg,
+		engines:   engines,
+		fetcher:   fetcher,
+		transport: tp,
+		opts:      opts,
 	}, nil
 }
 
@@ -79,6 +85,9 @@ func (c *Client) Close() error {
 	}
 	for _, e := range c.engines {
 		e.Close()
+	}
+	if c.transport != nil {
+		c.transport.Close()
 	}
 	return nil
 }

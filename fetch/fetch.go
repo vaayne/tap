@@ -1,14 +1,15 @@
 // Package fetch provides URL content extraction using go-defuddle.
-// It fetches a web page via HTTP and extracts clean content (HTML or Markdown).
+// It fetches a web page via HTTP (with optional browser fallback) and
+// extracts clean content (HTML or Markdown).
 package fetch
 
 import (
 	"context"
 	"fmt"
-	"io"
-	"net/http"
+	"log"
 
 	defuddle "github.com/vaayne/go-defuddle"
+	"github.com/vaayne/tap/transport"
 )
 
 // Result holds the extracted content from a web page.
@@ -33,19 +34,19 @@ type Result struct {
 
 // Fetcher extracts clean content from web pages.
 type Fetcher struct {
-	parser *defuddle.Parser
-	client *http.Client
+	parser    *defuddle.Parser
+	transport *transport.Transport
 }
 
-// New creates a new Fetcher. Call Close() when done.
-func New() (*Fetcher, error) {
+// New creates a new Fetcher backed by the given transport. Call Close() when done.
+func New(tp *transport.Transport) (*Fetcher, error) {
 	parser, err := defuddle.NewParser()
 	if err != nil {
 		return nil, fmt.Errorf("new parser: %w", err)
 	}
 	return &Fetcher{
-		parser: parser,
-		client: &http.Client{},
+		parser:    parser,
+		transport: tp,
 	}, nil
 }
 
@@ -60,24 +61,56 @@ func (f *Fetcher) Close() {
 type Options struct {
 	// Markdown converts extracted HTML to Markdown.
 	Markdown bool
+	// UseBrowser forces browser-based fetching (level 2).
+	UseBrowser bool
 }
 
 // Fetch retrieves a URL and extracts clean content.
+// It tries HTTP first, falling back to browser if the result is poor.
 func (f *Fetcher) Fetch(ctx context.Context, url string, opts *Options) (*Result, error) {
 	if opts == nil {
 		opts = &Options{Markdown: true}
-	}
-
-	html, err := f.fetchHTML(ctx, url)
-	if err != nil {
-		return nil, fmt.Errorf("fetch html: %w", err)
 	}
 
 	defOpts := &defuddle.Options{
 		Markdown: opts.Markdown,
 	}
 
-	dr, err := f.parser.Parse(html, url, defOpts)
+	// If browser is forced, skip HTTP.
+	if opts.UseBrowser {
+		return f.fetchViaBrowser(ctx, url, defOpts)
+	}
+
+	// Level 1: try direct HTTP.
+	html, err := f.transport.GetHTML(ctx, url)
+	if err == nil {
+		result, parseErr := f.parse(html, url, defOpts)
+		if parseErr == nil && hasContent(result) {
+			return result, nil
+		}
+		if parseErr != nil {
+			log.Printf("http fetch parse failed: %v, trying browser", parseErr)
+		} else {
+			log.Printf("http fetch returned poor content, trying browser")
+		}
+	} else {
+		log.Printf("http fetch failed: %v, trying browser", err)
+	}
+
+	// Level 2: fallback to browser.
+	return f.fetchViaBrowser(ctx, url, defOpts)
+}
+
+func (f *Fetcher) fetchViaBrowser(ctx context.Context, url string, defOpts *defuddle.Options) (*Result, error) {
+	html, err := f.transport.BrowseHTML(ctx, url)
+	if err != nil {
+		return nil, fmt.Errorf("browser fetch: %w", err)
+	}
+	return f.parse(html, url, defOpts)
+}
+
+func (f *Fetcher) parse(html, url string, opts *defuddle.Options) (*Result, error) {
+	dr, err := f.parser.Parse(html, url, opts)
 	if err != nil {
 		return nil, fmt.Errorf("defuddle parse: %w", err)
 	}
@@ -94,29 +127,7 @@ func (f *Fetcher) Fetch(ctx context.Context, url string, opts *Options) (*Result
 	}, nil
 }
 
-func (f *Fetcher) fetchHTML(ctx context.Context, url string) (string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return "", fmt.Errorf("new request: %w", err)
-	}
-
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36")
-	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
-
-	resp, err := f.client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("http get: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("http %d", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("read body: %w", err)
-	}
-
-	return string(body), nil
+// hasContent checks if a result has meaningful extracted content.
+func hasContent(r *Result) bool {
+	return r.Content != "" || r.Markdown != ""
 }
