@@ -25,4 +25,5 @@ Thumbs.db
 
 # Env
 .env
+!.env.example
 tap
