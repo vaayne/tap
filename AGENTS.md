@@ -56,6 +56,18 @@ cmd/tap/            → CLI binary (site, fetch subcommands + sync)
 - Run `go test ./... -timeout 60s -race` before pushing.
 - CI runs lint + tests on ubuntu and macos.
 
+## Release Process
+
+1. Ensure all CI checks pass on `main` (`mise run lint && mise run test`).
+2. Update `CHANGELOG.md`:
+   - Add a new `## [x.y.z] - YYYY-MM-DD` section under the latest entry.
+   - Categorize changes under `### Added`, `### Changed`, `### Fixed`, `### Removed` as appropriate.
+   - Add the comparison link at the bottom of the file.
+   - Follow [Keep a Changelog](https://keepachangelog.com/) format.
+3. Commit the changelog: `git commit -m "📝 docs: update CHANGELOG for vx.y.z"`.
+4. Tag the release: `git tag vx.y.z && git push origin main --tags`.
+5. CI (GoReleaser) builds and publishes the release automatically.
+
 ## Skills
 
 Agent skills live in `skills/`. See `skills/tap-web/` for the web access skill.
