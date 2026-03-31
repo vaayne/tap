@@ -29,11 +29,11 @@
 
 ## Phase 5: CLI with urfave/cli
 
-- [ ] 5.1 — Set up urfave/cli app with global flags (`cmd/tap/main.go`)
-- [ ] 5.2 — `tap site list` command (`cmd/tap/main.go`)
-- [ ] 5.3 — `tap site <name> [args]` command (`cmd/tap/main.go`)
-- [ ] 5.4 — `tap fetch <url>` command with `--json`/`--markdown` flags (`cmd/tap/main.go`)
-- [ ] 5.5 — Load .env, wire env vars to client options (`cmd/tap/main.go`)
+- [x] 5.1 — Set up urfave/cli app with global flags (`cmd/tap/main.go`)
+- [x] 5.2 — `tap site list` command (`cmd/tap/main.go`)
+- [x] 5.3 — `tap site <name> [args]` command (`cmd/tap/main.go`)
+- [x] 5.4 — `tap fetch <url>` command with `--json`/`--markdown` flags (`cmd/tap/main.go`)
+- [x] 5.5 — Load .env, wire env vars to client options (`cmd/tap/main.go`)
 
 ## Phase 6: Cleanup & docs
 

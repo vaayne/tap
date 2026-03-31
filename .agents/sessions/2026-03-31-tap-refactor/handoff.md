@@ -119,3 +119,29 @@
 - Old files moved to `.old/` (will be deleted in Phase 6)
 - Client wires QuickJS → Browser engine chain automatically
 - CLI in Phase 5 just creates a Client with options from env/flags
+
+## Phase 5: CLI with urfave/cli
+
+**Status:** complete
+
+**Tasks completed:**
+
+- 5.1: Set up urfave/cli v3 app with global flags (sites-dir, ws-url, profile-dir) + env var sources
+- 5.2: `tap site list` — lists all scripts with arg hints
+- 5.3: `tap site <name> [key=value ...]` — runs scripts with QuickJS→Browser fallback
+- 5.4: `tap fetch <url>` — markdown by default, `--json` for full metadata
+- 5.5: Loads .env via godotenv, env vars: TAP_SITES_DIR, TAP_WS_URL, TAP_PROFILE_DIR
+
+**Files changed:**
+
+- `cmd/tap/main.go` — full CLI implementation
+- `.gitignore` — added `tap` binary
+
+**Commits:**
+
+- `f270c98` — ✨ feat: add CLI with urfave/cli — site and fetch subcommands
+
+**Decisions & context for next phase:**
+
+- All commands smoke-tested and working
+- Ready for cleanup: remove `.old/`, update README, add LICENSE
