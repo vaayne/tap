@@ -27,37 +27,46 @@ func NewQuickJS(tp *transport.Transport) *QuickJS {
 func (q *QuickJS) Name() string { return "QuickJS" }
 func (q *QuickJS) Close() error { return nil }
 
-func (q *QuickJS) Run(_ context.Context, s *script.Script, args map[string]string) (any, error) {
-	rt, err := qjs.New()
-	if err != nil {
-		return nil, fmt.Errorf("qjs new: %w", err)
+func (q *QuickJS) Run(_ context.Context, s *script.Script, args map[string]string) (result any, err error) {
+	// The QJS WASM runtime can panic on certain async patterns (e.g. out of
+	// bounds memory access). Recover so the engine fallback chain continues.
+	defer func() {
+		if r := recover(); r != nil {
+			result = nil
+			err = fmt.Errorf("qjs panic: %v", r)
+		}
+	}()
+
+	rt, qErr := qjs.New()
+	if qErr != nil {
+		return nil, fmt.Errorf("qjs new: %w", qErr)
 	}
 	defer rt.Close()
 	ctx := rt.Context()
 
 	injectFetch(ctx, q.transport)
 
-	argsJSON, err := json.Marshal(args)
-	if err != nil {
-		return nil, fmt.Errorf("marshal args: %w", err)
+	argsJSON, qErr := json.Marshal(args)
+	if qErr != nil {
+		return nil, fmt.Errorf("marshal args: %w", qErr)
 	}
 
 	js := fmt.Sprintf(`await (%s)(%s)`, s.Body, string(argsJSON))
 
-	result, err := ctx.Eval("script.js", qjs.Code(js), qjs.FlagAsync())
-	if err != nil {
-		return nil, fmt.Errorf("qjs eval: %w", err)
+	qResult, qErr := ctx.Eval("script.js", qjs.Code(js), qjs.FlagAsync())
+	if qErr != nil {
+		return nil, fmt.Errorf("qjs eval: %w", qErr)
 	}
-	defer result.Free()
+	defer qResult.Free()
 
-	jsonStr := stringify(ctx, result)
+	jsonStr := stringify(ctx, qResult)
 	if jsonStr == "undefined" || jsonStr == "" {
 		return nil, fmt.Errorf("qjs returned empty result")
 	}
 
 	var out any
-	if err := json.Unmarshal([]byte(jsonStr), &out); err != nil {
-		return nil, fmt.Errorf("unmarshal result: %w", err)
+	if qErr := json.Unmarshal([]byte(jsonStr), &out); qErr != nil {
+		return nil, fmt.Errorf("unmarshal result: %w", qErr)
 	}
 
 	return out, nil
