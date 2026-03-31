@@ -2,10 +2,10 @@
 
 ## Phase 1: Project scaffolding & script package
 
-- [ ] 1.1 — Init module `github.com/vaayne/tap`, create `cmd/tap/main.go` stub (`go.mod`, `cmd/tap/main.go`)
-- [ ] 1.2 — Move meta parsing to `script/parser.go` (`script/parser.go`)
-- [ ] 1.3 — Move registry to `script/registry.go` (`script/registry.go`)
-- [ ] 1.4 — Unit test parser + registry (`script/parser_test.go`, `script/registry_test.go`)
+- [x] 1.1 — Init module `github.com/vaayne/tap`, create `cmd/tap/main.go` stub (`go.mod`, `cmd/tap/main.go`)
+- [x] 1.2 — Move meta parsing to `script/parser.go` (`script/parser.go`)
+- [x] 1.3 — Move registry to `script/registry.go` (`script/registry.go`)
+- [x] 1.4 — Unit test parser + registry (`script/parser_test.go`, `script/registry_test.go`)
 
 ## Phase 2: Engine package
 
