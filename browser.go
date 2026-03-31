@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"os"
+	"path/filepath"
 
 	"github.com/chromedp/chromedp"
 )
@@ -27,9 +28,12 @@ func newBrowserContext() (context.Context, context.CancelFunc) {
 		chromedp.Flag("no-default-browser-check", true),
 	)
 
-	if profileDir := os.Getenv("CDP_PROFILE_DIR"); profileDir != "" {
-		opts = append(opts, chromedp.UserDataDir(profileDir))
+	profileDir := os.Getenv("CDP_PROFILE_DIR")
+	if profileDir == "" {
+		home, _ := os.UserHomeDir()
+		profileDir = filepath.Join(home, ".cache", "cdp", "chrome-profile-"+os.Getenv("USER"))
 	}
+	opts = append(opts, chromedp.UserDataDir(profileDir))
 
 	ctx, cancel1 := chromedp.NewExecAllocator(context.Background(), opts...)
 	ctx, cancel2 := chromedp.NewContext(ctx)
