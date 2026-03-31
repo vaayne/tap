@@ -20,6 +20,8 @@ type Config struct {
 	WSURL string
 	// ProfileDir is the Chrome user data directory for persistent cookies/storage.
 	ProfileDir string
+	// Headless controls whether Chrome runs in headless mode (default: true).
+	Headless bool
 }
 
 // Transport provides shared HTTP and browser-based network access.
@@ -120,7 +122,7 @@ func (t *Transport) newBrowserContext(parent context.Context) (context.Context, 
 
 	opts := append(
 		chromedp.DefaultExecAllocatorOptions[:],
-		chromedp.Flag("headless", true),
+		chromedp.Flag("headless", t.config.Headless),
 		chromedp.Flag("disable-gpu", true),
 		chromedp.Flag("no-first-run", true),
 		chromedp.Flag("no-default-browser-check", true),

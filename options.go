@@ -1,14 +1,21 @@
 package tap
 
+import "time"
+
 // options holds the resolved configuration for a Client.
 type options struct {
-	sitesDir   string
-	wsURL      string
-	profileDir string
+	sitesDir    string
+	wsURL       string
+	profileDir  string
+	forceBrowser bool
+	headless     bool
+	timeout      time.Duration
 }
 
 func defaultOptions() options {
-	return options{}
+	return options{
+		headless: true,
+	}
 }
 
 // Option configures a Client.
@@ -34,5 +41,26 @@ func WithWSURL(url string) Option {
 func WithProfileDir(dir string) Option {
 	return func(o *options) {
 		o.profileDir = dir
+	}
+}
+
+// WithForceBrowser skips QuickJS and runs scripts directly in Chrome.
+func WithForceBrowser(force bool) Option {
+	return func(o *options) {
+		o.forceBrowser = force
+	}
+}
+
+// WithHeadless sets whether Chrome runs in headless mode (default: true).
+func WithHeadless(headless bool) Option {
+	return func(o *options) {
+		o.headless = headless
+	}
+}
+
+// WithTimeout sets the execution timeout for scripts and fetches.
+func WithTimeout(d time.Duration) Option {
+	return func(o *options) {
+		o.timeout = d
 	}
 }
