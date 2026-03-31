@@ -9,10 +9,10 @@
 
 ## Phase 2: Engine package
 
-- [ ] 2.1 — Define Engine interface + orchestrator (`engine/engine.go`)
-- [ ] 2.2 — Move QuickJS runner to `engine/quickjs.go` (`engine/quickjs.go`)
-- [ ] 2.3 — Move CDP browser to `engine/browser.go` (`engine/browser.go`)
-- [ ] 2.4 — Unit test engine fallback logic (`engine/engine_test.go`)
+- [x] 2.1 — Define Engine interface + orchestrator (`engine/engine.go`)
+- [x] 2.2 — Move QuickJS runner to `engine/quickjs.go` (`engine/quickjs.go`)
+- [x] 2.3 — Move CDP browser to `engine/browser.go` (`engine/browser.go`)
+- [x] 2.4 — Unit test engine fallback logic (`engine/engine_test.go`)
 
 ## Phase 3: Fetch package with go-defuddle
 

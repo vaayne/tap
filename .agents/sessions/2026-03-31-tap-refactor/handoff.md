@@ -34,3 +34,34 @@
 - Old root-level `meta.go` and `registry.go` still exist — will be removed in Phase 6
 - `script.Script` type is the canonical type going forward
 - Old `main.go` still references old types — will be replaced in Phase 5
+
+## Phase 2: Engine package
+
+**Status:** complete
+
+**Tasks completed:**
+
+- 2.1: Defined `Engine` interface with `Run()`, `Name()`, `Close()` + `RunScript()` orchestrator that tries engines in order
+- 2.2: Moved QuickJS runner to `engine/quickjs.go` — Go-backed fetch() polyfill, async eval
+- 2.3: Moved CDP browser to `engine/browser.go` — `BrowserConfig` struct for WSURL/ProfileDir, local/remote context creation
+- 2.4: Added 3 unit tests with mock engines: first succeeds, fallback, all fail
+
+**Files changed:**
+
+- `engine/engine.go` — Engine interface + RunScript orchestrator
+- `engine/quickjs.go` — QuickJS engine implementation
+- `engine/browser.go` — CDP browser engine implementation
+- `engine/engine_test.go` — orchestrator fallback tests
+
+**Commits:**
+
+- `7cd996c` — ✨ feat: add engine interface and RunScript orchestrator
+- `174c108` — ♻️ refactor: move QuickJS runner to engine/quickjs.go
+- `1c2619f` — ♻️ refactor: move CDP browser to engine/browser.go
+- `10b5448` — ✅ test: add engine fallback orchestrator tests
+
+**Decisions & context for next phase:**
+
+- `BrowserConfig` holds WSURL + ProfileDir — will be wired from Client options in Phase 4
+- Default profile dir is `~/.cache/tap/chrome-profile-$USER`
+- Engine interface uses `context.Context` for cancellation support
