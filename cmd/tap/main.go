@@ -9,6 +9,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/urfave/cli/v3"
 	"github.com/vaayne/tap"
+	"github.com/vaayne/tap/transport"
 )
 
 var version = "dev"
@@ -73,6 +74,12 @@ func globalFlags() []cli.Flag {
 			Usage: "Run browser in visible mode (useful for debugging auth)",
 		},
 		&cli.BoolFlag{
+			Name:    "lightpanda",
+			Aliases: []string{"lp"},
+			Usage:   "Use Lightpanda headless browser instead of Chrome (implies --browser)",
+			Sources: cli.EnvVars("TAP_LIGHTPANDA"),
+		},
+		&cli.BoolFlag{
 			Name:  "pause",
 			Usage: "Pause after navigation for manual interaction (requires interactive terminal)",
 		},
@@ -112,7 +119,7 @@ func globalFlags() []cli.Flag {
 	}
 }
 
-func newClient(cmd *cli.Command) (*tap.Client, error) {
+func newClient(ctx context.Context, cmd *cli.Command) (*tap.Client, error) {
 	var opts []tap.Option
 
 	dir := cmd.String("sites-dir")
@@ -137,6 +144,10 @@ func newClient(cmd *cli.Command) (*tap.Client, error) {
 		return nil, err
 	}
 
+	if cmd.Bool("lightpanda") {
+		opts = append(opts, tap.WithBrowserType(transport.BrowserLightpanda))
+		opts = append(opts, tap.WithForceBrowser(true))
+	}
 	if cmd.Bool("browser") || hasPauseMode(cmd) {
 		opts = append(opts, tap.WithForceBrowser(true))
 	}
@@ -150,11 +161,11 @@ func newClient(cmd *cli.Command) (*tap.Client, error) {
 		opts = append(opts, tap.WithTimeout(d))
 	}
 
-	return tap.New(opts...)
+	return tap.New(ctx, opts...)
 }
 
 // newClientWithOverrides creates a client with forced overrides (e.g. for login).
-func newClientWithOverrides(cmd *cli.Command, forceVisible bool) (*tap.Client, error) {
+func newClientWithOverrides(ctx context.Context, cmd *cli.Command, forceVisible bool) (*tap.Client, error) {
 	var opts []tap.Option
 
 	dir := cmd.String("sites-dir")
@@ -169,6 +180,9 @@ func newClientWithOverrides(cmd *cli.Command, forceVisible bool) (*tap.Client, e
 	if dir := cmd.String("profile-dir"); dir != "" {
 		opts = append(opts, tap.WithProfileDir(dir))
 	}
+	if cmd.Bool("lightpanda") {
+		opts = append(opts, tap.WithBrowserType(transport.BrowserLightpanda))
+	}
 	if forceVisible {
 		opts = append(opts, tap.WithHeadless(false))
 	}
@@ -176,7 +190,7 @@ func newClientWithOverrides(cmd *cli.Command, forceVisible bool) (*tap.Client, e
 		opts = append(opts, tap.WithTimeout(d))
 	}
 
-	return tap.New(opts...)
+	return tap.New(ctx, opts...)
 }
 
 // configureLogging sets up log output based on --verbose/--quiet flags.

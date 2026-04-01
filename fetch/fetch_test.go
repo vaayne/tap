@@ -8,7 +8,10 @@ import (
 )
 
 func TestFetch_ParseHTML(t *testing.T) {
-	tp := transport.New(transport.Config{})
+	tp, err := transport.New(context.Background(), transport.Config{})
+	if err != nil {
+		t.Fatalf("New transport: %v", err)
+	}
 	f, err := New(tp)
 	if err != nil {
 		t.Fatalf("New failed: %v", err)
@@ -27,7 +30,10 @@ func TestFetch_ParseHTML(t *testing.T) {
 }
 
 func TestFetch_InvalidURL(t *testing.T) {
-	tp := transport.New(transport.Config{})
+	tp, err := transport.New(context.Background(), transport.Config{})
+	if err != nil {
+		t.Fatalf("New transport: %v", err)
+	}
 	f, err := New(tp)
 	if err != nil {
 		t.Fatalf("New failed: %v", err)

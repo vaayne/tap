@@ -128,21 +128,35 @@ tap site --pause twitter/search query=claude
 
 `--pause` implies `--no-headless` (visible browser) and `-b` (browser mode).
 
+## Browser backends
+
+When HTTP isn't enough (JS-rendered pages), use a browser backend:
+
+- **`--lp`** — Lightpanda: fast headless browser, no cookies/auth. Prefer this when you just need JS rendering.
+- **`-b`** — Chrome: full browser with cookies, login state, `--pause` support. Use when auth is needed, **or when Lightpanda has compatibility issues with a site**.
+
+```bash
+tap fetch https://spa-site.com --lp          # Fast JS rendering
+tap site hackernews/top --lp                 # Structured data via Lightpanda
+tap site -b github/notifications             # Needs saved cookies → Chrome
+```
+
 ## Global options
 
 | Flag | Description |
 |---|---|
-| `--browser, -b` | Force browser mode (skip QuickJS) — use for sites needing login/cookies |
-| `--no-headless` | Show browser window (debug auth issues) |
-| `--pause` | Pause after navigation for manual interaction (login, CAPTCHA); implies `--no-headless` and `-b` |
+| `--lightpanda, --lp` | Use Lightpanda headless browser (fast, no cookies) |
+| `--browser, -b` | Force Chrome browser (cookies, login, interactive) |
+| `--no-headless` | Show Chrome window (debug auth issues) |
+| `--pause` | Pause for manual interaction; implies `--no-headless` and `-b` |
 | `--timeout, -t` | Execution timeout (e.g., `30s`, `2m`) |
 | `--quiet, -q` | Suppress log output |
 | `--verbose` | Enable verbose logging |
 
 ## Tips
 
-- For sites requiring authentication (Twitter, Xiaohongshu, Bilibili, etc.), use `tap login <url>` first. Cookies persist in the Chrome profile.
-- Use `--pause` for one-off CAPTCHA solving or interaction before a script runs.
-- Use `tap fetch` for arbitrary URLs; use `tap site` for structured data from known sites.
-- When a site script exists for the target, prefer `tap site` over `tap fetch` for better structured output.
+- Prefer `--lp` over `-b` when you just need JS rendering without auth.
+- For auth-required sites, use `tap login <url>` first, then `-b`. Cookies persist in the Chrome profile.
+- Use `--pause` for one-off CAPTCHA solving before a script runs.
+- Prefer `tap site` over `tap fetch` when a site script exists for better structured output.
 - If QuickJS execution fails, tap automatically falls back to browser mode.

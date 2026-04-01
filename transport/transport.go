@@ -13,34 +13,78 @@ import (
 	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/chromedp"
+	"github.com/vaayne/tap/browser"
+)
+
+// BrowserType identifies which browser backend to use.
+type BrowserType string
+
+const (
+	// BrowserChrome uses the system Chrome/Chromium (default).
+	BrowserChrome BrowserType = "chrome"
+	// BrowserLightpanda uses the Lightpanda headless browser.
+	BrowserLightpanda BrowserType = "lightpanda"
 )
 
 // Config holds transport configuration.
 type Config struct {
-	// WSURL is the remote CDP WebSocket URL. If empty, a local Chrome is launched.
+	// WSURL is the remote CDP WebSocket URL. If empty, a local browser is launched.
 	WSURL string
 	// ProfileDir is the Chrome user data directory for persistent cookies/storage.
 	ProfileDir string
 	// Headless controls whether Chrome runs in headless mode (default: true).
 	Headless bool
+	// Browser selects the browser backend (default: "chrome").
+	Browser BrowserType
 }
 
 // Transport provides shared HTTP and browser-based network access.
 type Transport struct {
-	config Config
-	http   *http.Client
+	config     Config
+	http       *http.Client
+	lightpanda *browser.Lightpanda
+
+	// lpAllocCtx is a shared CDP allocator context for Lightpanda.
+	// Created once at startup, reused for each browser context.
+	lpAllocCtx    context.Context
+	lpAllocCancel context.CancelFunc
 }
 
 // New creates a new Transport with the given config.
-func New(config Config) *Transport {
-	return &Transport{
+// If the Lightpanda browser backend is selected, it downloads (if needed)
+// and starts the Lightpanda server eagerly so errors surface immediately.
+func New(ctx context.Context, config Config) (*Transport, error) {
+	t := &Transport{
 		config: config,
 		http:   &http.Client{},
 	}
+
+	if config.Browser == BrowserLightpanda && config.WSURL == "" {
+		lp := browser.NewLightpanda("", "")
+		if err := lp.Start(ctx); err != nil {
+			return nil, fmt.Errorf("start lightpanda: %w", err)
+		}
+		t.lightpanda = lp
+
+		// Create a shared allocator for the Lightpanda lifetime.
+		allocCtx, allocCancel := chromedp.NewRemoteAllocator(
+			context.Background(), lp.WSURL(), chromedp.NoModifyURL,
+		)
+		t.lpAllocCtx = allocCtx
+		t.lpAllocCancel = allocCancel
+	}
+
+	return t, nil
 }
 
 // Close releases resources held by the transport.
 func (t *Transport) Close() error {
+	if t.lpAllocCancel != nil {
+		t.lpAllocCancel()
+	}
+	if t.lightpanda != nil {
+		t.lightpanda.Stop()
+	}
 	return nil
 }
 
@@ -191,12 +235,19 @@ func (t *Transport) BrowseInteractive(ctx context.Context, url string, pauseFn P
 }
 
 func (t *Transport) newBrowserContext(parent context.Context) (context.Context, context.CancelFunc) {
+	// Remote CDP endpoint (explicit --ws-url).
 	if t.config.WSURL != "" {
 		ctx, cancel1 := chromedp.NewRemoteAllocator(parent, t.config.WSURL, chromedp.NoModifyURL)
 		ctx, cancel2 := chromedp.NewContext(ctx)
 		return ctx, func() { cancel2(); cancel1() }
 	}
 
+	// Lightpanda browser backend.
+	if t.config.Browser == BrowserLightpanda {
+		return t.newLightpandaContext(parent)
+	}
+
+	// Default: local Chrome.
 	opts := append(
 		chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.Flag("headless", t.config.Headless),
@@ -214,6 +265,22 @@ func (t *Transport) newBrowserContext(parent context.Context) (context.Context, 
 
 	ctx, cancel1 := chromedp.NewExecAllocator(parent, opts...)
 	ctx, cancel2 := chromedp.NewContext(ctx)
+	return ctx, func() { cancel2(); cancel1() }
+}
+
+func (t *Transport) newLightpandaContext(parent context.Context) (context.Context, context.CancelFunc) {
+	ctx, cancel1 := chromedp.NewContext(t.lpAllocCtx)
+
+	// Respect the caller's context deadline/cancellation.
+	ctx, cancel2 := context.WithCancel(ctx)
+	go func() {
+		select {
+		case <-parent.Done():
+			cancel2()
+		case <-ctx.Done():
+		}
+	}()
+
 	return ctx, func() { cancel2(); cancel1() }
 }
 
