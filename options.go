@@ -1,6 +1,10 @@
 package tap
 
-import "time"
+import (
+	"time"
+
+	"github.com/vaayne/tap/transport"
+)
 
 // options holds the resolved configuration for a Client.
 type options struct {
@@ -9,6 +13,7 @@ type options struct {
 	profileDir  string
 	forceBrowser bool
 	headless     bool
+	pauseFn      transport.PauseFunc
 	timeout      time.Duration
 }
 
@@ -55,6 +60,14 @@ func WithForceBrowser(force bool) Option {
 func WithHeadless(headless bool) Option {
 	return func(o *options) {
 		o.headless = headless
+	}
+}
+
+// WithPause sets a function that is called after browser navigation,
+// allowing the user to interact (login, solve CAPTCHAs) before script execution.
+func WithPause(fn transport.PauseFunc) Option {
+	return func(o *options) {
+		o.pauseFn = fn
 	}
 }
 

@@ -78,15 +78,36 @@ func (t *Transport) Do(ctx context.Context, req *http.Request) (*http.Response, 
 	return t.http.Do(req.WithContext(ctx))
 }
 
+// PauseFunc is called after navigation to let the user interact with the
+// browser (e.g. login, solve a CAPTCHA). It should block until the user is
+// done. The context is cancelled if the parent context is cancelled.
+type PauseFunc func(ctx context.Context) error
+
 // BrowseHTML navigates to a URL in a browser and returns the rendered HTML.
 func (t *Transport) BrowseHTML(ctx context.Context, url string) (string, error) {
+	return t.BrowseHTMLWithPause(ctx, url, nil)
+}
+
+// BrowseHTMLWithPause is like BrowseHTML but calls pauseFn after navigation.
+func (t *Transport) BrowseHTMLWithPause(ctx context.Context, url string, pauseFn PauseFunc) (string, error) {
 	bctx, cancel := t.newBrowserContext(ctx)
 	defer cancel()
 
-	var html string
 	if err := chromedp.Run(bctx,
 		chromedp.Navigate(url),
 		chromedp.WaitReady("body"),
+	); err != nil {
+		return "", fmt.Errorf("browse html: %w", err)
+	}
+
+	if pauseFn != nil {
+		if err := pauseFn(bctx); err != nil {
+			return "", fmt.Errorf("pause: %w", err)
+		}
+	}
+
+	var html string
+	if err := chromedp.Run(bctx,
 		chromedp.OuterHTML("html", &html),
 	); err != nil {
 		return "", fmt.Errorf("browse html: %w", err)
@@ -97,6 +118,11 @@ func (t *Transport) BrowseHTML(ctx context.Context, url string) (string, error) 
 
 // BrowseEval navigates to a URL in a browser and evaluates JavaScript.
 func (t *Transport) BrowseEval(ctx context.Context, url string, js string) (any, error) {
+	return t.BrowseEvalWithPause(ctx, url, js, nil)
+}
+
+// BrowseEvalWithPause is like BrowseEval but calls pauseFn after navigation.
+func (t *Transport) BrowseEvalWithPause(ctx context.Context, url string, js string, pauseFn PauseFunc) (any, error) {
 	bctx, cancel := t.newBrowserContext(ctx)
 	defer cancel()
 
@@ -111,7 +137,6 @@ func (t *Transport) BrowseEval(ctx context.Context, url string, js string) (any,
 		js,
 	)
 
-	var result any
 	if err := chromedp.Run(bctx,
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			_, err := page.AddScriptToEvaluateOnNewDocument(preserveNativeFetch).Do(ctx)
@@ -119,6 +144,18 @@ func (t *Transport) BrowseEval(ctx context.Context, url string, js string) (any,
 		}),
 		chromedp.Navigate(url),
 		chromedp.WaitReady("body"),
+	); err != nil {
+		return nil, fmt.Errorf("browse eval: %w", err)
+	}
+
+	if pauseFn != nil {
+		if err := pauseFn(bctx); err != nil {
+			return nil, fmt.Errorf("pause: %w", err)
+		}
+	}
+
+	var result any
+	if err := chromedp.Run(bctx,
 		chromedp.Evaluate(wrappedJS, &result, func(p *runtime.EvaluateParams) *runtime.EvaluateParams {
 			return p.WithReturnByValue(true).WithAwaitPromise(true)
 		}),
@@ -127,6 +164,30 @@ func (t *Transport) BrowseEval(ctx context.Context, url string, js string) (any,
 	}
 
 	return result, nil
+}
+
+// BrowseInteractive navigates to a URL and keeps the browser open until
+// pauseFn returns. This is used by the "login" command to let users interact
+// with a site (login, solve CAPTCHAs) while cookies are persisted in the
+// Chrome profile directory.
+func (t *Transport) BrowseInteractive(ctx context.Context, url string, pauseFn PauseFunc) error {
+	bctx, cancel := t.newBrowserContext(ctx)
+	defer cancel()
+
+	if err := chromedp.Run(bctx,
+		chromedp.Navigate(url),
+		chromedp.WaitReady("body"),
+	); err != nil {
+		return fmt.Errorf("browse interactive: %w", err)
+	}
+
+	if pauseFn != nil {
+		if err := pauseFn(bctx); err != nil {
+			return fmt.Errorf("pause: %w", err)
+		}
+	}
+
+	return nil
 }
 
 func (t *Transport) newBrowserContext(parent context.Context) (context.Context, context.CancelFunc) {

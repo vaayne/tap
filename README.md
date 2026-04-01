@@ -128,7 +128,10 @@ All config via environment variables, `.env` file, or CLI flags:
 |---|---|---|---|
 | `TAP_SITES_DIR` | `--sites-dir` | Directory containing site scripts | `~/.config/tap/sites` |
 | `TAP_WS_URL` | `--ws-url` | Remote CDP WebSocket URL | _(local Chrome)_ |
+| `TAP_BROWSER` | `--browser`, `-b` | Force browser execution, skip QuickJS | `false` |
 | `TAP_PROFILE_DIR` | `--profile-dir` | Chrome profile for persistent cookies | `~/.cache/tap/chrome-profile-$USER` |
+| | `--pause` | Pause after navigation for manual interaction | `false` |
+| | `--no-headless` | Run browser in visible mode | `false` |
 
 ### Browser Modes
 
@@ -139,6 +142,28 @@ All config via environment variables, `.env` file, or CLI flags:
 export TAP_WS_URL=wss://your-remote-browser/ws
 tap site v2ex/hot
 ```
+
+### Login & Interactive Browser
+
+Some sites require login or CAPTCHA solving. Tap provides two ways to interact with the browser before running scripts:
+
+**`tap login`** — open a browser to log in, cookies are saved for future runs:
+```bash
+# Log in once, run scripts many times
+tap login https://github.com/login
+tap site -b github/notifications
+
+# Use a specific profile for work accounts
+tap login --profile-dir ~/.tap/work https://internal.corp.com
+```
+
+**`--pause`** — pause after navigation for one-off interactions:
+```bash
+# Browser opens → you solve CAPTCHA → press Enter → script executes
+tap site --pause twitter/search query=claude
+```
+
+The `--pause` flag implies `--no-headless` (visible browser) and `-b` (browser mode). Cookies are always saved to the Chrome profile directory.
 
 ## Writing Scripts
 
@@ -202,6 +227,8 @@ github.com/vaayne/tap/
 
 - [x] Site scripts with QuickJS + browser fallback
 - [x] `tap fetch <url>` — clean content extraction
+- [x] `tap login <url>` — interactive browser login with cookie persistence
+- [x] `--pause` flag — manual interaction before script execution
 - [ ] `tap screenshot <url>` — page screenshots
 - [ ] `tap pdf <url>` — save as PDF
 - [ ] `tap eval <js> --url <url>` — run arbitrary JS on a page

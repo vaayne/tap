@@ -69,12 +69,12 @@ func New(optFns ...Option) (*Client, error) {
 	var engines []engine.Engine
 	if opts.forceBrowser {
 		engines = []engine.Engine{
-			engine.NewBrowser(tp),
+			engine.NewBrowser(tp, opts.pauseFn),
 		}
 	} else {
 		engines = []engine.Engine{
 			engine.NewQuickJS(tp),
-			engine.NewBrowser(tp),
+			engine.NewBrowser(tp, opts.pauseFn),
 		}
 	}
 
@@ -143,6 +143,18 @@ func (c *Client) Fetch(ctx context.Context, url string, opts *fetch.Options) (*f
 		defer cancel()
 	}
 	return c.fetcher.Fetch(ctx, url, opts)
+}
+
+// Login opens a browser to the given URL and keeps it open until pauseFn
+// returns. Cookies are persisted in the Chrome profile directory so that
+// subsequent script runs are authenticated.
+func (c *Client) Login(ctx context.Context, url string, pauseFn transport.PauseFunc) error {
+	if c.opts.timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, c.opts.timeout)
+		defer cancel()
+	}
+	return c.transport.BrowseInteractive(ctx, url, pauseFn)
 }
 
 // ListScripts returns all available scripts sorted by name.

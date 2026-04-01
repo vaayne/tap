@@ -24,6 +24,7 @@ func main() {
 		Commands: []*cli.Command{
 			siteCmd(),
 			fetchCmd(),
+			loginCmd(),
 		},
 	}
 
@@ -70,6 +71,10 @@ func globalFlags() []cli.Flag {
 		&cli.BoolFlag{
 			Name:  "no-headless",
 			Usage: "Run browser in visible mode (useful for debugging auth)",
+		},
+		&cli.BoolFlag{
+			Name:  "pause",
+			Usage: "Pause after navigation for manual interaction (login, CAPTCHA)",
 		},
 		&cli.DurationFlag{
 			Name:    "timeout",
@@ -119,6 +124,37 @@ func newClient(cmd *cli.Command) (*tap.Client, error) {
 		opts = append(opts, tap.WithForceBrowser(true))
 	}
 	if cmd.Bool("no-headless") {
+		opts = append(opts, tap.WithHeadless(false))
+	}
+	if cmd.Bool("pause") {
+		opts = append(opts, tap.WithHeadless(false)) // --pause implies visible browser
+		opts = append(opts, tap.WithForceBrowser(true)) // --pause implies browser mode
+		opts = append(opts, tap.WithPause(terminalPause()))
+	}
+	if d := cmd.Duration("timeout"); d > 0 {
+		opts = append(opts, tap.WithTimeout(d))
+	}
+
+	return tap.New(opts...)
+}
+
+// newClientWithOverrides creates a client with forced overrides (e.g. for login).
+func newClientWithOverrides(cmd *cli.Command, forceVisible bool) (*tap.Client, error) {
+	var opts []tap.Option
+
+	dir := cmd.String("sites-dir")
+	if dir == "" {
+		dir = defaultSitesDir()
+	}
+	opts = append(opts, tap.WithSitesDir(dir))
+
+	if url := cmd.String("ws-url"); url != "" {
+		opts = append(opts, tap.WithWSURL(url))
+	}
+	if dir := cmd.String("profile-dir"); dir != "" {
+		opts = append(opts, tap.WithProfileDir(dir))
+	}
+	if forceVisible {
 		opts = append(opts, tap.WithHeadless(false))
 	}
 	if d := cmd.Duration("timeout"); d > 0 {

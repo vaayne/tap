@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- `tap login <url>` command — open a visible browser for login, CAPTCHA, or manual interaction; cookies persist in Chrome profile
+- `--pause` flag — pause after browser navigation to allow user interaction before script execution (implies `--no-headless` and `-b`)
+- `transport.PauseFunc` type and `BrowseInteractive`, `BrowseHTMLWithPause`, `BrowseEvalWithPause` transport methods
+- `WithPause` functional option for the Go library
+
 ## [0.1.4] - 2026-03-31
 
 ### Fixed

@@ -12,11 +12,12 @@ import (
 // Browser executes scripts in a real Chrome browser via CDP.
 type Browser struct {
 	transport *transport.Transport
+	pauseFn   transport.PauseFunc
 }
 
 // NewBrowser creates a new Browser engine backed by the given transport.
-func NewBrowser(tp *transport.Transport) *Browser {
-	return &Browser{transport: tp}
+func NewBrowser(tp *transport.Transport, pauseFn transport.PauseFunc) *Browser {
+	return &Browser{transport: tp, pauseFn: pauseFn}
 }
 
 func (b *Browser) Name() string { return "Browser" }
@@ -35,5 +36,5 @@ func (b *Browser) Run(ctx context.Context, s *script.Script, args map[string]str
 		navURL = "https://" + s.Meta.Domain
 	}
 
-	return b.transport.BrowseEval(ctx, navURL, js)
+	return b.transport.BrowseEvalWithPause(ctx, navURL, js, b.pauseFn)
 }
