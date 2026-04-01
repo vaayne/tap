@@ -99,7 +99,7 @@ func LaunchBrowser(ctx context.Context, config LocalConfig) (*ProcessRecord, err
 		args = append(args, "--headless=new")
 	}
 
-	cmd := exec.CommandContext(ctx, chromePath, args...)
+	cmd := exec.Command(chromePath, args...)
 
 	// Run Chrome in its own process group so it survives tap exit.
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
@@ -117,10 +117,15 @@ func LaunchBrowser(ctx context.Context, config LocalConfig) (*ProcessRecord, err
 	// Parse the debug URL from Chrome's stderr output with a timeout.
 	debugURL, err := parseDebugURL(stderrPipe, 10*time.Second)
 	if err != nil {
-		// Best-effort cleanup if we can't get the debug URL.
+		// Best-effort cleanup: kill and reap to avoid zombies and close pipes.
 		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
 		return nil, fmt.Errorf("parse chrome debug URL: %w", err)
 	}
+
+	// Release the process handle so Go does not accumulate zombies.
+	// Chrome runs detached (Setpgid) and is managed via PID from metadata.
+	_ = cmd.Process.Release()
 
 	return &ProcessRecord{
 		PID:            cmd.Process.Pid,
@@ -188,6 +193,9 @@ func CheckProcess(record *ProcessRecord) error {
 	}
 	defer func() { _ = resp.Body.Close() }()
 
+	// Drain the body to allow connection reuse.
+	_, _ = io.Copy(io.Discard, resp.Body)
+
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("debug endpoint returned status %d", resp.StatusCode)
 	}
@@ -209,6 +217,9 @@ func KillProcess(record *ProcessRecord) error {
 
 	// Send SIGTERM for a graceful shutdown.
 	if err := syscall.Kill(record.PID, syscall.SIGTERM); err != nil {
+		if errors.Is(err, syscall.ESRCH) {
+			return nil
+		}
 		return fmt.Errorf("send SIGTERM to %d: %w", record.PID, err)
 	}
 
