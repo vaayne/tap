@@ -152,8 +152,8 @@ func (lp *Lightpanda) download(ctx context.Context) error {
 		return fmt.Errorf("open file: %w", err)
 	}
 	defer func() {
-		f.Close()
-		os.Remove(tmp) // clean up on failure; no-op after successful rename
+		_ = f.Close()
+		_ = os.Remove(tmp) // clean up on failure; no-op after successful rename
 	}()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -229,7 +229,7 @@ func freePort() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer ln.Close()
+	defer func() { _ = ln.Close() }()
 	addr := ln.Addr().(*net.TCPAddr)
 	return fmt.Sprintf("%d", addr.Port), nil
 }
