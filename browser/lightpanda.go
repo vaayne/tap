@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -55,7 +55,7 @@ func (lp *Lightpanda) EnsureInstalled(ctx context.Context) error {
 		return nil // already installed
 	}
 
-	slog.Info("downloading lightpanda browser")
+	log.Println("downloading lightpanda browser")
 	return lp.download(ctx)
 }
 
@@ -81,7 +81,7 @@ func (lp *Lightpanda) Start(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("find free port: %w", err)
 		}
-		slog.Debug("port in use, using alternative", slog.String("from", lp.port), slog.String("to", free))
+		log.Printf("port %s in use, using %s", lp.port, free)
 		lp.port = free
 	}
 
@@ -105,7 +105,7 @@ func (lp *Lightpanda) Start(ctx context.Context) error {
 	}
 
 	lp.cmd = cmd
-	slog.Info("lightpanda browser ready", slog.String("ws", lp.WSURL()))
+	log.Printf("lightpanda browser ready: %s", lp.WSURL())
 	return nil
 }
 
@@ -117,7 +117,7 @@ func (lp *Lightpanda) Stop() {
 	_ = lp.cmd.Process.Kill()
 	_ = lp.cmd.Wait()
 	lp.cmd = nil
-	slog.Debug("lightpanda stopped")
+	log.Println("lightpanda stopped")
 }
 
 // Cleanup removes the downloaded binary.
@@ -186,7 +186,7 @@ func (lp *Lightpanda) download(ctx context.Context) error {
 		return fmt.Errorf("rename binary: %w", err)
 	}
 
-	slog.Info("lightpanda browser downloaded", slog.String("path", bin))
+	log.Printf("lightpanda browser downloaded: %s", bin)
 	return nil
 }
 

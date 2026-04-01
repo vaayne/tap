@@ -180,6 +180,9 @@ func newClientWithOverrides(cmd *cli.Command, forceVisible bool) (*tap.Client, e
 	if dir := cmd.String("profile-dir"); dir != "" {
 		opts = append(opts, tap.WithProfileDir(dir))
 	}
+	if cmd.Bool("lightpanda") {
+		opts = append(opts, tap.WithBrowserType(transport.BrowserLightpanda))
+	}
 	if forceVisible {
 		opts = append(opts, tap.WithHeadless(false))
 	}
