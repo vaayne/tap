@@ -82,10 +82,13 @@ func CloseTarget(ctx context.Context, debugURL string, targetID string) error {
 
 // NavigateTarget navigates an existing browser tab to url and waits for the body to be ready.
 func NavigateTarget(ctx context.Context, debugURL string, targetID string, url string) error {
-	return withTarget(ctx, debugURL, targetID,
+	if err := withTarget(ctx, debugURL, targetID,
 		chromedp.Navigate(url),
 		chromedp.WaitReady("body"),
-	)
+	); err != nil {
+		return fmt.Errorf("navigate target: %w", err)
+	}
+	return nil
 }
 
 // EvalTarget evaluates JavaScript in the context of an existing browser tab
