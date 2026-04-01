@@ -106,37 +106,47 @@ func (m *Manager) CreateSession(ctx context.Context, name string, mode Mode, opt
 
 // CloseSession terminates a browser session, kills the local process if
 // applicable, and removes all related metadata.
-func (m *Manager) CloseSession(ctx context.Context, name string) error {
+func (m *Manager) CloseSession(_ context.Context, name string) error {
 	return m.store.WithSessionLock(name, func() error {
-		state, err := m.store.Load()
+		// Phase 1: read process info under state lock.
+		var proc *ProcessRecord
+		var profileDir string
+		var isLocal bool
+		err := m.store.Update(func(state *State) error {
+			session, err := state.ResolveSession(name)
+			if err != nil {
+				return err
+			}
+			isLocal = session.Mode == ModeLocal
+			if session.Process != nil {
+				p := *session.Process
+				proc = &p
+			}
+			if session.Local != nil {
+				profileDir = session.Local.ProfileDir
+			}
+			return nil
+		})
 		if err != nil {
 			return fmt.Errorf("close session: %w", err)
 		}
 
-		session, err := state.ResolveSession(name)
-		if err != nil {
-			return fmt.Errorf("close session: %w", err)
+		// Phase 2: kill the local browser process outside the state lock.
+		if isLocal && proc != nil {
+			// Best-effort: don't fail if the process is already dead.
+			_ = KillProcess(proc)
+			if profileDir != "" {
+				_ = os.RemoveAll(profileDir)
+			}
 		}
 
-		// Kill the local browser process.
-		if session.Mode == ModeLocal && session.Process != nil {
-			if err := KillProcess(session.Process); err != nil {
+		// Phase 3: atomically remove session from state.
+		return m.store.Update(func(state *State) error {
+			if err := state.DeleteSession(name); err != nil {
 				return fmt.Errorf("close session: %w", err)
 			}
-			// Remove the profile directory.
-			if session.Local != nil && session.Local.ProfileDir != "" {
-				_ = os.RemoveAll(session.Local.ProfileDir)
-			}
-		}
-
-		if err := state.DeleteSession(name); err != nil {
-			return fmt.Errorf("close session: %w", err)
-		}
-
-		if err := m.store.Save(state); err != nil {
-			return fmt.Errorf("close session: %w", err)
-		}
-		return nil
+			return nil
+		})
 	})
 }
 
@@ -278,7 +288,9 @@ func (m *Manager) SelectTab(_ context.Context, sessionName string, tabName strin
 
 // Navigate changes the URL of a tracked tab.
 func (m *Manager) Navigate(ctx context.Context, sessionName string, tabName string, url string) error {
-	return m.store.UpdateSession(sessionName, func(_ *State, session *SessionRecord) error {
+	// Phase 1: resolve session/tab under lock, release before CDP I/O.
+	var debugURL, targetID, resolvedSession, resolvedTab string
+	err := m.store.UpdateSession(sessionName, func(_ *State, session *SessionRecord) error {
 		tab, err := session.ResolveTab(tabName)
 		if err != nil {
 			return fmt.Errorf("navigate: %w", err)
@@ -286,72 +298,63 @@ func (m *Manager) Navigate(ctx context.Context, sessionName string, tabName stri
 		if err := requireLiveTab(tab); err != nil {
 			return fmt.Errorf("navigate: %w", err)
 		}
-
-		debugURL, err := resolveDebugURL(session)
+		du, err := resolveDebugURL(session)
 		if err != nil {
 			return fmt.Errorf("navigate: %w", err)
 		}
+		debugURL = du
+		targetID = tab.TargetID
+		resolvedSession = session.Name
+		resolvedTab = tab.Name
+		return nil
+	})
+	if err != nil {
+		return err
+	}
 
-		if err := transport.NavigateTarget(ctx, debugURL, tab.TargetID, url); err != nil {
-			return fmt.Errorf("navigate: %w", err)
+	// Phase 2: CDP navigation outside any lock.
+	if err := transport.NavigateTarget(ctx, debugURL, targetID, url); err != nil {
+		return fmt.Errorf("navigate: %w", err)
+	}
+
+	// Phase 3: persist URL update under lock.
+	return m.store.UpdateSession(resolvedSession, func(_ *State, session *SessionRecord) error {
+		if tab, ok := session.Tabs[resolvedTab]; ok {
+			tab.URL = url
+			tab.UpdatedAt = time.Now().UTC()
 		}
-
-		tab.URL = url
-		tab.UpdatedAt = time.Now().UTC()
 		return nil
 	})
 }
 
 // Evaluate runs JavaScript in a tracked tab and returns the result.
 func (m *Manager) Evaluate(ctx context.Context, sessionName string, tabName string, js string) (any, error) {
-	var result any
-	err := m.store.UpdateSession(sessionName, func(_ *State, session *SessionRecord) error {
-		tab, err := session.ResolveTab(tabName)
-		if err != nil {
-			return fmt.Errorf("evaluate: %w", err)
-		}
-		if err := requireLiveTab(tab); err != nil {
-			return fmt.Errorf("evaluate: %w", err)
-		}
+	// Resolve session/tab under lock, then release before CDP I/O.
+	debugURL, targetID, err := m.resolveTarget(sessionName, tabName, "evaluate")
+	if err != nil {
+		return nil, err
+	}
 
-		debugURL, err := resolveDebugURL(session)
-		if err != nil {
-			return fmt.Errorf("evaluate: %w", err)
-		}
-
-		result, err = transport.EvalTarget(ctx, debugURL, tab.TargetID, js)
-		if err != nil {
-			return fmt.Errorf("evaluate: %w", err)
-		}
-		return nil
-	})
-	return result, err
+	result, err := transport.EvalTarget(ctx, debugURL, targetID, js)
+	if err != nil {
+		return nil, fmt.Errorf("evaluate: %w", err)
+	}
+	return result, nil
 }
 
 // Screenshot captures a full-page PNG of a tracked tab.
 func (m *Manager) Screenshot(ctx context.Context, sessionName string, tabName string) ([]byte, error) {
-	var buf []byte
-	err := m.store.UpdateSession(sessionName, func(_ *State, session *SessionRecord) error {
-		tab, err := session.ResolveTab(tabName)
-		if err != nil {
-			return fmt.Errorf("screenshot: %w", err)
-		}
-		if err := requireLiveTab(tab); err != nil {
-			return fmt.Errorf("screenshot: %w", err)
-		}
+	// Resolve session/tab under lock, then release before CDP I/O.
+	debugURL, targetID, err := m.resolveTarget(sessionName, tabName, "screenshot")
+	if err != nil {
+		return nil, err
+	}
 
-		debugURL, err := resolveDebugURL(session)
-		if err != nil {
-			return fmt.Errorf("screenshot: %w", err)
-		}
-
-		buf, err = transport.ScreenshotTarget(ctx, debugURL, tab.TargetID)
-		if err != nil {
-			return fmt.Errorf("screenshot: %w", err)
-		}
-		return nil
-	})
-	return buf, err
+	buf, err := transport.ScreenshotTarget(ctx, debugURL, targetID)
+	if err != nil {
+		return nil, fmt.Errorf("screenshot: %w", err)
+	}
+	return buf, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -387,6 +390,40 @@ func (m *Manager) Reconcile(ctx context.Context, sessionName string) error {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+// resolveTarget resolves a session and tab under lock and returns the debug URL
+// and target ID for use outside the lock during CDP I/O.
+func (m *Manager) resolveTarget(sessionName string, tabName string, op string) (string, string, error) {
+	var debugURL, targetID string
+	err := m.store.WithSessionLock(sessionName, func() error {
+		state, err := m.store.Load()
+		if err != nil {
+			return err
+		}
+		session, err := state.ResolveSession(sessionName)
+		if err != nil {
+			return err
+		}
+		tab, err := session.ResolveTab(tabName)
+		if err != nil {
+			return err
+		}
+		if err := requireLiveTab(tab); err != nil {
+			return err
+		}
+		du, err := resolveDebugURL(session)
+		if err != nil {
+			return err
+		}
+		debugURL = du
+		targetID = tab.TargetID
+		return nil
+	})
+	if err != nil {
+		return "", "", fmt.Errorf("%s: %w", op, err)
+	}
+	return debugURL, targetID, nil
+}
 
 // resolveDebugURL extracts the CDP debug endpoint from session metadata.
 func resolveDebugURL(session *SessionRecord) (string, error) {
