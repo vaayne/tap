@@ -8,11 +8,12 @@ import (
 
 // options holds the resolved configuration for a Client.
 type options struct {
-	sitesDir    string
-	wsURL       string
-	profileDir  string
+	sitesDir     string
+	wsURL        string
+	profileDir   string
 	forceBrowser bool
 	headless     bool
+	browserType  transport.BrowserType
 	pauseFn      transport.PauseFunc
 	timeout      time.Duration
 }
@@ -68,6 +69,13 @@ func WithHeadless(headless bool) Option {
 func WithPause(fn transport.PauseFunc) Option {
 	return func(o *options) {
 		o.pauseFn = fn
+	}
+}
+
+// WithBrowserType selects the browser backend ("chrome" or "lightpanda").
+func WithBrowserType(bt transport.BrowserType) Option {
+	return func(o *options) {
+		o.browserType = bt
 	}
 }
 

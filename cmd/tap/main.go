@@ -9,6 +9,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/urfave/cli/v3"
 	"github.com/vaayne/tap"
+	"github.com/vaayne/tap/transport"
 )
 
 var version = "dev"
@@ -71,6 +72,12 @@ func globalFlags() []cli.Flag {
 		&cli.BoolFlag{
 			Name:  "no-headless",
 			Usage: "Run browser in visible mode (useful for debugging auth)",
+		},
+		&cli.BoolFlag{
+			Name:    "lightpanda",
+			Aliases: []string{"lp"},
+			Usage:   "Use Lightpanda headless browser instead of Chrome (implies --browser)",
+			Sources: cli.EnvVars("TAP_LIGHTPANDA"),
 		},
 		&cli.BoolFlag{
 			Name:  "pause",
@@ -137,6 +144,10 @@ func newClient(cmd *cli.Command) (*tap.Client, error) {
 		return nil, err
 	}
 
+	if cmd.Bool("lightpanda") {
+		opts = append(opts, tap.WithBrowserType(transport.BrowserLightpanda))
+		opts = append(opts, tap.WithForceBrowser(true))
+	}
 	if cmd.Bool("browser") || hasPauseMode(cmd) {
 		opts = append(opts, tap.WithForceBrowser(true))
 	}

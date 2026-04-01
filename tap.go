@@ -55,11 +55,15 @@ func New(optFns ...Option) (*Client, error) {
 		}
 	}
 
-	tp := transport.New(transport.Config{
+	tp, err := transport.New(transport.Config{
 		WSURL:      opts.wsURL,
 		ProfileDir: opts.profileDir,
 		Headless:   opts.headless,
+		Browser:    opts.browserType,
 	})
+	if err != nil {
+		return nil, fmt.Errorf("new transport: %w", err)
+	}
 
 	fetcher, err := fetch.New(tp)
 	if err != nil {
