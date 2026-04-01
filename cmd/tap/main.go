@@ -23,6 +23,7 @@ func main() {
 		Version: version,
 		Flags:   globalFlags(),
 		Commands: []*cli.Command{
+			browserCmd(),
 			siteCmd(),
 			fetchCmd(),
 			loginCmd(),

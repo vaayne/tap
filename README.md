@@ -177,6 +177,56 @@ tap fetch https://example.com --wait-js 'document.body.innerText.includes("Code"
 
 `--pause`, `--delay`, `--wait-selector`, and `--wait-js` each imply `--no-headless` (visible browser) and `-b` (browser mode). `--pause` requires an interactive terminal. Cookies are always saved to the Chrome profile directory.
 
+### Persistent Browser Sessions
+
+Tap's persistent browser workflow lives under `tap browser ...`. Phase 1 defines the durable state model, command surface, and lifecycle contract; runtime commands land in later phases.
+
+Planned command tree:
+
+```bash
+tap browser session new <name> [--profile-dir <dir>] [--no-headless]
+tap browser session new <name> --ws-url <remote-cdp-url>
+tap browser session list
+tap browser session info [name]
+tap browser session select <name>
+tap browser session close [name]
+
+tap browser tab new <name> [--session <session>] [--url about:blank]
+tap browser tab list [--session <session>]
+tap browser tab select <name> [--session <session>]
+tap browser tab close [name] [--session <session>]
+
+tap browser navigate <url> [--session <session>] [--tab <tab>]
+tap browser evaluate <javascript> [--session <session>] [--tab <tab>] [--format pretty|json|raw]
+tap browser screenshot [--session <session>] [--tab <tab>] [--output <path>]
+```
+
+Resolution rules:
+
+- Session resolution order: `--session`, then the selected session from `tap browser session select`, then the only available session when exactly one exists.
+- Tab resolution order: `--tab`, then the selected tab within the resolved session, then the only live tracked tab when exactly one exists.
+- If a session or tab reference is still ambiguous, tap fails with guidance instead of guessing.
+
+Lifecycle rules:
+
+- A session is one persistent browser instance, either local or remote.
+- A tab is a named tracked CDP target within a session.
+- Only tracked tabs are part of tap metadata. Untracked live browser tabs are ignored by default.
+- If a tracked target disappears, tap marks the tab `stale`, clears invalid selected-tab state, and requires the user to recreate or reselect a usable tab.
+- `tap browser tab close` removes the tracked tab and promotes the next remaining live tracked tab by creation order, or leaves no selected tab if none remain.
+- `tap browser session close` removes the resolved session. For local sessions, tap first verifies browser-process ownership before terminating the managed browser and deleting its managed profile directory. For remote sessions, tap removes metadata only and never kills the remote browser.
+
+Local-vs-remote contract:
+
+| Operation | Local managed browser | Remote CDP session |
+|---|---|---|
+| `session new` | Launches a managed Chrome with a dedicated profile and debugging endpoint | Persists the explicit `--ws-url` and validates connection/auth/TLS at creation time |
+| `session close` | Verifies ownership, stops the managed browser, then removes metadata and managed profile state | Removes tap metadata only |
+| `tab new` / `tab close` | Supported against the managed browser | Supported when the remote endpoint allows target management; failures must be returned clearly |
+| `navigate` / `evaluate` / `screenshot` | Operate on the resolved tracked tab | Operate through the persisted session endpoint, ignoring later global `--ws-url` overrides |
+
+The browser metadata store uses a durable state directory instead of cache storage. Override it with `TAP_BROWSER_STATE_DIR` or `tap browser --state-root <dir> ...`.
+
 ## Writing Scripts
 
 Scripts live in the [tap-sites](https://github.com/vaayne/tap-sites) catalog, organized by site name:
