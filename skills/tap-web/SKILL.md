@@ -102,19 +102,47 @@ Pipe to `jq` for filtering:
 tap site hackernews/top count=5 -f json | jq '.'
 ```
 
+## Login & interactive browser
+
+Some sites require login or CAPTCHA solving before scripts work.
+
+### `tap login` — Log in once, run scripts many times
+
+```bash
+tap login https://github.com/login          # Opens visible browser, press Enter when done
+tap site -b github/notifications             # Subsequent runs use saved cookies
+
+tap login https://twitter.com/i/flow/login
+tap site twitter/search query="AI agents"
+```
+
+Cookies persist in the Chrome profile directory (`~/.cache/tap/chrome-profile-$USER`).
+Use `--profile-dir` to manage separate profiles (e.g., work vs personal).
+
+### `--pause` — One-off interaction before script execution
+
+```bash
+tap site --pause twitter/search query=claude
+# Browser opens → solve CAPTCHA / interact → press Enter → script runs → browser closes
+```
+
+`--pause` implies `--no-headless` (visible browser) and `-b` (browser mode).
+
 ## Global options
 
 | Flag | Description |
 |---|---|
 | `--browser, -b` | Force browser mode (skip QuickJS) — use for sites needing login/cookies |
 | `--no-headless` | Show browser window (debug auth issues) |
+| `--pause` | Pause after navigation for manual interaction (login, CAPTCHA); implies `--no-headless` and `-b` |
 | `--timeout, -t` | Execution timeout (e.g., `30s`, `2m`) |
 | `--quiet, -q` | Suppress log output |
 | `--verbose` | Enable verbose logging |
 
 ## Tips
 
-- For sites requiring authentication (Twitter, Xiaohongshu, Bilibili, etc.), run once with `--no-headless` to log in manually. Cookies persist in the Chrome profile.
+- For sites requiring authentication (Twitter, Xiaohongshu, Bilibili, etc.), use `tap login <url>` first. Cookies persist in the Chrome profile.
+- Use `--pause` for one-off CAPTCHA solving or interaction before a script runs.
 - Use `tap fetch` for arbitrary URLs; use `tap site` for structured data from known sites.
 - When a site script exists for the target, prefer `tap site` over `tap fetch` for better structured output.
 - If QuickJS execution fails, tap automatically falls back to browser mode.
