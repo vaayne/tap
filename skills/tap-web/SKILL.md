@@ -130,55 +130,35 @@ tap site --pause twitter/search query=claude
 
 ## Browser backends
 
-tap supports two browser backends. Choose based on the task:
+When HTTP isn't enough (JS-rendered pages), use a browser backend:
 
-### Lightpanda (`--lightpanda` / `--lp`) — fast headless browser
+- **`--lp`** — Lightpanda: fast headless browser, no cookies/auth. Prefer this when you just need JS rendering.
+- **`-b`** — Chrome: full browser with cookies, login state, `--pause` support. Use when auth is needed.
 
-Use Lightpanda when a plain HTTP request isn't enough (e.g., JavaScript-rendered content) but you don't need cookies, login state, or interactive auth. It is faster than Chrome and auto-downloads on first use.
+If Lightpanda has compatibility issues with a site, fall back to Chrome with `-b`.
 
 ```bash
-tap fetch https://spa-site.com --lp          # JS-rendered content, fast
+tap fetch https://spa-site.com --lp          # Fast JS rendering
 tap site hackernews/top --lp                 # Structured data via Lightpanda
-TAP_LIGHTPANDA=true tap fetch <url>          # Via env var
-```
-
-**When to use Lightpanda:**
-- Site requires JavaScript rendering (SPAs, dynamic content)
-- No login/cookies needed
-- Speed matters
-
-**When NOT to use Lightpanda:**
-- Site requires authentication or saved cookies (use Chrome with `tap login`)
-- You need `--pause` or `--no-headless` for interactive debugging
-- Site has compatibility issues with Lightpanda (fall back to Chrome with `-b`)
-
-### Chrome (`--browser` / `-b`) — full browser with cookies & auth
-
-Use Chrome when you need login state, cookies, CAPTCHAs, or interactive debugging.
-
-```bash
-tap login https://github.com/login           # Save cookies in Chrome profile
-tap site -b github/notifications             # Use saved cookies
-tap fetch --pause https://example.com        # Interactive mode
+tap site -b github/notifications             # Needs saved cookies → Chrome
 ```
 
 ## Global options
 
 | Flag | Description |
 |---|---|
-| `--lightpanda, --lp` | Use Lightpanda headless browser (fast, no cookies — prefer over Chrome when auth not needed) |
-| `--browser, -b` | Force Chrome browser mode (skip QuickJS) — use for sites needing login/cookies |
+| `--lightpanda, --lp` | Use Lightpanda headless browser (fast, no cookies) |
+| `--browser, -b` | Force Chrome browser (cookies, login, interactive) |
 | `--no-headless` | Show Chrome window (debug auth issues) |
-| `--pause` | Pause after navigation for manual interaction (login, CAPTCHA); implies `--no-headless` and `-b` |
+| `--pause` | Pause for manual interaction; implies `--no-headless` and `-b` |
 | `--timeout, -t` | Execution timeout (e.g., `30s`, `2m`) |
 | `--quiet, -q` | Suppress log output |
 | `--verbose` | Enable verbose logging |
 
 ## Tips
 
-- **Prefer `--lp` over `-b`** when you just need JS rendering without auth — it's faster and lighter.
-- For sites requiring authentication (Twitter, Xiaohongshu, Bilibili, etc.), use `tap login <url>` first, then `-b`. Cookies persist in the Chrome profile.
-- Use `--pause` for one-off CAPTCHA solving or interaction before a script runs.
-- Use `tap fetch` for arbitrary URLs; use `tap site` for structured data from known sites.
-- When a site script exists for the target, prefer `tap site` over `tap fetch` for better structured output.
+- Prefer `--lp` over `-b` when you just need JS rendering without auth.
+- For auth-required sites, use `tap login <url>` first, then `-b`. Cookies persist in the Chrome profile.
+- Use `--pause` for one-off CAPTCHA solving before a script runs.
+- Prefer `tap site` over `tap fetch` when a site script exists for better structured output.
 - If QuickJS execution fails, tap automatically falls back to browser mode.
