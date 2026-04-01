@@ -133,9 +133,7 @@ tap site --pause twitter/search query=claude
 When HTTP isn't enough (JS-rendered pages), use a browser backend:
 
 - **`--lp`** — Lightpanda: fast headless browser, no cookies/auth. Prefer this when you just need JS rendering.
-- **`-b`** — Chrome: full browser with cookies, login state, `--pause` support. Use when auth is needed.
-
-If Lightpanda has compatibility issues with a site, fall back to Chrome with `-b`.
+- **`-b`** — Chrome: full browser with cookies, login state, `--pause` support. Use when auth is needed, **or when Lightpanda has compatibility issues with a site**.
 
 ```bash
 tap fetch https://spa-site.com --lp          # Fast JS rendering
