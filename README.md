@@ -130,7 +130,10 @@ All config via environment variables, `.env` file, or CLI flags:
 | `TAP_WS_URL` | `--ws-url` | Remote CDP WebSocket URL | _(local Chrome)_ |
 | `TAP_BROWSER` | `--browser`, `-b` | Force browser execution, skip QuickJS | `false` |
 | `TAP_PROFILE_DIR` | `--profile-dir` | Chrome profile for persistent cookies | `~/.cache/tap/chrome-profile-$USER` |
-| | `--pause` | Pause after navigation for manual interaction | `false` |
+| | `--pause` | Pause after navigation for manual interaction (TTY only) | `false` |
+| | `--delay` | Wait a fixed duration after navigation | `0s` |
+| | `--wait-selector` | Wait until a CSS selector becomes visible | `""` |
+| | `--wait-js` | Wait until a JavaScript expression becomes truthy | `""` |
 | | `--no-headless` | Run browser in visible mode | `false` |
 
 ### Browser Modes
@@ -157,13 +160,22 @@ tap site -b github/notifications
 tap login --profile-dir ~/.tap/work https://internal.corp.com
 ```
 
-**`--pause`** — pause after navigation for one-off interactions:
+**Browser wait modes** — interact with or wait on the page before extraction/script execution:
 ```bash
 # Browser opens → you solve CAPTCHA → press Enter → script executes
 tap site --pause twitter/search query=claude
+
+# Wait 5 seconds after navigation
+tap fetch https://example.com --delay 5s
+
+# Continue once a selector becomes visible
+tap fetch https://example.com --wait-selector '.redeem-code'
+
+# Continue once a JS expression becomes truthy
+tap fetch https://example.com --wait-js 'document.body.innerText.includes("Code")'
 ```
 
-The `--pause` flag implies `--no-headless` (visible browser) and `-b` (browser mode). Cookies are always saved to the Chrome profile directory.
+`--pause`, `--delay`, `--wait-selector`, and `--wait-js` each imply `--no-headless` (visible browser) and `-b` (browser mode). `--pause` requires an interactive terminal. Cookies are always saved to the Chrome profile directory.
 
 ## Writing Scripts
 

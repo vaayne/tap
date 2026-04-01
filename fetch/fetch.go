@@ -63,6 +63,8 @@ type Options struct {
 	Markdown bool
 	// UseBrowser forces browser-based fetching (level 2).
 	UseBrowser bool
+	// PauseFunc runs after browser navigation before HTML extraction.
+	PauseFunc transport.PauseFunc
 }
 
 // Fetch retrieves a URL and extracts clean content.
@@ -78,7 +80,7 @@ func (f *Fetcher) Fetch(ctx context.Context, url string, opts *Options) (*Result
 
 	// If browser is forced, skip HTTP.
 	if opts.UseBrowser {
-		return f.fetchViaBrowser(ctx, url, defOpts)
+		return f.fetchViaBrowser(ctx, url, opts, defOpts)
 	}
 
 	// Level 1: try direct HTTP.
@@ -98,11 +100,11 @@ func (f *Fetcher) Fetch(ctx context.Context, url string, opts *Options) (*Result
 	}
 
 	// Level 2: fallback to browser.
-	return f.fetchViaBrowser(ctx, url, defOpts)
+	return f.fetchViaBrowser(ctx, url, opts, defOpts)
 }
 
-func (f *Fetcher) fetchViaBrowser(ctx context.Context, url string, defOpts *defuddle.Options) (*Result, error) {
-	html, err := f.transport.BrowseHTML(ctx, url)
+func (f *Fetcher) fetchViaBrowser(ctx context.Context, url string, opts *Options, defOpts *defuddle.Options) (*Result, error) {
+	html, err := f.transport.BrowseHTMLWithPause(ctx, url, opts.PauseFunc)
 	if err != nil {
 		return nil, fmt.Errorf("browser fetch: %w", err)
 	}

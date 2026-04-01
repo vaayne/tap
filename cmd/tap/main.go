@@ -74,7 +74,19 @@ func globalFlags() []cli.Flag {
 		},
 		&cli.BoolFlag{
 			Name:  "pause",
-			Usage: "Pause after navigation for manual interaction (login, CAPTCHA)",
+			Usage: "Pause after navigation for manual interaction (requires interactive terminal)",
+		},
+		&cli.DurationFlag{
+			Name:  "delay",
+			Usage: "Wait a fixed duration after navigation before continuing (implies --no-headless and --browser)",
+		},
+		&cli.StringFlag{
+			Name:  "wait-selector",
+			Usage: "Wait until a CSS selector becomes visible before continuing (implies --no-headless and --browser)",
+		},
+		&cli.StringFlag{
+			Name:  "wait-js",
+			Usage: "Wait until a JavaScript expression becomes truthy before continuing (implies --no-headless and --browser)",
 		},
 		&cli.DurationFlag{
 			Name:    "timeout",
@@ -120,16 +132,19 @@ func newClient(cmd *cli.Command) (*tap.Client, error) {
 	if dir := cmd.String("profile-dir"); dir != "" {
 		opts = append(opts, tap.WithProfileDir(dir))
 	}
-	if cmd.Bool("browser") {
+	pauseFn, err := resolvePauseFunc(cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	if cmd.Bool("browser") || hasPauseMode(cmd) {
 		opts = append(opts, tap.WithForceBrowser(true))
 	}
-	if cmd.Bool("no-headless") {
+	if cmd.Bool("no-headless") || hasPauseMode(cmd) {
 		opts = append(opts, tap.WithHeadless(false))
 	}
-	if cmd.Bool("pause") {
-		opts = append(opts, tap.WithHeadless(false)) // --pause implies visible browser
-		opts = append(opts, tap.WithForceBrowser(true)) // --pause implies browser mode
-		opts = append(opts, tap.WithPause(terminalPause()))
+	if pauseFn != nil {
+		opts = append(opts, tap.WithPause(pauseFn))
 	}
 	if d := cmd.Duration("timeout"); d > 0 {
 		opts = append(opts, tap.WithTimeout(d))

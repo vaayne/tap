@@ -1,14 +1,10 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"fmt"
-	"os"
-	"strings"
 
 	"github.com/urfave/cli/v3"
-	"github.com/vaayne/tap/transport"
 )
 
 func loginCmd() *cli.Command {
@@ -32,10 +28,7 @@ Examples:
 				return fmt.Errorf("URL required (e.g. tap login https://github.com/login)")
 			}
 
-			url := cmd.Args().First()
-			if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
-				url = "https://" + url
-			}
+			url := normalizeURL(cmd.Args().First())
 
 			// Force visible browser for login
 			client, err := newClientWithOverrides(cmd, true)
@@ -51,26 +44,4 @@ Examples:
 			return client.Login(ctx, url, waitForEnter)
 		},
 	}
-}
-
-// waitForEnter blocks until the user presses Enter or the context is cancelled.
-func waitForEnter(ctx context.Context) error {
-	done := make(chan struct{})
-	go func() {
-		reader := bufio.NewReader(os.Stdin)
-		_, _ = reader.ReadString('\n')
-		close(done)
-	}()
-
-	select {
-	case <-done:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-}
-
-// terminalPause returns a PauseFunc that waits for Enter on stdin.
-func terminalPause() transport.PauseFunc {
-	return waitForEnter
 }

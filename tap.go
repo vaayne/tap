@@ -137,6 +137,15 @@ func (c *Client) RunScript(ctx context.Context, name string, args map[string]str
 
 // Fetch retrieves a URL and extracts clean content using go-defuddle.
 func (c *Client) Fetch(ctx context.Context, url string, opts *fetch.Options) (*fetch.Result, error) {
+	if opts == nil {
+		opts = &fetch.Options{Markdown: true}
+	}
+	if c.opts.forceBrowser {
+		opts.UseBrowser = true
+	}
+	if opts.PauseFunc == nil {
+		opts.PauseFunc = c.opts.pauseFn
+	}
 	if c.opts.timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, c.opts.timeout)
