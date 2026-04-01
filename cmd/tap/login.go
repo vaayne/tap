@@ -31,7 +31,7 @@ Examples:
 			url := normalizeURL(cmd.Args().First())
 
 			// Force visible browser for login
-			client, err := newClientWithOverrides(cmd, true)
+			client, err := newClientWithOverrides(ctx, cmd, true)
 			if err != nil {
 				return err
 			}

@@ -25,7 +25,7 @@ func testSitesDir(t *testing.T) string {
 
 func TestNew(t *testing.T) {
 	dir := testSitesDir(t)
-	client, err := New(WithSitesDir(dir))
+	client, err := New(context.Background(), WithSitesDir(dir))
 	if err != nil {
 		t.Fatalf("New failed: %v", err)
 	}
@@ -46,7 +46,7 @@ func TestNew(t *testing.T) {
 }
 
 func TestNew_NoSitesDir(t *testing.T) {
-	client, err := New()
+	client, err := New(context.Background())
 	if err != nil {
 		t.Fatalf("New failed: %v", err)
 	}
@@ -59,7 +59,7 @@ func TestNew_NoSitesDir(t *testing.T) {
 
 func TestRunScript_NotFound(t *testing.T) {
 	dir := testSitesDir(t)
-	client, err := New(WithSitesDir(dir))
+	client, err := New(context.Background(), WithSitesDir(dir))
 	if err != nil {
 		t.Fatalf("New failed: %v", err)
 	}
@@ -73,7 +73,7 @@ func TestRunScript_NotFound(t *testing.T) {
 
 func TestRunScript_MissingRequiredArg(t *testing.T) {
 	dir := testSitesDir(t)
-	client, err := New(WithSitesDir(dir))
+	client, err := New(context.Background(), WithSitesDir(dir))
 	if err != nil {
 		t.Fatalf("New failed: %v", err)
 	}
@@ -87,7 +87,7 @@ func TestRunScript_MissingRequiredArg(t *testing.T) {
 }
 
 func TestFetch(t *testing.T) {
-	client, err := New()
+	client, err := New(context.Background())
 	if err != nil {
 		t.Fatalf("New failed: %v", err)
 	}

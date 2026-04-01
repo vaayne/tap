@@ -119,7 +119,7 @@ func globalFlags() []cli.Flag {
 	}
 }
 
-func newClient(cmd *cli.Command) (*tap.Client, error) {
+func newClient(ctx context.Context, cmd *cli.Command) (*tap.Client, error) {
 	var opts []tap.Option
 
 	dir := cmd.String("sites-dir")
@@ -161,11 +161,11 @@ func newClient(cmd *cli.Command) (*tap.Client, error) {
 		opts = append(opts, tap.WithTimeout(d))
 	}
 
-	return tap.New(opts...)
+	return tap.New(ctx, opts...)
 }
 
 // newClientWithOverrides creates a client with forced overrides (e.g. for login).
-func newClientWithOverrides(cmd *cli.Command, forceVisible bool) (*tap.Client, error) {
+func newClientWithOverrides(ctx context.Context, cmd *cli.Command, forceVisible bool) (*tap.Client, error) {
 	var opts []tap.Option
 
 	dir := cmd.String("sites-dir")
@@ -190,7 +190,7 @@ func newClientWithOverrides(cmd *cli.Command, forceVisible bool) (*tap.Client, e
 		opts = append(opts, tap.WithTimeout(d))
 	}
 
-	return tap.New(opts...)
+	return tap.New(ctx, opts...)
 }
 
 // configureLogging sets up log output based on --verbose/--quiet flags.

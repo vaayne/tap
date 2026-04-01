@@ -53,7 +53,7 @@ type Transport struct {
 // New creates a new Transport with the given config.
 // If the Lightpanda browser backend is selected, it downloads (if needed)
 // and starts the Lightpanda server eagerly so errors surface immediately.
-func New(config Config) (*Transport, error) {
+func New(ctx context.Context, config Config) (*Transport, error) {
 	t := &Transport{
 		config: config,
 		http:   &http.Client{},
@@ -61,7 +61,7 @@ func New(config Config) (*Transport, error) {
 
 	if config.Browser == BrowserLightpanda && config.WSURL == "" {
 		lp := browser.NewLightpanda("", "")
-		if err := lp.Start(context.Background()); err != nil {
+		if err := lp.Start(ctx); err != nil {
 			return nil, fmt.Errorf("start lightpanda: %w", err)
 		}
 		t.lightpanda = lp

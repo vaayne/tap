@@ -6,7 +6,7 @@
 //
 // Basic usage:
 //
-//	client, err := tap.New(tap.WithSitesDir("./sites"))
+//	client, err := tap.New(ctx, tap.WithSitesDir("./sites"))
 //	if err != nil {
 //	    log.Fatal(err)
 //	}
@@ -40,7 +40,8 @@ type Client struct {
 }
 
 // New creates a new Client with the given options.
-func New(optFns ...Option) (*Client, error) {
+// The context is used for any startup work (e.g. downloading a browser binary).
+func New(ctx context.Context, optFns ...Option) (*Client, error) {
 	opts := defaultOptions()
 	for _, fn := range optFns {
 		fn(&opts)
@@ -55,7 +56,7 @@ func New(optFns ...Option) (*Client, error) {
 		}
 	}
 
-	tp, err := transport.New(transport.Config{
+	tp, err := transport.New(ctx, transport.Config{
 		WSURL:      opts.wsURL,
 		ProfileDir: opts.profileDir,
 		Headless:   opts.headless,
@@ -67,6 +68,7 @@ func New(optFns ...Option) (*Client, error) {
 
 	fetcher, err := fetch.New(tp)
 	if err != nil {
+		_ = tp.Close()
 		return nil, fmt.Errorf("new fetcher: %w", err)
 	}
 

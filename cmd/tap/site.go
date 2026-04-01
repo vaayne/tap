@@ -40,7 +40,7 @@ func siteCmd() *cli.Command {
 			scriptName := args.First()
 			scriptArgs := parseArgs(args.Tail())
 
-			client, err := newClient(cmd)
+			client, err := newClient(ctx, cmd)
 			if err != nil {
 				return err
 			}
@@ -70,7 +70,7 @@ func siteListCmd() *cli.Command {
 		Usage: "List all available scripts (grouped by site)",
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			configureLogging(cmd)
-			client, err := newClient(cmd)
+			client, err := newClient(ctx, cmd)
 			if err != nil {
 				return err
 			}
@@ -129,7 +129,7 @@ func siteInfoCmd() *cli.Command {
 				return fmt.Errorf("script name required")
 			}
 
-			client, err := newClient(cmd)
+			client, err := newClient(ctx, cmd)
 			if err != nil {
 				return err
 			}

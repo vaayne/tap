@@ -28,7 +28,7 @@ func fetchCmd() *cli.Command {
 
 			url := cmd.Args().First()
 
-			client, err := newClient(cmd)
+			client, err := newClient(ctx, cmd)
 			if err != nil {
 				return err
 			}
