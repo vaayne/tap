@@ -34,7 +34,7 @@ func TestFetch_InvalidURL(t *testing.T) {
 	}
 	defer f.Close()
 
-	_, err = f.Fetch(context.Background(), "http://invalid.localhost.test", nil)
+	_, err = f.Fetch(context.Background(), "://bad-url", nil)
 	if err == nil {
 		t.Error("expected error for invalid URL")
 	}

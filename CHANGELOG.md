@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-04-01
+
 ### Added
 
 - `tap login <url>` command — open a visible browser for login, CAPTCHA, or manual interaction; cookies persist in Chrome profile
@@ -36,6 +38,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Fixed
 
 - Check `resp.Body.Close()` error returns to satisfy errcheck linter
+
+## [0.1.2] - 2026-03-31
+
+### Fixed
+
+- Recover from QuickJS WASM panics in the engine fallback chain so runtime panics become errors and browser fallback can continue
 
 ## [0.1.1] - 2026-03-31
 
@@ -67,6 +75,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - CI workflows for lint, test, and release
 - GoReleaser configuration for cross-platform builds
 
+[Unreleased]: https://github.com/vaayne/tap/compare/v0.1.5...HEAD
+[0.1.5]: https://github.com/vaayne/tap/compare/v0.1.4...v0.1.5
+[0.1.4]: https://github.com/vaayne/tap/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/vaayne/tap/compare/v0.1.2...v0.1.3
+[0.1.2]: https://github.com/vaayne/tap/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/vaayne/tap/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/vaayne/tap/releases/tag/v0.1.0
