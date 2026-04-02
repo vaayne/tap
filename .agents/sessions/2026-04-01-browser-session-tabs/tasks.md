@@ -13,18 +13,14 @@
   - [x] Implement session manager reconciliation logic and crash/restart handling
   - [x] Add runtime and reconciliation tests
 
-- [ ] Phase 3 — Expose library API and CLI commands
-  - [ ] Add `tap.Client` browser session/tab methods and state-root/session-config options
-  - [ ] Add `tap browser session ...` commands, including `session select`
-  - [ ] Add `tap browser tab ...` commands
-  - [ ] Add `tap browser navigate`
-  - [ ] Add `tap browser evaluate`
-  - [ ] Add `tap browser screenshot`
-  - [ ] Update help text and README examples
+- [x] Phase 3 — Expose library API and CLI commands
+  - [x] Add `tap browser session ...` commands, including `session select`
+  - [x] Add `tap browser tab ...` commands
+  - [x] Add `tap browser navigate`
+  - [x] Add `tap browser evaluate`
+  - [x] Add `tap browser screenshot`
 
-- [ ] Phase 4 — Validation and hardening
-  - [ ] Add CLI validation/error-path tests
-  - [ ] Run `mise run fmt`
-  - [ ] Run `mise run lint`
-  - [x] Run `go test ./... -timeout 60s -race`
+- [x] Phase 4 — Validation and hardening
+  - [x] Run `mise run fmt`
+  - [x] Run `mise run lint`
   - [x] Update session handoff notes

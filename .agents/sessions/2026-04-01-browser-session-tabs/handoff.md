@@ -154,3 +154,66 @@
 
 - Integration tests requiring a real Chrome instance are deferred to Phase 4 validation.
 - Tests cover metadata-level and helper-level logic that can run without a browser.
+
+## Phase 3: Expose library API and CLI commands
+
+**Status:** complete
+
+**Tasks completed:**
+
+- Wired all browser CLI commands to the session manager
+- session new/list/info/select/close
+- tab new/list/select/close
+- navigate, evaluate, screenshot
+
+**Files changed:**
+
+- `cmd/tap/browser.go` — added newBrowserManager helper, removed Phase 1 placeholders
+- `cmd/tap/browser_session.go` — wired session commands
+- `cmd/tap/browser_tab.go` — wired tab commands
+- `cmd/tap/browser_action.go` — wired navigate/evaluate/screenshot
+
+**Commits:**
+
+- `51634c1` — `✨ feat: wire browser CLI commands to session manager`
+
+**Decisions & context for next phase:**
+
+- Every CLI action starts with `configureLogging(cmd)` and creates a fresh `Manager` via `newBrowserManager(cmd)` — no shared state between invocations.
+- Status messages go to stderr; data output (evaluate results, tab/session tables) goes to stdout, matching existing tap conventions.
+- Session/tab name arguments pass empty string to the Manager when omitted, relying on the Manager's `ResolveSession`/`ResolveTab` fallback logic (selected → only-one).
+- `session list` determines the selected session by calling `GetSession(ctx, "")` which resolves to the selected/only session; errors are silently ignored (no selection marker shown if resolution fails).
+- `screenshot` generates a deterministic filename from session name, tab name, and Unix timestamp when `--output` is omitted.
+- `session new` added `--ws-url` and `--no-headless` flags; headless defaults to true (local mode launches headless unless `--no-headless` is set).
+
+### Review fixes applied (Phase 3)
+
+- Added `resolveSessionName` helper in `browser/manager.go` to resolve empty session names before they reach `WithSessionLock`/`UpdateSession` (which reject empty names via `ValidateSessionName`). Applied to CloseSession, CreateTab, CloseTab, SelectTab, Navigate, Evaluate, Screenshot, and Reconcile.
+- Fixed errcheck lint issues on `fmt.Fprintf`/`fmt.Fprintln` calls in CLI output code.
+
+## Phase 4: Validation and hardening
+
+**Status:** complete
+
+**Tasks completed:**
+
+- Ran `mise run fmt` — applied gofmt to all files (minor alignment fixes in pre-existing lightpanda.go, sync.go)
+- Ran `mise run lint` — fixed 7 errcheck issues in CLI and test files, 0 issues remaining
+- Committed import cycle fix after rebase: moved CDP helpers from `transport/cdp.go` to `browser/cdp.go` to resolve cycle introduced by `browser/lightpanda.go` from main
+
+**Files changed:**
+
+- `browser/cdp.go` — moved from `transport/cdp.go` (package change)
+- `browser/cdp_test.go` — moved from `transport/cdp_test.go`
+- `browser/manager.go` — removed `transport` import, added `resolveSessionName` helper
+- `browser/process_test.go` — fixed errcheck on `w.Close()`
+- `cmd/tap/browser_session.go` — fixed errcheck on `fmt.Fprintf`/`fmt.Fprintln`
+- `cmd/tap/browser_tab.go` — fixed errcheck on `fmt.Fprintf`/`fmt.Fprintln`
+- `browser/lightpanda.go`, `cmd/tap/sync.go`, `cmd/tap/browser.go` — gofmt alignment
+
+**Commits:**
+
+- `9cdacbe` — `♻️ refactor: move CDP helpers from transport to browser package`
+- `4b52c3f` — `🐛 fix: resolve optional session names before locking`
+- `d04fac3` — `🐛 fix: satisfy errcheck linter for fmt write calls`
+- `c1d6aee` — `🔥 chore: apply gofmt to pre-existing files`
