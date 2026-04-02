@@ -22,27 +22,27 @@ func ListTargets(ctx context.Context, debugURL string) ([]TargetInfo, error) {
 	bctx, cancel := withBrowser(ctx, debugURL)
 	defer cancel()
 
-	// Ensure the browser connection is established.
-	if err := chromedp.Run(bctx); err != nil {
-		return nil, fmt.Errorf("list targets: connect: %w", err)
-	}
-
-	infos, err := target.GetTargets().Do(bctx)
+	var out []TargetInfo
+	err := chromedp.Run(bctx, chromedp.ActionFunc(func(ctx context.Context) error {
+		infos, err := target.GetTargets().Do(ctx)
+		if err != nil {
+			return err
+		}
+		for _, ti := range infos {
+			if ti.Type != "page" {
+				continue
+			}
+			out = append(out, TargetInfo{
+				TargetID: string(ti.TargetID),
+				Title:    ti.Title,
+				URL:      ti.URL,
+				Type:     ti.Type,
+			})
+		}
+		return nil
+	}))
 	if err != nil {
 		return nil, fmt.Errorf("list targets: %w", err)
-	}
-
-	var out []TargetInfo
-	for _, ti := range infos {
-		if ti.Type != "page" {
-			continue
-		}
-		out = append(out, TargetInfo{
-			TargetID: string(ti.TargetID),
-			Title:    ti.Title,
-			URL:      ti.URL,
-			Type:     ti.Type,
-		})
 	}
 	return out, nil
 }
@@ -52,12 +52,12 @@ func CreateTarget(ctx context.Context, debugURL string, url string) (string, err
 	bctx, cancel := withBrowser(ctx, debugURL)
 	defer cancel()
 
-	// Ensure the browser connection is established.
-	if err := chromedp.Run(bctx); err != nil {
-		return "", fmt.Errorf("create target: connect: %w", err)
-	}
-
-	id, err := target.CreateTarget(url).Do(bctx)
+	var id target.ID
+	err := chromedp.Run(bctx, chromedp.ActionFunc(func(ctx context.Context) error {
+		var err error
+		id, err = target.CreateTarget(url).Do(ctx)
+		return err
+	}))
 	if err != nil {
 		return "", fmt.Errorf("create target: %w", err)
 	}
@@ -69,15 +69,12 @@ func CloseTarget(ctx context.Context, debugURL string, targetID string) error {
 	bctx, cancel := withBrowser(ctx, debugURL)
 	defer cancel()
 
-	// Ensure the browser connection is established.
-	if err := chromedp.Run(bctx); err != nil {
-		return fmt.Errorf("close target: connect: %w", err)
-	}
-
-	if err := target.CloseTarget(target.ID(targetID)).Do(bctx); err != nil {
-		return fmt.Errorf("close target: %w", err)
-	}
-	return nil
+	return chromedp.Run(bctx, chromedp.ActionFunc(func(ctx context.Context) error {
+		if err := target.CloseTarget(target.ID(targetID)).Do(ctx); err != nil {
+			return fmt.Errorf("close target: %w", err)
+		}
+		return nil
+	}))
 }
 
 // NavigateTarget navigates an existing browser tab to url and waits for the body to be ready.
