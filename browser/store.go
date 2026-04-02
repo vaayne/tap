@@ -19,15 +19,19 @@ type Store struct {
 }
 
 // DefaultStateRoot returns the durable directory used for browser metadata.
+// Uses $XDG_CACHE_HOME/tap/browser, falling back to ~/.cache/tap/browser.
 func DefaultStateRoot() (string, error) {
 	if root := os.Getenv(EnvStateRoot); root != "" {
 		return root, nil
 	}
-	configDir, err := os.UserConfigDir()
-	if err != nil {
-		return "", fmt.Errorf("resolve user config dir: %w", err)
+	if dir := os.Getenv("XDG_CACHE_HOME"); dir != "" {
+		return filepath.Join(dir, "tap", "browser"), nil
 	}
-	return filepath.Join(configDir, "tap", "browser"), nil
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("resolve user home dir: %w", err)
+	}
+	return filepath.Join(home, ".cache", "tap", "browser"), nil
 }
 
 // NewStore initializes a metadata store rooted at the provided directory.

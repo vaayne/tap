@@ -1,3 +1,5 @@
+//go:build !windows
+
 package browser
 
 import (
@@ -183,6 +185,11 @@ func parseDebugURL(r io.Reader, timeout time.Duration) (string, error) {
 // CheckProcess verifies that the process described by record is alive and
 // its debug endpoint is reachable.
 func CheckProcess(record *ProcessRecord) error {
+	return CheckProcessContext(context.Background(), record)
+}
+
+// CheckProcessContext is like CheckProcess but accepts a context for cancellation.
+func CheckProcessContext(ctx context.Context, record *ProcessRecord) error {
 	if record == nil || record.PID <= 0 {
 		return errors.New("no process record to check")
 	}
@@ -198,8 +205,13 @@ func CheckProcess(record *ProcessRecord) error {
 		return fmt.Errorf("parse debug URL: %w", err)
 	}
 
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, httpURL+"/json/version", nil)
+	if err != nil {
+		return fmt.Errorf("create debug request: %w", err)
+	}
+
 	client := &http.Client{Timeout: 5 * time.Second}
-	resp, err := client.Get(httpURL + "/json/version")
+	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("debug endpoint unreachable: %w", err)
 	}

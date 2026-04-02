@@ -1,3 +1,5 @@
+//go:build !windows
+
 package browser
 
 import (
@@ -235,8 +237,13 @@ func (m *Manager) CreateTab(ctx context.Context, sessionName string, tabName str
 		return fmt.Errorf("create tab: %w", err)
 	}
 
-	// Phase 3: persist tab metadata under lock.
-	return m.store.UpdateSession(sessionName, func(state *State, _ *SessionRecord) error {
+	// Phase 3: persist tab metadata under lock. Re-check for duplicates
+	// since another CreateTab could have raced between Phase 1 and Phase 3.
+	// On any failure, best-effort close the orphaned CDP target.
+	err = m.store.UpdateSession(sessionName, func(state *State, session *SessionRecord) error {
+		if _, exists := session.Tabs[tabName]; exists {
+			return fmt.Errorf("create tab: tab %q already exists in session %q", tabName, sessionName)
+		}
 		now := time.Now()
 		tab, err := NewTab(tabName, targetID, url, now)
 		if err != nil {
@@ -248,6 +255,12 @@ func (m *Manager) CreateTab(ctx context.Context, sessionName string, tabName str
 		}
 		return nil
 	})
+	if err != nil {
+		// Best-effort cleanup of the orphaned CDP target.
+		_ = CloseTarget(ctx, debugURL, targetID)
+		return err
+	}
+	return nil
 }
 
 // CloseTab closes a browser tab and removes it from session metadata.
@@ -380,10 +393,14 @@ func (m *Manager) Navigate(ctx context.Context, sessionName string, tabName stri
 
 	// Phase 3: persist URL update under lock.
 	return m.store.UpdateSession(resolvedSession, func(_ *State, session *SessionRecord) error {
-		if tab, ok := session.Tabs[resolvedTab]; ok {
-			tab.URL = url
-			tab.UpdatedAt = time.Now().UTC()
+		tab, ok := session.Tabs[resolvedTab]
+		if !ok {
+			// Tab was deleted between Phase 2 and Phase 3. Navigation
+			// succeeded in the browser but we can't update metadata.
+			return fmt.Errorf("navigate: tab %q was removed during navigation", resolvedTab)
 		}
+		tab.URL = url
+		tab.UpdatedAt = time.Now().UTC()
 		return nil
 	})
 }
