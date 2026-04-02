@@ -17,9 +17,9 @@ import (
 )
 
 const (
-	lightpandaReleaseURL   = "https://github.com/lightpanda-io/browser/releases/download/nightly"
-	lightpandaDefaultPort  = "9224"
-	lightpandaTimeout      = "180"
+	lightpandaReleaseURL  = "https://github.com/lightpanda-io/browser/releases/download/nightly"
+	lightpandaDefaultPort = "9224"
+	lightpandaTimeout     = "180"
 )
 
 // Lightpanda manages the Lightpanda browser process.

@@ -177,6 +177,23 @@ tap fetch https://example.com --wait-js 'document.body.innerText.includes("Code"
 
 `--pause`, `--delay`, `--wait-selector`, and `--wait-js` each imply `--no-headless` (visible browser) and `-b` (browser mode). `--pause` requires an interactive terminal. Cookies are always saved to the Chrome profile directory.
 
+### Persistent Browser Sessions
+
+Tap provides persistent browser automation via `tap browser`. Sessions and tabs survive across CLI invocations, letting you navigate, evaluate JavaScript, and capture screenshots against long-lived browser state.
+
+```bash
+# Quick start
+tap browser session new work
+tap browser tab new main --url https://example.com
+tap browser navigate https://httpbin.org/html
+tap browser evaluate 'document.title'
+tap browser screenshot
+tap browser tab close main
+tap browser session close work
+```
+
+Both local Chrome and remote CDP endpoints are supported. See [docs/browser.md](docs/browser.md) for the full reference.
+
 ## Writing Scripts
 
 Scripts live in the [tap-sites](https://github.com/vaayne/tap-sites) catalog, organized by site name:
@@ -225,14 +242,17 @@ github.com/vaayne/tap/
 │   ├── engine.go       # Engine interface + fallback orchestrator
 │   ├── quickjs.go      # QuickJS engine with Go fetch() polyfill
 │   └── browser.go      # Chrome CDP engine (delegates to transport)
+├── browser/            # Persistent browser sessions, tabs, and CDP helpers
 ├── fetch/
 │   └── fetch.go        # URL → clean content via go-defuddle (HTTP → browser fallback)
 ├── script/
 │   ├── parser.go       # Script @meta parser
 │   └── registry.go     # Script directory scanner + index
-└── cmd/tap/
-    ├── main.go         # CLI binary (urfave/cli)
-    └── sync.go         # Remote script sync + search
+├── cmd/tap/
+│   ├── main.go         # CLI binary (urfave/cli)
+│   └── sync.go         # Remote script sync + search
+└── docs/
+    └── browser.md      # Persistent browser sessions reference
 ```
 
 ## Roadmap
@@ -241,9 +261,8 @@ github.com/vaayne/tap/
 - [x] `tap fetch <url>` — clean content extraction
 - [x] `tap login <url>` — interactive browser login with cookie persistence
 - [x] `--pause` flag — manual interaction before script execution
-- [ ] `tap screenshot <url>` — page screenshots
+- [x] `tap browser` — persistent browser sessions, tabs, navigation, JS evaluation, and screenshots
 - [ ] `tap pdf <url>` — save as PDF
-- [ ] `tap eval <js> --url <url>` — run arbitrary JS on a page
 - [ ] `tap fill <script>` — form automation
 
 ## License

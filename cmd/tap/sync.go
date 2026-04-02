@@ -20,8 +20,8 @@ const (
 	searchAPI  = apiBaseURL + "/api/search"
 	contentAPI = apiBaseURL + "/api/scripts"
 
-	syncTTL       = 24 * time.Hour
-	lastSyncFile  = ".last_sync"
+	syncTTL      = 24 * time.Hour
+	lastSyncFile = ".last_sync"
 )
 
 // defaultSitesDir returns the default cache directory for site scripts.
@@ -51,14 +51,14 @@ type syncManifest struct {
 
 // searchResult represents a script returned by the search API.
 type searchResult struct {
-	Name        string                    `json:"name"`
-	Site        string                    `json:"site"`
-	Description string                    `json:"description"`
-	Domain      string                    `json:"domain"`
-	ReadOnly    bool                      `json:"readOnly"`
-	Example     string                    `json:"example"`
-	Args        map[string]searchArgDef   `json:"args"`
-	UsageCount  int                       `json:"usageCount"`
+	Name        string                  `json:"name"`
+	Site        string                  `json:"site"`
+	Description string                  `json:"description"`
+	Domain      string                  `json:"domain"`
+	ReadOnly    bool                    `json:"readOnly"`
+	Example     string                  `json:"example"`
+	Args        map[string]searchArgDef `json:"args"`
+	UsageCount  int                     `json:"usageCount"`
 }
 
 type searchArgDef struct {
