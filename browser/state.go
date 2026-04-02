@@ -126,70 +126,77 @@ func NewState() *State {
 	}
 }
 
-// DefaultCapabilityMatrix returns the documented capability contract for the
-// first persistent browser release.
-func DefaultCapabilityMatrix() map[Mode]map[Operation]Capability {
-	return map[Mode]map[Operation]Capability{
-		ModeLocal: {
-			OperationSessionNew: {
-				Supported: true,
-				Notes:     "Launch a managed local Chrome with a dedicated profile and debugging endpoint.",
-			},
-			OperationSessionClose: {
-				Supported: true,
-				Notes:     "Terminate the managed browser after ownership checks, then remove local metadata and profile state.",
-			},
-			OperationTabNew: {
-				Supported: true,
-				Notes:     "Create a tracked target within the managed local browser.",
-			},
-			OperationTabClose: {
-				Supported: true,
-				Notes:     "Close the tracked target and drop its metadata.",
-			},
-			OperationNavigate: {
-				Supported: true,
-				Notes:     "Navigate an explicit or selected tracked tab.",
-			},
-			OperationEvaluate: {
-				Supported: true,
-				Notes:     "Run JavaScript on an explicit or selected tracked tab.",
-			},
-			OperationScreenshot: {
-				Supported: true,
-				Notes:     "Capture a screenshot from an explicit or selected tracked tab.",
-			},
-		},
-		ModeRemote: {
-			OperationSessionNew: {
-				Supported: true,
-				Notes:     "Bind the session to an explicit --ws-url and validate connection/auth/TLS up front.",
-			},
-			OperationSessionClose: {
-				Supported: true,
-				Notes:     "Remove tap metadata only. Remote browser processes are never terminated by tap.",
-			},
-			OperationTabNew: {
-				Supported: true,
-				Notes:     "Supported when the remote endpoint allows target creation; failures must be returned clearly.",
-			},
-			OperationTabClose: {
-				Supported: true,
-				Notes:     "Supported when the remote endpoint allows target closure; tap removes metadata only after confirmation.",
-			},
-			OperationNavigate: {
-				Supported: true,
-				Notes:     "Operate through the persisted session endpoint, ignoring later global --ws-url overrides.",
-			},
-			OperationEvaluate: {
-				Supported: true,
-				Notes:     "Operate through the persisted session endpoint, ignoring later global --ws-url overrides.",
-			},
-			OperationScreenshot: {
-				Supported: true,
-				Notes:     "Operate through the persisted session endpoint, ignoring later global --ws-url overrides.",
-			},
-		},
+var localCapabilities = map[Operation]Capability{
+	OperationSessionNew: {
+		Supported: true,
+		Notes:     "Launch a managed local Chrome with a dedicated profile and debugging endpoint.",
+	},
+	OperationSessionClose: {
+		Supported: true,
+		Notes:     "Terminate the managed browser after ownership checks, then remove local metadata and profile state.",
+	},
+	OperationTabNew: {
+		Supported: true,
+		Notes:     "Create a tracked target within the managed local browser.",
+	},
+	OperationTabClose: {
+		Supported: true,
+		Notes:     "Close the tracked target and drop its metadata.",
+	},
+	OperationNavigate: {
+		Supported: true,
+		Notes:     "Navigate an explicit or selected tracked tab.",
+	},
+	OperationEvaluate: {
+		Supported: true,
+		Notes:     "Run JavaScript on an explicit or selected tracked tab.",
+	},
+	OperationScreenshot: {
+		Supported: true,
+		Notes:     "Capture a screenshot from an explicit or selected tracked tab.",
+	},
+}
+
+var remoteCapabilities = map[Operation]Capability{
+	OperationSessionNew: {
+		Supported: true,
+		Notes:     "Bind the session to an explicit --ws-url and validate connection/auth/TLS up front.",
+	},
+	OperationSessionClose: {
+		Supported: true,
+		Notes:     "Remove tap metadata only. Remote browser processes are never terminated by tap.",
+	},
+	OperationTabNew: {
+		Supported: true,
+		Notes:     "Supported when the remote endpoint allows target creation; failures must be returned clearly.",
+	},
+	OperationTabClose: {
+		Supported: true,
+		Notes:     "Supported when the remote endpoint allows target closure; tap removes metadata only after confirmation.",
+	},
+	OperationNavigate: {
+		Supported: true,
+		Notes:     "Operate through the persisted session endpoint, ignoring later global --ws-url overrides.",
+	},
+	OperationEvaluate: {
+		Supported: true,
+		Notes:     "Operate through the persisted session endpoint, ignoring later global --ws-url overrides.",
+	},
+	OperationScreenshot: {
+		Supported: true,
+		Notes:     "Operate through the persisted session endpoint, ignoring later global --ws-url overrides.",
+	},
+}
+
+// CapabilitiesForMode returns the documented capability contract for the given mode.
+func CapabilitiesForMode(mode Mode) map[Operation]Capability {
+	switch mode {
+	case ModeLocal:
+		return localCapabilities
+	case ModeRemote:
+		return remoteCapabilities
+	default:
+		return nil
 	}
 }
 
@@ -206,7 +213,7 @@ func NewLocalSession(name string, profileDir string, headless bool, now time.Tim
 		Mode:         ModeLocal,
 		Local:        &LocalConfig{ProfileDir: profileDir, Headless: headless},
 		Tabs:         make(map[string]*TabRecord),
-		Capabilities: DefaultCapabilityMatrix()[ModeLocal],
+		Capabilities: CapabilitiesForMode(ModeLocal),
 		CreatedAt:    now.UTC(),
 		UpdatedAt:    now.UTC(),
 	}, nil
@@ -225,7 +232,7 @@ func NewRemoteSession(name string, wsURL string, now time.Time) (*SessionRecord,
 		Mode:         ModeRemote,
 		Remote:       &RemoteConfig{WSURL: wsURL},
 		Tabs:         make(map[string]*TabRecord),
-		Capabilities: DefaultCapabilityMatrix()[ModeRemote],
+		Capabilities: CapabilitiesForMode(ModeRemote),
 		CreatedAt:    now.UTC(),
 		UpdatedAt:    now.UTC(),
 	}, nil
@@ -307,7 +314,6 @@ func (s *State) Normalize() {
 
 // Validate checks that the in-memory state satisfies the Phase 1 metadata contract.
 func (s *State) Validate() error {
-	s.Normalize()
 	if s.Version != StateVersion {
 		return fmt.Errorf("unsupported browser state version %d", s.Version)
 	}
@@ -404,7 +410,6 @@ func (s *State) CreateSession(session *SessionRecord) error {
 	if session == nil {
 		return errors.New("session is required")
 	}
-	s.Normalize()
 	if err := session.validate(); err != nil {
 		return err
 	}
@@ -420,7 +425,6 @@ func (s *State) CreateSession(session *SessionRecord) error {
 
 // DeleteSession removes a session and clears the selected session when needed.
 func (s *State) DeleteSession(name string) error {
-	s.Normalize()
 	if _, ok := s.Sessions[name]; !ok {
 		return fmt.Errorf("%w: %s", ErrSessionNotFound, name)
 	}
@@ -433,7 +437,6 @@ func (s *State) DeleteSession(name string) error {
 
 // SelectSession persists the default session used when --session is omitted.
 func (s *State) SelectSession(name string) error {
-	s.Normalize()
 	if _, ok := s.Sessions[name]; !ok {
 		return fmt.Errorf("%w: %s", ErrSessionNotFound, name)
 	}
@@ -444,7 +447,6 @@ func (s *State) SelectSession(name string) error {
 // ResolveSession returns the explicit session, the selected session, or the only
 // available session when there is exactly one.
 func (s *State) ResolveSession(name string) (*SessionRecord, error) {
-	s.Normalize()
 	if name != "" {
 		session, ok := s.Sessions[name]
 		if !ok {
@@ -471,7 +473,6 @@ func (s *State) UpsertTab(sessionName string, tab *TabRecord) error {
 	if tab == nil {
 		return errors.New("tab is required")
 	}
-	s.Normalize()
 	session, ok := s.Sessions[sessionName]
 	if !ok {
 		return fmt.Errorf("%w: %s", ErrSessionNotFound, sessionName)
@@ -486,7 +487,7 @@ func (s *State) UpsertTab(sessionName string, tab *TabRecord) error {
 		tab.CreatedAt = existing.CreatedAt
 	}
 	session.Tabs[tab.Name] = tab
-	session.UpdatedAt = tab.UpdatedAt
+	session.UpdatedAt = time.Now().UTC()
 	if session.SelectedTab == "" && tab.Status == TabStatusLive {
 		session.SelectedTab = tab.Name
 	}
@@ -495,7 +496,6 @@ func (s *State) UpsertTab(sessionName string, tab *TabRecord) error {
 
 // DeleteTab removes a tracked tab and advances selection to the next live tab.
 func (s *State) DeleteTab(sessionName string, tabName string) error {
-	s.Normalize()
 	session, ok := s.Sessions[sessionName]
 	if !ok {
 		return fmt.Errorf("%w: %s", ErrSessionNotFound, sessionName)
@@ -513,7 +513,6 @@ func (s *State) DeleteTab(sessionName string, tabName string) error {
 
 // SelectTab persists the default live tab used when --tab is omitted.
 func (s *State) SelectTab(sessionName string, tabName string) error {
-	s.Normalize()
 	session, ok := s.Sessions[sessionName]
 	if !ok {
 		return fmt.Errorf("%w: %s", ErrSessionNotFound, sessionName)
@@ -567,7 +566,6 @@ func (s *SessionRecord) ResolveTab(name string) (*TabRecord, error) {
 
 // ReconcileSession updates tab liveness after reloading or reconnecting a browser session.
 func (s *State) ReconcileSession(sessionName string, liveTargetIDs []string, now time.Time) error {
-	s.Normalize()
 	session, ok := s.Sessions[sessionName]
 	if !ok {
 		return fmt.Errorf("%w: %s", ErrSessionNotFound, sessionName)

@@ -10,6 +10,8 @@ import (
 	"github.com/chromedp/chromedp"
 )
 
+const TargetTypePage = "page"
+
 // TargetInfo holds metadata about a CDP target (browser tab).
 type TargetInfo struct {
 	TargetID string
@@ -30,7 +32,7 @@ func ListTargets(ctx context.Context, debugURL string) ([]TargetInfo, error) {
 			return err
 		}
 		for _, ti := range infos {
-			if ti.Type != "page" {
+			if ti.Type != TargetTypePage {
 				continue
 			}
 			out = append(out, TargetInfo{

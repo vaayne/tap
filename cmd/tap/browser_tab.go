@@ -82,26 +82,19 @@ func browserTabListCmd() *cli.Command {
 				return err
 			}
 			sessionName := cmd.String("session")
-			tabs, err := mgr.ListTabs(ctx, sessionName)
+			list, err := mgr.ListTabs(ctx, sessionName)
 			if err != nil {
 				return err
 			}
-			if len(tabs) == 0 {
+			if len(list.Tabs) == 0 {
 				fmt.Fprintln(os.Stderr, "No tracked tabs found.")
 				return nil
-			}
-
-			// Determine which tab is selected.
-			session, err := mgr.GetSession(ctx, sessionName)
-			selectedTab := ""
-			if err == nil && session != nil {
-				selectedTab = session.SelectedTab
 			}
 
 			c := useColor(cmd)
 			w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
 			_, _ = fmt.Fprintln(w, bold(c, "NAME\tSTATUS\tURL\tSELECTED"))
-			for _, tab := range tabs {
+			for _, tab := range list.Tabs {
 				status := string(tab.Status)
 				switch tab.Status {
 				case browser.TabStatusLive:
@@ -110,7 +103,7 @@ func browserTabListCmd() *cli.Command {
 					status = yellow(c, status)
 				}
 				sel := ""
-				if tab.Name == selectedTab {
+				if tab.Name == list.SelectedTab {
 					sel = green(c, "*")
 				}
 				_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", tab.Name, status, tab.URL, sel)

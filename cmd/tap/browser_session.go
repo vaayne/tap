@@ -86,28 +86,21 @@ func browserSessionListCmd() *cli.Command {
 			if err != nil {
 				return err
 			}
-			sessions, err := mgr.ListSessions(ctx)
+			list, err := mgr.ListSessions(ctx)
 			if err != nil {
 				return err
 			}
-			if len(sessions) == 0 {
+			if len(list.Sessions) == 0 {
 				fmt.Fprintln(os.Stderr, "No browser sessions found.")
 				return nil
-			}
-
-			// Determine which session is selected.
-			state, err := mgr.GetSession(ctx, "")
-			selectedName := ""
-			if err == nil && state != nil {
-				selectedName = state.Name
 			}
 
 			c := useColor(cmd)
 			w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
 			_, _ = fmt.Fprintln(w, bold(c, "NAME\tMODE\tTABS\tSELECTED"))
-			for _, s := range sessions {
+			for _, s := range list.Sessions {
 				sel := ""
-				if s.Name == selectedName {
+				if s.Name == list.SelectedSession {
 					sel = green(c, "*")
 				}
 				_, _ = fmt.Fprintf(w, "%s\t%s\t%d\t%s\n", s.Name, s.Mode, len(s.Tabs), sel)

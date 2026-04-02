@@ -51,12 +51,12 @@ func TestManagerListSessionsEmpty(t *testing.T) {
 	store := testStore(t)
 	mgr := NewManager(store)
 
-	sessions, err := mgr.ListSessions(context.Background())
+	list, err := mgr.ListSessions(context.Background())
 	if err != nil {
 		t.Fatalf("ListSessions error: %v", err)
 	}
-	if len(sessions) != 0 {
-		t.Fatalf("ListSessions = %d sessions, want 0", len(sessions))
+	if len(list.Sessions) != 0 {
+		t.Fatalf("ListSessions = %d sessions, want 0", len(list.Sessions))
 	}
 }
 

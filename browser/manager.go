@@ -5,8 +5,6 @@ package browser
 import (
 	"context"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
@@ -69,24 +67,8 @@ func (m *Manager) CreateSession(ctx context.Context, name string, mode Mode, opt
 		}
 
 	case ModeRemote:
-		// Validate the remote endpoint is reachable.
-		httpURL, err := debugURLToHTTP(opts.WSURL)
-		if err != nil {
+		if err := checkDebugEndpoint(ctx, opts.WSURL); err != nil {
 			return fmt.Errorf("create session: %w", err)
-		}
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, httpURL+"/json/version", nil)
-		if err != nil {
-			return fmt.Errorf("create session: %w", err)
-		}
-		client := &http.Client{Timeout: 10 * time.Second}
-		resp, err := client.Do(req)
-		if err != nil {
-			return fmt.Errorf("create session: remote endpoint unreachable: %w", err)
-		}
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			return fmt.Errorf("create session: remote endpoint returned status %d", resp.StatusCode)
 		}
 
 		session, err := NewRemoteSession(name, opts.WSURL, now)
@@ -161,8 +143,14 @@ func (m *Manager) CloseSession(_ context.Context, name string) error {
 	})
 }
 
+// SessionList holds the result of listing sessions including the current selection.
+type SessionList struct {
+	Sessions        []*SessionRecord
+	SelectedSession string
+}
+
 // ListSessions returns all tracked sessions sorted by name.
-func (m *Manager) ListSessions(_ context.Context) ([]*SessionRecord, error) {
+func (m *Manager) ListSessions(_ context.Context) (*SessionList, error) {
 	state, err := m.store.Load()
 	if err != nil {
 		return nil, fmt.Errorf("list sessions: %w", err)
@@ -175,7 +163,7 @@ func (m *Manager) ListSessions(_ context.Context) ([]*SessionRecord, error) {
 	sort.Slice(sessions, func(i, j int) bool {
 		return sessions[i].Name < sessions[j].Name
 	})
-	return sessions, nil
+	return &SessionList{Sessions: sessions, SelectedSession: state.SelectedSession}, nil
 }
 
 // GetSession resolves a session by name (or falls back to the selected/only session).
@@ -311,8 +299,14 @@ func (m *Manager) CloseTab(ctx context.Context, sessionName string, tabName stri
 	})
 }
 
+// TabList holds the result of listing tabs including the current selection.
+type TabList struct {
+	Tabs        []*TabRecord
+	SelectedTab string
+}
+
 // ListTabs returns all tracked tabs for a session sorted by creation time.
-func (m *Manager) ListTabs(_ context.Context, sessionName string) ([]*TabRecord, error) {
+func (m *Manager) ListTabs(_ context.Context, sessionName string) (*TabList, error) {
 	state, err := m.store.Load()
 	if err != nil {
 		return nil, fmt.Errorf("list tabs: %w", err)
@@ -333,7 +327,7 @@ func (m *Manager) ListTabs(_ context.Context, sessionName string) ([]*TabRecord,
 		}
 		return tabs[i].CreatedAt.Before(tabs[j].CreatedAt)
 	})
-	return tabs, nil
+	return &TabList{Tabs: tabs, SelectedTab: session.SelectedTab}, nil
 }
 
 // SelectTab persists the default tab used when --tab is omitted.

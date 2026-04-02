@@ -74,6 +74,7 @@ func (s *Store) Load() (*State, error) {
 	if err := json.Unmarshal(data, state); err != nil {
 		return nil, fmt.Errorf("decode browser state: %w", err)
 	}
+	state.Normalize()
 	if err := state.Validate(); err != nil {
 		return nil, fmt.Errorf("validate browser state: %w", err)
 	}

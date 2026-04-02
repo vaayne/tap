@@ -199,8 +199,14 @@ func CheckProcessContext(ctx context.Context, record *ProcessRecord) error {
 		return fmt.Errorf("process %d is not alive: %w", record.PID, err)
 	}
 
-	// Verify the debug endpoint is reachable.
-	httpURL, err := debugURLToHTTP(record.DebugURL)
+	return checkDebugEndpoint(ctx, record.DebugURL)
+}
+
+// checkDebugEndpoint verifies that a CDP debug endpoint is reachable by
+// hitting its /json/version path. Used by both process ownership checks and
+// remote session creation validation.
+func checkDebugEndpoint(ctx context.Context, debugURL string) error {
+	httpURL, err := debugURLToHTTP(debugURL)
 	if err != nil {
 		return fmt.Errorf("parse debug URL: %w", err)
 	}
@@ -210,15 +216,13 @@ func CheckProcessContext(ctx context.Context, record *ProcessRecord) error {
 		return fmt.Errorf("create debug request: %w", err)
 	}
 
-	client := &http.Client{Timeout: 5 * time.Second}
+	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("debug endpoint unreachable: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
-
-	// Drain the body to allow connection reuse.
 	_, _ = io.Copy(io.Discard, resp.Body)
+	_ = resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("debug endpoint returned status %d", resp.StatusCode)
