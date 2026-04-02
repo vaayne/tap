@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-04-02
+
+### Added
+
+- Full Windows support for browser session management (`tap browser` commands)
+- Windows process management using `OpenProcess` / `GetExitCodeProcess` for liveness checks and `taskkill` for two-phase graceful+forced termination
+- Windows Chrome discovery via `Program Files`, `LocalAppData`, and registry (`App Paths\chrome.exe`)
+- Real file locking on Windows via `LockFileEx` / `UnlockFileEx` with retry semantics
+
+### Changed
+
+- Split `browser/process.go` into portable shared code and platform-specific files (`process_unix.go`, `process_windows.go`)
+- Made `browser/manager.go` fully portable (removed `//go:build !windows` constraint)
+- Profile directory cleanup now retries on failure to handle transient file locks
+
 ## [0.1.7] - 2026-04-02
 
 ### Added
