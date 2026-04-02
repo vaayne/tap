@@ -165,10 +165,26 @@ func FormsTarget(ctx context.Context, debugURL string, targetID string) ([]FormF
     } else if (el.placeholder) {
       selector = tag + "[placeholder=" + JSON.stringify(el.placeholder) + "]";
     } else if (el.type === "submit" || (tag === "button" && !el.type)) {
-      const siblings = [...document.querySelectorAll(tag)];
-      const idx = siblings.indexOf(el);
-      if (idx >= 0) {
-        selector = tag + ":nth-of-type(" + (idx + 1) + ")";
+      const parent = el.parentElement;
+      if (parent) {
+        const siblings = [...parent.children].filter(c => c.tagName.toLowerCase() === tag);
+        const idx = siblings.indexOf(el);
+        if (idx >= 0) {
+          // Build a unique path: parent selector + child nth-of-type
+          let parentSel = "";
+          if (parent.id) {
+            parentSel = "#" + CSS.escape(parent.id);
+          } else {
+            parentSel = parent.tagName.toLowerCase();
+            const gp = parent.parentElement;
+            if (gp) {
+              const pSiblings = [...gp.children].filter(c => c.tagName.toLowerCase() === parent.tagName.toLowerCase());
+              const pIdx = pSiblings.indexOf(parent);
+              if (pIdx >= 0) parentSel += ":nth-of-type(" + (pIdx + 1) + ")";
+            }
+          }
+          selector = parentSel + " > " + tag + ":nth-of-type(" + (idx + 1) + ")";
+        }
       }
     }
 
@@ -247,8 +263,9 @@ func FillTarget(ctx context.Context, debugURL string, targetID string, fields []
       if (el.checked) el.click();
     }
   } else {
-    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set
-      || Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
+    const setter = (tag === "textarea")
+      ? Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set
+      : Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
     if (setter) {
       setter.call(el, %q);
     } else {
