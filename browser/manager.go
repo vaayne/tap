@@ -436,6 +436,33 @@ func (m *Manager) Screenshot(ctx context.Context, sessionName string, tabName st
 	return &ScreenshotResult{Data: buf, SessionName: rt.SessionName, TabName: rt.TabName}, nil
 }
 
+// Forms discovers fillable form elements in a tracked tab.
+func (m *Manager) Forms(ctx context.Context, sessionName string, tabName string) ([]FormField, error) {
+	rt, err := m.resolveTarget(sessionName, tabName, "forms")
+	if err != nil {
+		return nil, err
+	}
+
+	fields, err := FormsTarget(ctx, rt.DebugURL, rt.TargetID)
+	if err != nil {
+		return nil, fmt.Errorf("forms: %w", err)
+	}
+	return fields, nil
+}
+
+// Fill sets values in form fields of a tracked tab.
+func (m *Manager) Fill(ctx context.Context, sessionName string, tabName string, fields []FillField, submitSelector string) error {
+	rt, err := m.resolveTarget(sessionName, tabName, "fill")
+	if err != nil {
+		return err
+	}
+
+	if err := FillTarget(ctx, rt.DebugURL, rt.TargetID, fields, submitSelector); err != nil {
+		return fmt.Errorf("fill: %w", err)
+	}
+	return nil
+}
+
 // ---------------------------------------------------------------------------
 // Reconciliation
 // ---------------------------------------------------------------------------

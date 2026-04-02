@@ -39,6 +39,8 @@ it stale and clears selected-tab state instead of silently adopting a new tab.`,
 			browserNavigateCmd(),
 			browserEvaluateCmd(),
 			browserScreenshotCmd(),
+			browserFormsCmd(),
+			browserFillCmd(),
 		},
 	}
 }
