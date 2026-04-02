@@ -2,12 +2,15 @@
 name: tap-web
 description: >
   Access websites, search the web, and extract clean content using the `tap` CLI.
+  Also manage persistent browser sessions for long-lived automation workflows.
   Use when the user asks to search the web, read a webpage, fetch article content,
   get trending topics, look up social media posts, check stock prices, search videos,
-  or retrieve structured data from any supported site. Triggers on: "search for",
-  "what's trending on", "fetch this page", "read this URL", "get content from",
+  retrieve structured data from any supported site, or manage browser sessions/tabs
+  for persistent automation. Triggers on: "search for", "what's trending on",
+  "fetch this page", "read this URL", "get content from",
   "look up on Twitter/Weibo/Reddit/YouTube/etc.", "check stock", "translate",
-  or any web access task.
+  "browser session", "open a tab", "navigate to", "take a screenshot",
+  "evaluate javascript", "persistent browser", or any web access task.
 ---
 
 # tap-web
@@ -113,6 +116,66 @@ tap site -b github/notifications             # Needs saved cookies → Chrome
 | `--quiet, -q` | Suppress log output |
 | `--verbose` | Enable verbose logging |
 
+## `tap browser` — Persistent browser sessions and tabs
+
+Manage long-lived browser instances that survive across CLI invocations. Use for multi-step automation, multi-tab workflows, or interactive debugging.
+
+### Session lifecycle
+
+```bash
+tap browser session new <name>                # Launch a managed headless Chrome
+tap browser session new <name> --no-headless  # Visible browser
+tap browser session new <name> --ws-url <url> # Connect to remote CDP endpoint
+tap browser session list                      # List all sessions
+tap browser session info [name]               # Show session details and tabs
+tap browser session select <name>             # Set default session
+tap browser session close [name]              # Stop browser and remove metadata
+```
+
+### Tab lifecycle
+
+```bash
+tap browser tab new <name> [--url <url>]      # Create a tracked tab
+tap browser tab list                          # List tracked tabs
+tap browser tab select <name>                 # Set default tab
+tap browser tab close [name]                  # Close and remove a tab
+```
+
+### Browser actions
+
+```bash
+tap browser navigate <url>                    # Navigate the selected tab
+tap browser evaluate <javascript>             # Run JS and print the result
+tap browser screenshot [--output <path>]      # Capture a full-page PNG
+```
+
+All action commands accept `--session <name>` and `--tab <name>` to override defaults.
+
+### Resolution rules
+
+When `--session` or `--tab` is omitted, tap resolves automatically:
+
+- **Session**: `--session` flag → selected session → the only session
+- **Tab**: `--tab` flag → selected tab → the only live tracked tab
+
+If ambiguous, tap fails with guidance instead of guessing.
+
+### Example: multi-tab workflow
+
+```bash
+tap browser session new research
+tap browser tab new docs --url https://go.dev/doc
+tap browser tab new api --url https://pkg.go.dev
+
+tap browser tab select docs
+tap browser evaluate 'document.title'
+
+tap browser tab select api
+tap browser evaluate 'document.title'
+
+tap browser session close research
+```
+
 ## Tips
 
 - Prefer `--lp` over `-b` when you just need JS rendering without auth.
@@ -120,3 +183,5 @@ tap site -b github/notifications             # Needs saved cookies → Chrome
 - Use `--pause` for one-off CAPTCHA solving before a script runs.
 - Prefer `tap site` over `tap fetch` when a site script exists for better structured output.
 - If QuickJS execution fails, tap automatically falls back to browser mode.
+- Use `tap browser` for multi-step workflows that need state across invocations.
+- Prefer `tap browser` over `-b` when you need to keep a browser alive between commands.
