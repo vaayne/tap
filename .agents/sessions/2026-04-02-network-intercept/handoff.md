@@ -29,3 +29,54 @@
 **All tests pass:** `go test ./... -timeout 60s -race` ✓
 
 **Ready for Phase 2:** Manager methods (`NetworkWait`, `NetworkGetBody`) can wrap `WaitForRequest` and `GetResponseBody` using the `resolveTarget` pattern from existing Manager methods.
+
+### Fixes (post-review)
+- `e5b727a` — Allow `LoadingFailed` to match without `ResponseReceived` (DNS failure, connection refused). Added `?` literal test case.
+
+**Note for Phase 4**: Pre-compile regex in `matchURL` for performance when called per-event in `EnableNetworkLog`. Also prune completed entries from the requests map.
+
+## Phase 2: Manager Methods — Wait & Body (Complete)
+
+**Commits:**
+- `78a9f7e` — ✨ feat: add NetworkWait and NetworkGetBody Manager methods
+
+**Files modified:**
+- `browser/manager.go` — Added `NetworkWait` and `NetworkGetBody` methods using `resolveTarget` pattern
+
+## Phase 3: CLI — `wait` & `body` (Complete)
+
+**Commits:**
+- `9dfba38` — ✨ feat: add 'tap browser network wait' and 'body' CLI commands
+
+**Files created/modified:**
+- `cmd/tap/browser_network.go` (new) — `browserNetworkCmd()` group, `browserNetworkWaitCmd()`, `browserNetworkBodyCmd()`, `buildNetworkFilter()`, `splitCSV()`
+- `cmd/tap/browser.go` — Registered `browserNetworkCmd()` in the browser command tree
+
+## Phase 4: Network Log — Streaming Capture (Complete)
+
+**Commits:**
+- `200ffcc` — ✨ feat: add network log streaming (EnableNetworkLog + CLI)
+
+**Files modified:**
+- `browser/network.go` — Added `EnableNetworkLog` with buffered channel (256), non-blocking send, delete completed entries from requests map, goroutine closes channel on session end
+- `browser/manager.go` — Added `NetworkLog` Manager method
+- `cmd/tap/browser_network.go` — Added `browserNetworkLogCmd()` with NDJSON streaming
+
+## Phase 5: Fetch Domain Interception (Complete)
+
+**Commits:**
+- `87d96e3` — ✨ feat: add Fetch domain interception (block/mock/headers)
+
+**Files modified:**
+- `browser/network.go` — Added `InterceptRule` type, `ValidateInterceptRules`, `SetInterceptRules` (Fetch domain + EventRequestPaused goroutine handler), `ClearIntercept`
+- `browser/manager.go` — Added `interceptCancel` map to Manager, `NetworkIntercept` (with prior cancel tracking), `NetworkClearIntercept`
+- `cmd/tap/browser_network.go` — Added `browserNetworkInterceptCmd()` and `browserNetworkClearCmd()`
+- `browser/network_test.go` — Added `TestValidateInterceptRules` (7 cases)
+
+**Key decisions:**
+- `SetInterceptRules` returns a cancel func; Manager stores it in `interceptCancel` map keyed by `session:tab`
+- Event handler runs CDP commands (FailRequest/FulfillRequest/ContinueRequest) in goroutines per chromedp requirement
+- FulfillRequest body is base64-encoded per CDP spec
+- Intercept CLI blocks with `<-ctx.Done()` to keep the interception goroutine alive
+
+**All tests pass:** `go test ./... -timeout 60s -race` ✓
