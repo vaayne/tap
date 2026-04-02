@@ -89,25 +89,17 @@ session name, tab name, and current timestamp.`,
 			}
 			sessionName := cmd.String("session")
 			tabName := cmd.String("tab")
-			data, err := mgr.Screenshot(ctx, sessionName, tabName)
+			result, err := mgr.Screenshot(ctx, sessionName, tabName)
 			if err != nil {
 				return err
 			}
 
 			outPath := cmd.String("output")
 			if outPath == "" {
-				s := sessionName
-				if s == "" {
-					s = "default"
-				}
-				t := tabName
-				if t == "" {
-					t = "default"
-				}
-				outPath = fmt.Sprintf("screenshot-%s-%s-%d.png", s, t, time.Now().Unix())
+				outPath = fmt.Sprintf("screenshot-%s-%s-%d.png", result.SessionName, result.TabName, time.Now().Unix())
 			}
 
-			if err := os.WriteFile(outPath, data, 0o644); err != nil {
+			if err := os.WriteFile(outPath, result.Data, 0o644); err != nil {
 				return fmt.Errorf("write screenshot: %w", err)
 			}
 			fmt.Fprintf(os.Stderr, "%s\n", outPath)

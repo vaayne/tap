@@ -133,8 +133,10 @@ func LaunchBrowser(ctx context.Context, config LocalConfig) (*ProcessRecord, err
 	// Capture PID before Release, which sets Pid to -1.
 	pid := cmd.Process.Pid
 
-	// Release the process handle so Go does not accumulate zombies.
+	// Release the process handle so Go's runtime does not track this child.
 	// Chrome runs detached (Setpgid) and is managed via PID from metadata.
+	// When the tap CLI exits, Chrome is reparented to init/launchd which
+	// will reap it when it eventually exits.
 	_ = cmd.Process.Release()
 
 	return &ProcessRecord{
@@ -227,6 +229,10 @@ func KillProcess(record *ProcessRecord) error {
 
 	// Verify we own this process by checking the debug endpoint.
 	// If the endpoint is unreachable (PID reuse), skip termination.
+	// Note: there is a small TOCTOU window between this check and the kill
+	// below, but the debug URL check is strong enough for practical use —
+	// PID reuse within milliseconds while a matching debug server appears
+	// on the same port is extremely unlikely.
 	if record.DebugURL != "" {
 		if err := CheckProcess(record); err != nil {
 			return nil // can't verify ownership — skip kill

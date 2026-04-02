@@ -73,6 +73,9 @@ func CloseTarget(ctx context.Context, debugURL string, targetID string) error {
 	// Use the browser-level executor because chromedp's tab-level Target.Execute
 	// intercepts and rejects CloseTarget commands.
 	return chromedp.Run(bctx, chromedp.ActionFunc(func(ctx context.Context) error {
+		// Use bctx (the outer chromedp context) to reach the Browser executor.
+		// The inner ctx from ActionFunc is bound to the tab-level Target executor
+		// which intercepts CloseTarget, so we need the browser-level one.
 		c := chromedp.FromContext(bctx)
 		if c == nil || c.Browser == nil {
 			return fmt.Errorf("close target: no browser connection")

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"syscall"
 	"time"
 )
 
@@ -141,7 +142,9 @@ func (m *Manager) CloseSession(_ context.Context, name string) error {
 		if isLocal && proc != nil {
 			// Best-effort: don't fail if the process is already dead.
 			_ = KillProcess(proc)
-			if profileDir != "" {
+			// Only remove the profile after confirming the process is gone,
+			// so we don't delete files Chrome is still writing to.
+			if profileDir != "" && (proc.PID <= 0 || syscall.Kill(proc.PID, 0) != nil) {
 				_ = os.RemoveAll(profileDir)
 			}
 		}
@@ -209,9 +212,12 @@ func (m *Manager) CreateTab(ctx context.Context, sessionName string, tabName str
 	}
 	sessionName = resolved
 
-	// Phase 1: resolve debug URL under lock.
+	// Phase 1: resolve debug URL and check for duplicates under lock.
 	var debugURL string
 	err = m.store.UpdateSession(sessionName, func(_ *State, session *SessionRecord) error {
+		if _, exists := session.Tabs[tabName]; exists {
+			return fmt.Errorf("create tab: tab %q already exists in session %q", tabName, sessionName)
+		}
 		du, err := resolveDebugURL(session)
 		if err != nil {
 			return fmt.Errorf("create tab: %w", err)
@@ -385,31 +391,38 @@ func (m *Manager) Navigate(ctx context.Context, sessionName string, tabName stri
 // Evaluate runs JavaScript in a tracked tab and returns the result.
 func (m *Manager) Evaluate(ctx context.Context, sessionName string, tabName string, js string) (any, error) {
 	// Resolve session/tab under lock, then release before CDP I/O.
-	debugURL, targetID, err := m.resolveTarget(sessionName, tabName, "evaluate")
+	rt, err := m.resolveTarget(sessionName, tabName, "evaluate")
 	if err != nil {
 		return nil, err
 	}
 
-	result, err := EvalTarget(ctx, debugURL, targetID, js)
+	result, err := EvalTarget(ctx, rt.DebugURL, rt.TargetID, js)
 	if err != nil {
 		return nil, fmt.Errorf("evaluate: %w", err)
 	}
 	return result, nil
 }
 
+// ScreenshotResult holds the screenshot data and resolved names.
+type ScreenshotResult struct {
+	Data        []byte
+	SessionName string
+	TabName     string
+}
+
 // Screenshot captures a full-page PNG of a tracked tab.
-func (m *Manager) Screenshot(ctx context.Context, sessionName string, tabName string) ([]byte, error) {
+func (m *Manager) Screenshot(ctx context.Context, sessionName string, tabName string) (*ScreenshotResult, error) {
 	// Resolve session/tab under lock, then release before CDP I/O.
-	debugURL, targetID, err := m.resolveTarget(sessionName, tabName, "screenshot")
+	rt, err := m.resolveTarget(sessionName, tabName, "screenshot")
 	if err != nil {
 		return nil, err
 	}
 
-	buf, err := ScreenshotTarget(ctx, debugURL, targetID)
+	buf, err := ScreenshotTarget(ctx, rt.DebugURL, rt.TargetID)
 	if err != nil {
 		return nil, fmt.Errorf("screenshot: %w", err)
 	}
-	return buf, nil
+	return &ScreenshotResult{Data: buf, SessionName: rt.SessionName, TabName: rt.TabName}, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -463,15 +476,24 @@ func (m *Manager) Reconcile(ctx context.Context, sessionName string) error {
 // Helpers
 // ---------------------------------------------------------------------------
 
-// resolveTarget resolves a session and tab under lock and returns the debug URL
-// and target ID for use outside the lock during CDP I/O.
-func (m *Manager) resolveTarget(sessionName string, tabName string, op string) (string, string, error) {
+// resolvedTarget holds the result of resolving a session and tab for CDP I/O.
+type resolvedTarget struct {
+	DebugURL    string
+	TargetID    string
+	SessionName string
+	TabName     string
+}
+
+// resolveTarget resolves a session and tab under lock and returns the debug URL,
+// target ID, and resolved names for use outside the lock during CDP I/O.
+func (m *Manager) resolveTarget(sessionName string, tabName string, op string) (resolvedTarget, error) {
 	resolved, err := m.resolveSessionName(sessionName)
 	if err != nil {
-		return "", "", fmt.Errorf("%s: %w", op, err)
+		return resolvedTarget{}, fmt.Errorf("%s: %w", op, err)
 	}
 	sessionName = resolved
-	var debugURL, targetID string
+	var rt resolvedTarget
+	rt.SessionName = sessionName
 	err = m.store.WithSessionLock(sessionName, func() error {
 		state, err := m.store.Load()
 		if err != nil {
@@ -492,14 +514,15 @@ func (m *Manager) resolveTarget(sessionName string, tabName string, op string) (
 		if err != nil {
 			return err
 		}
-		debugURL = du
-		targetID = tab.TargetID
+		rt.DebugURL = du
+		rt.TargetID = tab.TargetID
+		rt.TabName = tab.Name
 		return nil
 	})
 	if err != nil {
-		return "", "", fmt.Errorf("%s: %w", op, err)
+		return resolvedTarget{}, fmt.Errorf("%s: %w", op, err)
 	}
-	return debugURL, targetID, nil
+	return rt, nil
 }
 
 // resolveSessionName resolves an optional session name to a concrete name
