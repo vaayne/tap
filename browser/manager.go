@@ -105,6 +105,11 @@ func (m *Manager) CreateSession(ctx context.Context, name string, mode Mode, opt
 // CloseSession terminates a browser session, kills the local process if
 // applicable, and removes all related metadata.
 func (m *Manager) CloseSession(_ context.Context, name string) error {
+	resolved, err := m.resolveSessionName(name)
+	if err != nil {
+		return fmt.Errorf("close session: %w", err)
+	}
+	name = resolved
 	return m.store.WithSessionLock(name, func() error {
 		// Phase 1: read process info under state lock.
 		var proc *ProcessRecord
@@ -195,6 +200,11 @@ func (m *Manager) SelectSession(_ context.Context, name string) error {
 
 // CreateTab opens a new browser tab and tracks it in session metadata.
 func (m *Manager) CreateTab(ctx context.Context, sessionName string, tabName string, url string) error {
+	resolved, err := m.resolveSessionName(sessionName)
+	if err != nil {
+		return fmt.Errorf("create tab: %w", err)
+	}
+	sessionName = resolved
 	return m.store.UpdateSession(sessionName, func(state *State, session *SessionRecord) error {
 		debugURL, err := resolveDebugURL(session)
 		if err != nil {
@@ -221,6 +231,11 @@ func (m *Manager) CreateTab(ctx context.Context, sessionName string, tabName str
 
 // CloseTab closes a browser tab and removes it from session metadata.
 func (m *Manager) CloseTab(ctx context.Context, sessionName string, tabName string) error {
+	resolved, err := m.resolveSessionName(sessionName)
+	if err != nil {
+		return fmt.Errorf("close tab: %w", err)
+	}
+	sessionName = resolved
 	return m.store.UpdateSession(sessionName, func(state *State, session *SessionRecord) error {
 		tab, err := session.ResolveTab(tabName)
 		if err != nil {
@@ -272,6 +287,11 @@ func (m *Manager) ListTabs(_ context.Context, sessionName string) ([]*TabRecord,
 
 // SelectTab persists the default tab used when --tab is omitted.
 func (m *Manager) SelectTab(_ context.Context, sessionName string, tabName string) error {
+	resolved, err := m.resolveSessionName(sessionName)
+	if err != nil {
+		return fmt.Errorf("select tab: %w", err)
+	}
+	sessionName = resolved
 	return m.store.UpdateSession(sessionName, func(state *State, _ *SessionRecord) error {
 		if err := state.SelectTab(sessionName, tabName); err != nil {
 			return fmt.Errorf("select tab: %w", err)
@@ -286,9 +306,14 @@ func (m *Manager) SelectTab(_ context.Context, sessionName string, tabName strin
 
 // Navigate changes the URL of a tracked tab.
 func (m *Manager) Navigate(ctx context.Context, sessionName string, tabName string, url string) error {
+	resolved, err := m.resolveSessionName(sessionName)
+	if err != nil {
+		return fmt.Errorf("navigate: %w", err)
+	}
+	sessionName = resolved
 	// Phase 1: resolve session/tab under lock, release before CDP I/O.
 	var debugURL, targetID, resolvedSession, resolvedTab string
-	err := m.store.UpdateSession(sessionName, func(_ *State, session *SessionRecord) error {
+	err = m.store.UpdateSession(sessionName, func(_ *State, session *SessionRecord) error {
 		tab, err := session.ResolveTab(tabName)
 		if err != nil {
 			return fmt.Errorf("navigate: %w", err)
@@ -361,6 +386,11 @@ func (m *Manager) Screenshot(ctx context.Context, sessionName string, tabName st
 
 // Reconcile refreshes tab liveness by comparing metadata against live CDP targets.
 func (m *Manager) Reconcile(ctx context.Context, sessionName string) error {
+	resolved, err := m.resolveSessionName(sessionName)
+	if err != nil {
+		return fmt.Errorf("reconcile: %w", err)
+	}
+	sessionName = resolved
 	return m.store.UpdateSession(sessionName, func(state *State, session *SessionRecord) error {
 		debugURL, err := resolveDebugURL(session)
 		if err != nil {
@@ -392,8 +422,13 @@ func (m *Manager) Reconcile(ctx context.Context, sessionName string) error {
 // resolveTarget resolves a session and tab under lock and returns the debug URL
 // and target ID for use outside the lock during CDP I/O.
 func (m *Manager) resolveTarget(sessionName string, tabName string, op string) (string, string, error) {
+	resolved, err := m.resolveSessionName(sessionName)
+	if err != nil {
+		return "", "", fmt.Errorf("%s: %w", op, err)
+	}
+	sessionName = resolved
 	var debugURL, targetID string
-	err := m.store.WithSessionLock(sessionName, func() error {
+	err = m.store.WithSessionLock(sessionName, func() error {
 		state, err := m.store.Load()
 		if err != nil {
 			return err
@@ -421,6 +456,23 @@ func (m *Manager) resolveTarget(sessionName string, tabName string, op string) (
 		return "", "", fmt.Errorf("%s: %w", op, err)
 	}
 	return debugURL, targetID, nil
+}
+
+// resolveSessionName resolves an optional session name to a concrete name
+// before it reaches WithSessionLock or UpdateSession (which reject empty names).
+func (m *Manager) resolveSessionName(name string) (string, error) {
+	if name != "" {
+		return name, nil
+	}
+	state, err := m.store.Load()
+	if err != nil {
+		return "", err
+	}
+	session, err := state.ResolveSession("")
+	if err != nil {
+		return "", err
+	}
+	return session.Name, nil
 }
 
 // resolveDebugURL extracts the CDP debug endpoint from session metadata.
