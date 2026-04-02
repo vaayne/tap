@@ -100,7 +100,7 @@ func browserTabListCmd() *cli.Command {
 
 			c := useColor(cmd)
 			w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
-			fmt.Fprintln(w, bold(c, "NAME\tSTATUS\tURL\tSELECTED"))
+			_, _ = fmt.Fprintln(w, bold(c, "NAME\tSTATUS\tURL\tSELECTED"))
 			for _, tab := range tabs {
 				status := string(tab.Status)
 				switch tab.Status {
@@ -113,7 +113,7 @@ func browserTabListCmd() *cli.Command {
 				if tab.Name == selectedTab {
 					sel = green(c, "*")
 				}
-				fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", tab.Name, status, tab.URL, sel)
+				_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", tab.Name, status, tab.URL, sel)
 			}
 			return w.Flush()
 		},

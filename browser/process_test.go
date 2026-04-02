@@ -111,7 +111,7 @@ func TestParseDebugURL(t *testing.T) {
 	t.Run("timeout with no output", func(t *testing.T) {
 		// Use a pipe that blocks forever (never writes).
 		r, w := io.Pipe()
-		defer w.Close()
+		defer func() { _ = w.Close() }()
 
 		_, err := parseDebugURL(r, 50*time.Millisecond)
 		if err == nil {

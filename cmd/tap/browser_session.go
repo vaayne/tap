@@ -104,13 +104,13 @@ func browserSessionListCmd() *cli.Command {
 
 			c := useColor(cmd)
 			w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
-			fmt.Fprintln(w, bold(c, "NAME\tMODE\tTABS\tSELECTED"))
+			_, _ = fmt.Fprintln(w, bold(c, "NAME\tMODE\tTABS\tSELECTED"))
 			for _, s := range sessions {
 				sel := ""
 				if s.Name == selectedName {
 					sel = green(c, "*")
 				}
-				fmt.Fprintf(w, "%s\t%s\t%d\t%s\n", s.Name, s.Mode, len(s.Tabs), sel)
+				_, _ = fmt.Fprintf(w, "%s\t%s\t%d\t%s\n", s.Name, s.Mode, len(s.Tabs), sel)
 			}
 			return w.Flush()
 		},
@@ -139,8 +139,8 @@ are not auto-adopted in v1.`,
 			}
 
 			c := useColor(cmd)
-			fmt.Fprintf(os.Stdout, "%s %s\n", bold(c, "Name:"), session.Name)
-			fmt.Fprintf(os.Stdout, "%s %s\n", bold(c, "Mode:"), session.Mode)
+			_, _ = fmt.Fprintf(os.Stdout, "%s %s\n", bold(c, "Name:"), session.Name)
+			_, _ = fmt.Fprintf(os.Stdout, "%s %s\n", bold(c, "Mode:"), session.Mode)
 			debugURL := ""
 			if session.Process != nil && session.Process.DebugURL != "" {
 				debugURL = session.Process.DebugURL
@@ -148,18 +148,18 @@ are not auto-adopted in v1.`,
 				debugURL = session.Remote.WSURL
 			}
 			if debugURL != "" {
-				fmt.Fprintf(os.Stdout, "%s %s\n", bold(c, "Debug URL:"), debugURL)
+				_, _ = fmt.Fprintf(os.Stdout, "%s %s\n", bold(c, "Debug URL:"), debugURL)
 			}
-			fmt.Fprintf(os.Stdout, "%s %s\n", bold(c, "Created:"), session.CreatedAt.Format("2006-01-02 15:04:05"))
+			_, _ = fmt.Fprintf(os.Stdout, "%s %s\n", bold(c, "Created:"), session.CreatedAt.Format("2006-01-02 15:04:05"))
 
 			if len(session.Tabs) == 0 {
-				fmt.Fprintf(os.Stdout, "\n%s\n", dim(c, "No tracked tabs."))
+				_, _ = fmt.Fprintf(os.Stdout, "\n%s\n", dim(c, "No tracked tabs."))
 				return nil
 			}
 
-			fmt.Fprintf(os.Stdout, "\n%s\n", bold(c, "Tabs:"))
+			_, _ = fmt.Fprintf(os.Stdout, "\n%s\n", bold(c, "Tabs:"))
 			w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
-			fmt.Fprintln(w, "  NAME\tSTATUS\tURL")
+			_, _ = fmt.Fprintln(w, "  NAME\tSTATUS\tURL")
 			for _, tab := range session.Tabs {
 				status := string(tab.Status)
 				switch tab.Status {
@@ -172,7 +172,7 @@ are not auto-adopted in v1.`,
 				if tab.Name == session.SelectedTab {
 					sel = " " + green(c, "*")
 				}
-				fmt.Fprintf(w, "  %s%s\t%s\t%s\n", tab.Name, sel, status, tab.URL)
+				_, _ = fmt.Fprintf(w, "  %s%s\t%s\t%s\n", tab.Name, sel, status, tab.URL)
 			}
 			return w.Flush()
 		},
