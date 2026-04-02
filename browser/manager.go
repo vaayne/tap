@@ -36,6 +36,9 @@ func NewManager(store *Store) *Manager {
 
 // CreateSession launches or connects to a browser and persists session metadata.
 func (m *Manager) CreateSession(ctx context.Context, name string, mode Mode, opts SessionOptions) error {
+	if err := ValidateSessionName(name); err != nil {
+		return fmt.Errorf("create session: %w", err)
+	}
 	now := time.Now()
 
 	switch mode {
@@ -205,17 +208,29 @@ func (m *Manager) CreateTab(ctx context.Context, sessionName string, tabName str
 		return fmt.Errorf("create tab: %w", err)
 	}
 	sessionName = resolved
-	return m.store.UpdateSession(sessionName, func(state *State, session *SessionRecord) error {
-		debugURL, err := resolveDebugURL(session)
+
+	// Phase 1: resolve debug URL under lock.
+	var debugURL string
+	err = m.store.UpdateSession(sessionName, func(_ *State, session *SessionRecord) error {
+		du, err := resolveDebugURL(session)
 		if err != nil {
 			return fmt.Errorf("create tab: %w", err)
 		}
+		debugURL = du
+		return nil
+	})
+	if err != nil {
+		return err
+	}
 
-		targetID, err := CreateTarget(ctx, debugURL, url)
-		if err != nil {
-			return fmt.Errorf("create tab: %w", err)
-		}
+	// Phase 2: create CDP target outside the state lock.
+	targetID, err := CreateTarget(ctx, debugURL, url)
+	if err != nil {
+		return fmt.Errorf("create tab: %w", err)
+	}
 
+	// Phase 3: persist tab metadata under lock.
+	return m.store.UpdateSession(sessionName, func(state *State, _ *SessionRecord) error {
 		now := time.Now()
 		tab, err := NewTab(tabName, targetID, url, now)
 		if err != nil {

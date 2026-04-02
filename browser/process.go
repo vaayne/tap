@@ -215,6 +215,14 @@ func KillProcess(record *ProcessRecord) error {
 		return nil // already dead
 	}
 
+	// Verify we own this process by checking the debug endpoint.
+	// If the endpoint is unreachable (PID reuse), skip termination.
+	if record.DebugURL != "" {
+		if err := CheckProcess(record); err != nil {
+			return nil // can't verify ownership — skip kill
+		}
+	}
+
 	// Send SIGTERM for a graceful shutdown.
 	if err := syscall.Kill(record.PID, syscall.SIGTERM); err != nil {
 		if errors.Is(err, syscall.ESRCH) {
