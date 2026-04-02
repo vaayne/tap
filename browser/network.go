@@ -235,3 +235,108 @@ func getResponseBodyOn(ctx context.Context, requestID network.RequestID) ([]byte
 	}
 	return body, nil
 }
+
+// EnableNetworkLog enables the Network domain on a target and streams completed
+// request/response entries to the returned channel. The channel is buffered
+// (256 entries); if the buffer fills, new entries are dropped.
+//
+// Call the returned cancel func to stop capturing and close the channel.
+// The caller should drain the channel or call cancel to avoid goroutine leaks.
+func EnableNetworkLog(ctx context.Context, debugURL string, targetID string, filter NetworkFilter) (<-chan NetworkEntry, func(), error) {
+	taskCtx, taskCancel, err := withTargetListen(ctx, debugURL, targetID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("enable network log: %w", err)
+	}
+
+	ch := make(chan NetworkEntry, 256)
+
+	type requestState struct {
+		entry   NetworkEntry
+		gotResp bool
+	}
+
+	requests := make(map[network.RequestID]*requestState)
+
+	// trySend sends an entry to the channel without blocking.
+	trySend := func(entry NetworkEntry) {
+		select {
+		case ch <- entry:
+		default:
+			// Buffer full — drop entry.
+		}
+	}
+
+	chromedp.ListenTarget(taskCtx, func(ev interface{}) {
+		switch e := ev.(type) {
+		case *network.EventRequestWillBeSent:
+			requests[e.RequestID] = &requestState{
+				entry: NetworkEntry{
+					RequestID:    string(e.RequestID),
+					URL:          e.Request.URL,
+					Method:       e.Request.Method,
+					ResourceType: string(e.Type),
+					ReqHeaders:   headersToMap(e.Request.Headers),
+					Timestamp:     time.Now(),
+				},
+			}
+
+		case *network.EventResponseReceived:
+			rs, ok := requests[e.RequestID]
+			if !ok {
+				rs = &requestState{
+					entry: NetworkEntry{
+						RequestID: string(e.RequestID),
+						Timestamp: time.Now(),
+					},
+				}
+				requests[e.RequestID] = rs
+			}
+			rs.entry.Status = e.Response.Status
+			rs.entry.MIMEType = e.Response.MimeType
+			rs.entry.ResHeaders = headersToMap(e.Response.Headers)
+			if rs.entry.URL == "" {
+				rs.entry.URL = e.Response.URL
+			}
+			if rs.entry.ResourceType == "" {
+				rs.entry.ResourceType = string(e.Type)
+			}
+			rs.gotResp = true
+
+		case *network.EventLoadingFinished:
+			rs, ok := requests[e.RequestID]
+			if !ok {
+				return
+			}
+			entry := rs.entry
+			delete(requests, e.RequestID)
+			if rs.gotResp && matchesFilter(entry, filter) {
+				trySend(entry)
+			}
+
+		case *network.EventLoadingFailed:
+			rs, ok := requests[e.RequestID]
+			if !ok {
+				return
+			}
+			entry := rs.entry
+			entry.Error = e.ErrorText
+			delete(requests, e.RequestID)
+			if matchesFilter(entry, filter) {
+				trySend(entry)
+			}
+		}
+	})
+
+	if err := chromedp.Run(taskCtx, network.Enable()); err != nil {
+		taskCancel()
+		return nil, nil, fmt.Errorf("enable network log: enable network: %w", err)
+	}
+
+	// Goroutine closes the channel when the CDP session ends.
+	go func() {
+		<-taskCtx.Done()
+		close(ch)
+	}()
+
+	return ch, taskCancel, nil
+}

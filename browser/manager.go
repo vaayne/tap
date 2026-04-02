@@ -491,6 +491,21 @@ func (m *Manager) NetworkGetBody(ctx context.Context, sessionName string, tabNam
 	return body, nil
 }
 
+// NetworkLog starts capturing network requests for a tracked tab and streams
+// completed entries to the returned channel. Call cancel to stop capturing.
+func (m *Manager) NetworkLog(ctx context.Context, sessionName string, tabName string, filter NetworkFilter) (<-chan NetworkEntry, func(), error) {
+	rt, err := m.resolveTarget(sessionName, tabName, "network log")
+	if err != nil {
+		return nil, nil, err
+	}
+
+	ch, cancel, err := EnableNetworkLog(ctx, rt.DebugURL, rt.TargetID, filter)
+	if err != nil {
+		return nil, nil, fmt.Errorf("network log: %w", err)
+	}
+	return ch, cancel, nil
+}
+
 // ---------------------------------------------------------------------------
 // Reconciliation
 // ---------------------------------------------------------------------------

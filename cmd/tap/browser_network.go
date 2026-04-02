@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -23,6 +24,7 @@ the Fetch domain for active interception (intercept, clear).`,
 		Commands: []*cli.Command{
 			browserNetworkWaitCmd(),
 			browserNetworkBodyCmd(),
+			browserNetworkLogCmd(),
 		},
 	}
 }
@@ -182,4 +184,73 @@ func splitCSV(s string) []string {
 		}
 	}
 	return out
+}
+
+func browserNetworkLogCmd() *cli.Command {
+	return &cli.Command{
+		Name:  "log",
+		Usage: "Stream captured network requests as NDJSON",
+		Flags: append(browserActionFlags(false),
+			&cli.StringFlag{
+				Name:  "url-pattern",
+				Usage: "Glob pattern to match request URLs",
+			},
+			&cli.StringFlag{
+				Name:  "method",
+				Usage: "HTTP method(s) to match, comma-separated",
+			},
+			&cli.StringFlag{
+				Name:  "resource-type",
+				Usage: "Resource type(s) to match, comma-separated",
+			},
+			&cli.DurationFlag{
+				Name:  "timeout",
+				Usage: "Maximum duration to capture (0 = until interrupted)",
+				Value: 0,
+			},
+		),
+		Description: `Enable the Network domain and stream completed request/response entries
+as newline-delimited JSON (NDJSON) to stdout.
+
+Runs until --timeout expires or the process is interrupted (Ctrl-C).
+
+Examples:
+  tap browser network log
+  tap browser network log --url-pattern "*/api/*" --timeout 30s
+  tap browser network log --resource-type XHR,Fetch`,
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			configureLogging(cmd)
+
+			filter := buildNetworkFilter(cmd)
+
+			mgr, err := newBrowserManager(cmd)
+			if err != nil {
+				return err
+			}
+
+			sessionName := cmd.String("session")
+			tabName := cmd.String("tab")
+
+			logCtx := ctx
+			var logCancel context.CancelFunc
+			if timeout := cmd.Duration("timeout"); timeout > 0 {
+				logCtx, logCancel = context.WithTimeout(ctx, timeout)
+				defer logCancel()
+			}
+
+			ch, cancel, err := mgr.NetworkLog(logCtx, sessionName, tabName, filter)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+
+			enc := json.NewEncoder(os.Stdout)
+			for entry := range ch {
+				if err := enc.Encode(entry); err != nil {
+					return fmt.Errorf("write entry: %w", err)
+				}
+			}
+			return nil
+		},
+	}
 }
