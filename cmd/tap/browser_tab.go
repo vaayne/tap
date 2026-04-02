@@ -3,8 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
+	"text/tabwriter"
 
 	"github.com/urfave/cli/v3"
+	"github.com/vaayne/tap/browser"
 )
 
 func browserTabCmd() *cli.Command {
@@ -42,10 +45,22 @@ func browserTabNewCmd() *cli.Command {
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			if cmd.Args().Len() == 0 {
+			configureLogging(cmd)
+			tabName := cmd.Args().First()
+			if tabName == "" {
 				return fmt.Errorf("tab name required")
 			}
-			return ensureBrowserPhase3("tap browser tab new", cmd)
+			mgr, err := newBrowserManager(cmd)
+			if err != nil {
+				return err
+			}
+			sessionName := cmd.String("session")
+			url := cmd.String("url")
+			if err := mgr.CreateTab(ctx, sessionName, tabName, url); err != nil {
+				return err
+			}
+			fmt.Fprintf(os.Stderr, "Tab %q created\n", tabName)
+			return nil
 		},
 	}
 }
@@ -61,7 +76,46 @@ func browserTabListCmd() *cli.Command {
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			return ensureBrowserPhase3("tap browser tab list", cmd)
+			configureLogging(cmd)
+			mgr, err := newBrowserManager(cmd)
+			if err != nil {
+				return err
+			}
+			sessionName := cmd.String("session")
+			tabs, err := mgr.ListTabs(ctx, sessionName)
+			if err != nil {
+				return err
+			}
+			if len(tabs) == 0 {
+				fmt.Fprintln(os.Stderr, "No tracked tabs found.")
+				return nil
+			}
+
+			// Determine which tab is selected.
+			session, err := mgr.GetSession(ctx, sessionName)
+			selectedTab := ""
+			if err == nil && session != nil {
+				selectedTab = session.SelectedTab
+			}
+
+			c := useColor(cmd)
+			w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
+			fmt.Fprintln(w, bold(c, "NAME\tSTATUS\tURL\tSELECTED"))
+			for _, tab := range tabs {
+				status := string(tab.Status)
+				switch tab.Status {
+				case browser.TabStatusLive:
+					status = green(c, status)
+				case browser.TabStatusStale:
+					status = yellow(c, status)
+				}
+				sel := ""
+				if tab.Name == selectedTab {
+					sel = green(c, "*")
+				}
+				fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", tab.Name, status, tab.URL, sel)
+			}
+			return w.Flush()
 		},
 	}
 }
@@ -78,10 +132,21 @@ func browserTabSelectCmd() *cli.Command {
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			if cmd.Args().Len() == 0 {
+			configureLogging(cmd)
+			tabName := cmd.Args().First()
+			if tabName == "" {
 				return fmt.Errorf("tab name required")
 			}
-			return ensureBrowserPhase3("tap browser tab select", cmd)
+			mgr, err := newBrowserManager(cmd)
+			if err != nil {
+				return err
+			}
+			sessionName := cmd.String("session")
+			if err := mgr.SelectTab(ctx, sessionName, tabName); err != nil {
+				return err
+			}
+			fmt.Fprintf(os.Stderr, "Tab %q selected\n", tabName)
+			return nil
 		},
 	}
 }
@@ -102,7 +167,21 @@ func browserTabCloseCmd() *cli.Command {
 If the closed tab was selected, tap promotes the next remaining live tracked tab
 by creation order. If none remain, selected-tab state is cleared.`,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			return ensureBrowserPhase3("tap browser tab close", cmd)
+			configureLogging(cmd)
+			mgr, err := newBrowserManager(cmd)
+			if err != nil {
+				return err
+			}
+			sessionName := cmd.String("session")
+			tabName := cmd.Args().First()
+			if err := mgr.CloseTab(ctx, sessionName, tabName); err != nil {
+				return err
+			}
+			if tabName == "" {
+				tabName = "(resolved)"
+			}
+			fmt.Fprintf(os.Stderr, "Tab %q closed\n", tabName)
+			return nil
 		},
 	}
 }

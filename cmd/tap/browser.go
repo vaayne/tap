@@ -1,8 +1,6 @@
 package main
 
 import (
-	"context"
-	"errors"
 	"fmt"
 
 	"github.com/urfave/cli/v3"
@@ -45,10 +43,13 @@ it stale and clears selected-tab state instead of silently adopting a new tab.`,
 	}
 }
 
-func browserActionNotImplemented(name string) func(context.Context, *cli.Command) error {
-	return func(_ context.Context, _ *cli.Command) error {
-		return fmt.Errorf("%s is defined in Phase 1 but will be implemented in a later phase", name)
+func newBrowserManager(cmd *cli.Command) (*browser.Manager, error) {
+	root := browserStateRoot(cmd)
+	store, err := browser.NewStore(root)
+	if err != nil {
+		return nil, fmt.Errorf("init browser store: %w", err)
 	}
+	return browser.NewManager(store), nil
 }
 
 func browserActionFlags(includeOutput bool) []cli.Flag {
@@ -83,11 +84,3 @@ func browserStateRoot(cmd *cli.Command) string {
 	return defaultRoot
 }
 
-func ensureBrowserPhase3(name string, cmd *cli.Command) error {
-	configureLogging(cmd)
-	root := browserStateRoot(cmd)
-	if root == "" {
-		return errors.New("browser state root could not be resolved")
-	}
-	return browserActionNotImplemented(name)(context.Background(), cmd)
-}
