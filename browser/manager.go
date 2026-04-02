@@ -9,8 +9,6 @@ import (
 	"path/filepath"
 	"sort"
 	"time"
-
-	"github.com/vaayne/tap/transport"
 )
 
 // SessionOptions holds optional settings for session creation.
@@ -203,7 +201,7 @@ func (m *Manager) CreateTab(ctx context.Context, sessionName string, tabName str
 			return fmt.Errorf("create tab: %w", err)
 		}
 
-		targetID, err := transport.CreateTarget(ctx, debugURL, url)
+		targetID, err := CreateTarget(ctx, debugURL, url)
 		if err != nil {
 			return fmt.Errorf("create tab: %w", err)
 		}
@@ -235,7 +233,7 @@ func (m *Manager) CloseTab(ctx context.Context, sessionName string, tabName stri
 			if err != nil {
 				return fmt.Errorf("close tab: %w", err)
 			}
-			if err := transport.CloseTarget(ctx, debugURL, tab.TargetID); err != nil {
+			if err := CloseTarget(ctx, debugURL, tab.TargetID); err != nil {
 				return fmt.Errorf("close tab: %w", err)
 			}
 		}
@@ -313,7 +311,7 @@ func (m *Manager) Navigate(ctx context.Context, sessionName string, tabName stri
 	}
 
 	// Phase 2: CDP navigation outside any lock.
-	if err := transport.NavigateTarget(ctx, debugURL, targetID, url); err != nil {
+	if err := NavigateTarget(ctx, debugURL, targetID, url); err != nil {
 		return fmt.Errorf("navigate: %w", err)
 	}
 
@@ -335,7 +333,7 @@ func (m *Manager) Evaluate(ctx context.Context, sessionName string, tabName stri
 		return nil, err
 	}
 
-	result, err := transport.EvalTarget(ctx, debugURL, targetID, js)
+	result, err := EvalTarget(ctx, debugURL, targetID, js)
 	if err != nil {
 		return nil, fmt.Errorf("evaluate: %w", err)
 	}
@@ -350,7 +348,7 @@ func (m *Manager) Screenshot(ctx context.Context, sessionName string, tabName st
 		return nil, err
 	}
 
-	buf, err := transport.ScreenshotTarget(ctx, debugURL, targetID)
+	buf, err := ScreenshotTarget(ctx, debugURL, targetID)
 	if err != nil {
 		return nil, fmt.Errorf("screenshot: %w", err)
 	}
@@ -369,7 +367,7 @@ func (m *Manager) Reconcile(ctx context.Context, sessionName string) error {
 			return fmt.Errorf("reconcile: %w", err)
 		}
 
-		targets, err := transport.ListTargets(ctx, debugURL)
+		targets, err := ListTargets(ctx, debugURL)
 		if err != nil {
 			return fmt.Errorf("reconcile: %w", err)
 		}
