@@ -2,11 +2,13 @@ package browser
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"regexp"
 	"strings"
 	"time"
 
+	"github.com/chromedp/cdproto/fetch"
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/chromedp"
 )
@@ -339,4 +341,155 @@ func EnableNetworkLog(ctx context.Context, debugURL string, targetID string, fil
 	}()
 
 	return ch, taskCancel, nil
+}
+
+// InterceptRule defines how to modify or block requests matching a filter.
+// Block and MockBody are mutually exclusive.
+type InterceptRule struct {
+	Filter      NetworkFilter     `json:"filter"`
+	Block       bool              `json:"block,omitempty"`
+	AddHeaders  map[string]string `json:"addHeaders,omitempty"`
+	MockStatus  int               `json:"mockStatus,omitempty"`
+	MockBody    string            `json:"mockBody,omitempty"`
+	MockHeaders map[string]string `json:"mockHeaders,omitempty"`
+}
+
+// ValidateInterceptRules checks that rules are well-formed.
+func ValidateInterceptRules(rules []InterceptRule) error {
+	for i, r := range rules {
+		if r.Block && r.MockBody != "" {
+			return fmt.Errorf("rule %d: block and mock body are mutually exclusive", i)
+		}
+		if r.MockBody != "" && r.MockStatus == 0 {
+			return fmt.Errorf("rule %d: mock body requires mock status", i)
+		}
+	}
+	return nil
+}
+
+// SetInterceptRules enables Fetch domain interception with the given rules.
+// It replaces any previously set rules. The returned cancel func stops the
+// interception goroutine and disables the Fetch domain.
+//
+// Pass nil/empty rules to effectively disable interception (or use ClearIntercept).
+func SetInterceptRules(ctx context.Context, debugURL string, targetID string, rules []InterceptRule) (func(), error) {
+	if err := ValidateInterceptRules(rules); err != nil {
+		return nil, fmt.Errorf("set intercept rules: %w", err)
+	}
+
+	taskCtx, taskCancel, err := withTargetListen(ctx, debugURL, targetID)
+	if err != nil {
+		return nil, fmt.Errorf("set intercept rules: %w", err)
+	}
+
+	// Build CDP RequestPattern entries from rules.
+	var patterns []*fetch.RequestPattern
+	for _, r := range rules {
+		p := &fetch.RequestPattern{}
+		if r.Filter.URLPattern != "" {
+			p.URLPattern = r.Filter.URLPattern
+		}
+		if len(r.Filter.ResourceTypes) == 1 {
+			p.ResourceType = network.ResourceType(r.Filter.ResourceTypes[0])
+		}
+		patterns = append(patterns, p)
+	}
+	if len(patterns) == 0 {
+		// Match all requests if no patterns specified.
+		patterns = []*fetch.RequestPattern{{}}
+	}
+
+	// Register the event handler before enabling the domain.
+	chromedp.ListenTarget(taskCtx, func(ev interface{}) {
+		e, ok := ev.(*fetch.EventRequestPaused)
+		if !ok {
+			return
+		}
+
+		// Find the first matching rule.
+		entry := NetworkEntry{
+			URL:          e.Request.URL,
+			Method:       e.Request.Method,
+			ResourceType: string(e.ResourceType),
+		}
+
+		var matched *InterceptRule
+		for i := range rules {
+			if matchesFilter(entry, rules[i].Filter) {
+				matched = &rules[i]
+				break
+			}
+		}
+
+		// Must respond to every paused request. If no rule matches, continue.
+		// Run CDP commands in a goroutine to avoid blocking the event loop.
+		go func() {
+			if matched == nil {
+				_ = fetch.ContinueRequest(e.RequestID).Do(taskCtx)
+				return
+			}
+
+			if matched.Block {
+				_ = fetch.FailRequest(e.RequestID, network.ErrorReasonBlockedByClient).Do(taskCtx)
+				return
+			}
+
+			if matched.MockBody != "" {
+				headers := []*fetch.HeaderEntry{}
+				for k, v := range matched.MockHeaders {
+					headers = append(headers, &fetch.HeaderEntry{Name: k, Value: v})
+				}
+				if len(headers) == 0 {
+					headers = append(headers, &fetch.HeaderEntry{
+						Name: "Content-Type", Value: "application/json",
+					})
+				}
+				_ = fetch.FulfillRequest(e.RequestID, int64(matched.MockStatus)).
+					WithResponseHeaders(headers).
+					WithBody(base64.StdEncoding.EncodeToString([]byte(matched.MockBody))).
+					Do(taskCtx)
+				return
+			}
+
+			// AddHeaders only — continue with modified headers.
+			if len(matched.AddHeaders) > 0 {
+				headers := []*fetch.HeaderEntry{}
+				// Preserve existing request headers.
+				for k, v := range e.Request.Headers {
+					headers = append(headers, &fetch.HeaderEntry{
+						Name: k, Value: fmt.Sprintf("%v", v),
+					})
+				}
+				// Add/override with new headers.
+				for k, v := range matched.AddHeaders {
+					headers = append(headers, &fetch.HeaderEntry{Name: k, Value: v})
+				}
+				_ = fetch.ContinueRequest(e.RequestID).WithHeaders(headers).Do(taskCtx)
+				return
+			}
+
+			// Rule matched but no action specified — continue normally.
+			_ = fetch.ContinueRequest(e.RequestID).Do(taskCtx)
+		}()
+	})
+
+	if err := chromedp.Run(taskCtx, fetch.Enable().WithPatterns(patterns)); err != nil {
+		taskCancel()
+		return nil, fmt.Errorf("set intercept rules: enable fetch: %w", err)
+	}
+
+	return taskCancel, nil
+}
+
+// ClearIntercept disables the Fetch domain on a target.
+func ClearIntercept(ctx context.Context, debugURL string, targetID string) error {
+	err := withTarget(ctx, debugURL, targetID,
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			return fetch.Disable().Do(ctx)
+		}),
+	)
+	if err != nil {
+		return fmt.Errorf("clear intercept: %w", err)
+	}
+	return nil
 }

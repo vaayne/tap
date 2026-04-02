@@ -25,6 +25,8 @@ the Fetch domain for active interception (intercept, clear).`,
 			browserNetworkWaitCmd(),
 			browserNetworkBodyCmd(),
 			browserNetworkLogCmd(),
+			browserNetworkInterceptCmd(),
+			browserNetworkClearCmd(),
 		},
 	}
 }
@@ -250,6 +252,155 @@ Examples:
 					return fmt.Errorf("write entry: %w", err)
 				}
 			}
+			return nil
+		},
+	}
+}
+
+func browserNetworkInterceptCmd() *cli.Command {
+	return &cli.Command{
+		Name:  "intercept",
+		Usage: "Set request interception rules (block, mock, or modify headers)",
+		Flags: append(browserActionFlags(false),
+			&cli.StringFlag{
+				Name:  "url-pattern",
+				Usage: "Glob pattern to match request URLs",
+			},
+			&cli.StringFlag{
+				Name:  "method",
+				Usage: "HTTP method(s) to match, comma-separated",
+			},
+			&cli.StringFlag{
+				Name:  "resource-type",
+				Usage: "Resource type(s) to match, comma-separated",
+			},
+			&cli.BoolFlag{
+				Name:  "block",
+				Usage: "Block matching requests (mutually exclusive with --respond)",
+			},
+			&cli.StringSliceFlag{
+				Name:  "header",
+				Usage: `Add/override request header (repeatable, format "Key: Value")`,
+			},
+			&cli.StringFlag{
+				Name:  "respond",
+				Usage: "Mock response body (mutually exclusive with --block)",
+			},
+			&cli.IntFlag{
+				Name:  "status",
+				Usage: "Mock response HTTP status code (required with --respond)",
+				Value: 200,
+			},
+			&cli.StringFlag{
+				Name:  "content-type",
+				Usage: "Mock response Content-Type header",
+				Value: "application/json",
+			},
+		),
+		Description: `Set Fetch domain interception rules on a tracked tab.
+
+Rules are replace-all: each call replaces any previously set rules.
+Pass a single rule per invocation. Use 'tap browser network clear' to
+remove all rules.
+
+Examples:
+  # Block ad requests
+  tap browser network intercept --block --url-pattern "*.ads.*"
+
+  # Mock an API response
+  tap browser network intercept --url-pattern "*/api/user" \\
+    --respond '{"name":"test"}' --status 200
+
+  # Add auth header to API requests
+  tap browser network intercept --url-pattern "*/api/*" \\
+    --header "Authorization: Bearer tok_abc123"`,
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			configureLogging(cmd)
+
+			filter := buildNetworkFilter(cmd)
+			block := cmd.Bool("block")
+			respondBody := cmd.String("respond")
+
+			if block && respondBody != "" {
+				return fmt.Errorf("--block and --respond are mutually exclusive")
+			}
+
+			rule := browser.InterceptRule{
+				Filter: filter,
+				Block:  block,
+			}
+
+			if respondBody != "" {
+				rule.MockBody = respondBody
+				rule.MockStatus = cmd.Int("status")
+				rule.MockHeaders = map[string]string{
+					"Content-Type": cmd.String("content-type"),
+				}
+			}
+
+			// Parse --header flags.
+			for _, h := range cmd.StringSlice("header") {
+				parts := strings.SplitN(h, ":", 2)
+				if len(parts) != 2 {
+					return fmt.Errorf("invalid header format %q (expected \"Key: Value\")", h)
+				}
+				if rule.AddHeaders == nil {
+					rule.AddHeaders = make(map[string]string)
+				}
+				rule.AddHeaders[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
+			}
+
+			mgr, err := newBrowserManager(cmd)
+			if err != nil {
+				return err
+			}
+
+			sessionName := cmd.String("session")
+			tabName := cmd.String("tab")
+
+			if err := mgr.NetworkIntercept(ctx, sessionName, tabName, []browser.InterceptRule{rule}); err != nil {
+				return err
+			}
+
+			if block {
+				fmt.Fprintln(os.Stderr, "Blocking matching requests")
+			} else if respondBody != "" {
+				fmt.Fprintf(os.Stderr, "Mocking matching requests with status %d\n", rule.MockStatus)
+			} else if len(rule.AddHeaders) > 0 {
+				fmt.Fprintln(os.Stderr, "Adding headers to matching requests")
+			}
+
+			// Keep the process alive so the interception goroutine stays active.
+			<-ctx.Done()
+			return nil
+		},
+	}
+}
+
+func browserNetworkClearCmd() *cli.Command {
+	return &cli.Command{
+		Name:  "clear",
+		Usage: "Remove all Fetch domain interception rules",
+		Flags: browserActionFlags(false),
+		Description: `Disable the Fetch domain and remove all interception rules
+from the resolved tracked tab.
+
+This does not affect passive Network domain capture (log/wait).`,
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			configureLogging(cmd)
+
+			mgr, err := newBrowserManager(cmd)
+			if err != nil {
+				return err
+			}
+
+			sessionName := cmd.String("session")
+			tabName := cmd.String("tab")
+
+			if err := mgr.NetworkClearIntercept(ctx, sessionName, tabName); err != nil {
+				return err
+			}
+			fmt.Fprintln(os.Stderr, "Interception rules cleared")
 			return nil
 		},
 	}

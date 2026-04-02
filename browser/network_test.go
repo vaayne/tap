@@ -4,8 +4,7 @@ import (
 	"testing"
 )
 
-func TestMatchURL(t *testing.T) {
-	tests := []struct {
+func TestMatchURL(t *testing.T) {	tests := []struct {
 		name    string
 		pattern string
 		url     string
@@ -117,6 +116,30 @@ func TestMatchesFilter(t *testing.T) {
 			got := matchesFilter(tt.entry, tt.filter)
 			if got != tt.want {
 				t.Errorf("matchesFilter() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestValidateInterceptRules(t *testing.T) {
+	tests := []struct {
+		name    string
+		rules   []InterceptRule
+		wantErr bool
+	}{
+		{"empty rules", nil, false},
+		{"block only", []InterceptRule{{Block: true}}, false},
+		{"mock only", []InterceptRule{{MockBody: `{"ok":true}`, MockStatus: 200}}, false},
+		{"headers only", []InterceptRule{{AddHeaders: map[string]string{"X-Test": "1"}}}, false},
+		{"block and mock", []InterceptRule{{Block: true, MockBody: "body"}}, true},
+		{"mock without status", []InterceptRule{{MockBody: "body"}}, true},
+		{"multiple valid", []InterceptRule{{Block: true}, {MockBody: "x", MockStatus: 200}}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateInterceptRules(tt.rules)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateInterceptRules() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

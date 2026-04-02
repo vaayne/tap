@@ -21,11 +21,16 @@ type SessionOptions struct {
 // browser actions using the metadata store and CDP transport layer.
 type Manager struct {
 	store *Store
+
+	// interceptCancel tracks the active Fetch domain interception cancel func
+	// per target (keyed by "session:tab"). When new rules are set, the previous
+	// cancel is called first to prevent goroutine leaks.
+	interceptCancel map[string]func()
 }
 
 // NewManager creates a session manager backed by the given store.
 func NewManager(store *Store) *Manager {
-	return &Manager{store: store}
+	return &Manager{store: store, interceptCancel: make(map[string]func())}
 }
 
 // ---------------------------------------------------------------------------
@@ -504,6 +509,55 @@ func (m *Manager) NetworkLog(ctx context.Context, sessionName string, tabName st
 		return nil, nil, fmt.Errorf("network log: %w", err)
 	}
 	return ch, cancel, nil
+}
+
+// interceptKey returns the map key for tracking intercept cancel funcs.
+func interceptKey(session, tab string) string {
+	return session + ":" + tab
+}
+
+// NetworkIntercept sets Fetch domain interception rules on a tracked tab.
+// Replaces any previously set rules (cancels the old interception goroutine).
+func (m *Manager) NetworkIntercept(ctx context.Context, sessionName string, tabName string, rules []InterceptRule) error {
+	rt, err := m.resolveTarget(sessionName, tabName, "network intercept")
+	if err != nil {
+		return err
+	}
+
+	// Cancel any previous interception on this target.
+	key := interceptKey(rt.SessionName, rt.TabName)
+	if prev, ok := m.interceptCancel[key]; ok {
+		prev()
+		delete(m.interceptCancel, key)
+	}
+
+	cancel, err := SetInterceptRules(ctx, rt.DebugURL, rt.TargetID, rules)
+	if err != nil {
+		return fmt.Errorf("network intercept: %w", err)
+	}
+	m.interceptCancel[key] = cancel
+	return nil
+}
+
+// NetworkClearIntercept removes all Fetch domain interception rules from a
+// tracked tab.
+func (m *Manager) NetworkClearIntercept(ctx context.Context, sessionName string, tabName string) error {
+	rt, err := m.resolveTarget(sessionName, tabName, "network clear")
+	if err != nil {
+		return err
+	}
+
+	// Cancel the interception goroutine if active.
+	key := interceptKey(rt.SessionName, rt.TabName)
+	if prev, ok := m.interceptCancel[key]; ok {
+		prev()
+		delete(m.interceptCancel, key)
+	}
+
+	if err := ClearIntercept(ctx, rt.DebugURL, rt.TargetID); err != nil {
+		return fmt.Errorf("network clear: %w", err)
+	}
+	return nil
 }
 
 // ---------------------------------------------------------------------------
