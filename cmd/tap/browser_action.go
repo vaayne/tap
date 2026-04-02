@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/urfave/cli/v3"
+	"github.com/vaayne/tap/browser"
 )
 
 func browserNavigateCmd() *cli.Command {
@@ -103,6 +104,100 @@ session name, tab name, and current timestamp.`,
 				return fmt.Errorf("write screenshot: %w", err)
 			}
 			fmt.Fprintf(os.Stderr, "%s\n", outPath)
+			return nil
+		},
+	}
+}
+
+func browserFormsCmd() *cli.Command {
+	return &cli.Command{
+		Name:  "forms",
+		Usage: "Discover fillable form elements in a tracked browser tab",
+		Flags: append(browserActionFlags(false), &cli.StringFlag{
+			Name:    "format",
+			Aliases: []string{"f"},
+			Usage:   "Output format: json, pretty (default), raw",
+			Value:   formatPretty,
+		}),
+		Description: `List all fillable form elements (inputs, textareas, selects, buttons)
+in the resolved tracked tab.
+
+Each element includes its best CSS selector, type, name, placeholder, current
+value, associated label, and role (text, toggle, select, submit). Use the
+reported selectors with 'tap browser fill'.`,
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			configureLogging(cmd)
+			mgr, err := newBrowserManager(cmd)
+			if err != nil {
+				return err
+			}
+			sessionName := cmd.String("session")
+			tabName := cmd.String("tab")
+			fields, err := mgr.Forms(ctx, sessionName, tabName)
+			if err != nil {
+				return err
+			}
+			if len(fields) == 0 {
+				fmt.Fprintln(os.Stderr, "No fillable form elements found.")
+				return nil
+			}
+			return printResult(cmd, fields)
+		},
+	}
+}
+
+func browserFillCmd() *cli.Command {
+	return &cli.Command{
+		Name:      "fill",
+		Usage:     "Fill form fields in a tracked browser tab",
+		ArgsUsage: "<selector> <value> [<selector> <value> ...]",
+		Flags: append(browserActionFlags(false), &cli.StringFlag{
+			Name:  "submit",
+			Usage: "CSS selector of element to click after filling (e.g. button[type=submit])",
+		}),
+		Description: `Fill one or more form fields by CSS selector, then optionally submit.
+
+Arguments are selector/value pairs. Values are set using React-compatible
+native setters with proper input/change event dispatch, so this works with
+React, Vue, Angular, and vanilla HTML forms.
+
+Examples:
+  tap browser fill "#username" "myuser"
+  tap browser fill "#email" "me@example.com" "#password" "secret" --submit "button[type=submit]"
+  tap browser fill "input[type=search]" "query text"`,
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			configureLogging(cmd)
+			args := cmd.Args().Slice()
+			if len(args) == 0 || len(args)%2 != 0 {
+				return fmt.Errorf("arguments must be selector/value pairs (got %d args)", len(args))
+			}
+
+			var fields []browser.FillField
+			for i := 0; i < len(args); i += 2 {
+				fields = append(fields, browser.FillField{
+					Selector: args[i],
+					Value:    args[i+1],
+				})
+			}
+
+			mgr, err := newBrowserManager(cmd)
+			if err != nil {
+				return err
+			}
+			sessionName := cmd.String("session")
+			tabName := cmd.String("tab")
+			submitSelector := cmd.String("submit")
+
+			if err := mgr.Fill(ctx, sessionName, tabName, fields, submitSelector); err != nil {
+				return err
+			}
+
+			for _, f := range fields {
+				fmt.Fprintf(os.Stderr, "Filled %s\n", f.Selector)
+			}
+			if submitSelector != "" {
+				fmt.Fprintf(os.Stderr, "Clicked %s\n", submitSelector)
+			}
 			return nil
 		},
 	}

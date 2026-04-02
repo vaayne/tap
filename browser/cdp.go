@@ -129,6 +129,203 @@ func ScreenshotTarget(ctx context.Context, debugURL string, targetID string) ([]
 	return buf, nil
 }
 
+// FormField describes a fillable form element on the page.
+type FormField struct {
+	Selector    string `json:"selector"`
+	Tag         string `json:"tag"`
+	Type        string `json:"type,omitempty"`
+	Name        string `json:"name,omitempty"`
+	ID          string `json:"id,omitempty"`
+	Placeholder string `json:"placeholder,omitempty"`
+	Value       string `json:"value,omitempty"`
+	Label       string `json:"label,omitempty"`
+	Required    bool   `json:"required,omitempty"`
+	Disabled    bool   `json:"disabled,omitempty"`
+	Role        string `json:"role,omitempty"`
+}
+
+// FillField pairs a CSS selector with the value to fill.
+type FillField struct {
+	Selector string
+	Value    string
+}
+
+// FormsTarget discovers fillable form elements in a browser tab.
+func FormsTarget(ctx context.Context, debugURL string, targetID string) ([]FormField, error) {
+	js := `
+(() => {
+  const els = document.querySelectorAll('input, textarea, select, button[type="submit"], button:not([type]), input[type="submit"]');
+  return [...els].map(el => {
+    const tag = el.tagName.toLowerCase();
+    let selector = "";
+    if (el.id) {
+      selector = "#" + CSS.escape(el.id);
+    } else if (el.name) {
+      selector = tag + "[name=" + JSON.stringify(el.name) + "]";
+      // Disambiguate when multiple elements share the same name (radio groups, checkboxes)
+      const dupes = document.querySelectorAll(selector);
+      if (dupes.length > 1) {
+        if (el.value) {
+          selector += "[value=" + JSON.stringify(el.value) + "]";
+        } else {
+          const idx = [...dupes].indexOf(el);
+          if (idx > 0) {
+            // nth-of-type won't work here; use a parent-scoped index
+            const parent = el.parentElement;
+            if (parent) {
+              const siblings = [...parent.querySelectorAll(selector)];
+              const sIdx = siblings.indexOf(el);
+              if (sIdx >= 0) {
+                let parentSel = parent.id ? "#" + CSS.escape(parent.id) : parent.tagName.toLowerCase();
+                selector = parentSel + " " + selector + ":nth-of-type(" + (sIdx + 1) + ")";
+              }
+            }
+          }
+        }
+      }
+    } else if (el.placeholder) {
+      selector = tag + "[placeholder=" + JSON.stringify(el.placeholder) + "]";
+    } else if (el.type === "submit" || (tag === "button" && !el.type)) {
+      const parent = el.parentElement;
+      if (parent) {
+        const siblings = [...parent.children].filter(c => c.tagName.toLowerCase() === tag);
+        const idx = siblings.indexOf(el);
+        if (idx >= 0) {
+          // Build a unique path: parent selector + child nth-of-type
+          let parentSel = "";
+          if (parent.id) {
+            parentSel = "#" + CSS.escape(parent.id);
+          } else {
+            parentSel = parent.tagName.toLowerCase();
+            const gp = parent.parentElement;
+            if (gp) {
+              const pSiblings = [...gp.children].filter(c => c.tagName.toLowerCase() === parent.tagName.toLowerCase());
+              const pIdx = pSiblings.indexOf(parent);
+              if (pIdx >= 0) parentSel += ":nth-of-type(" + (pIdx + 1) + ")";
+            }
+          }
+          selector = parentSel + " > " + tag + ":nth-of-type(" + (idx + 1) + ")";
+        }
+      }
+    }
+
+    let label = "";
+    if (el.id) {
+      const lbl = document.querySelector("label[for=" + JSON.stringify(el.id) + "]");
+      if (lbl) label = lbl.textContent.trim();
+    }
+    if (!label && el.closest("label")) {
+      label = el.closest("label").textContent.trim();
+    }
+    if (!label && el.getAttribute("aria-label")) {
+      label = el.getAttribute("aria-label");
+    }
+
+    let role = "";
+    if (tag === "button" || el.type === "submit") role = "submit";
+    else if (tag === "select") role = "select";
+    else if (tag === "textarea") role = "text";
+    else if (["text","email","password","search","tel","url","number"].includes(el.type)) role = "text";
+    else if (["checkbox","radio"].includes(el.type)) role = "toggle";
+    else if (el.type === "hidden") role = "hidden";
+    else if (el.type === "file") role = "file";
+
+    return {
+      selector: selector,
+      tag: tag,
+      type: el.type || "",
+      name: el.name || "",
+      id: el.id || "",
+      placeholder: el.placeholder || "",
+      value: tag === "select" ? el.value || "" : el.value || "",
+      label: label,
+      required: el.required || false,
+      disabled: el.disabled || false,
+      role: role,
+    };
+  }).filter(f => f.role !== "hidden" && f.selector !== "");
+})()
+`
+	var fields []FormField
+	err := withTarget(ctx, debugURL, targetID,
+		chromedp.Evaluate(js, &fields, func(p *runtime.EvaluateParams) *runtime.EvaluateParams {
+			return p.WithReturnByValue(true).WithAwaitPromise(true)
+		}),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("forms target: %w", err)
+	}
+	return fields, nil
+}
+
+// FillTarget fills form fields in a browser tab using React-compatible value setting.
+func FillTarget(ctx context.Context, debugURL string, targetID string, fields []FillField, submitSelector string) error {
+	var actions []chromedp.Action
+
+	for _, f := range fields {
+		sel := f.Selector
+		val := f.Value
+		// Use a JS snippet that sets value via native setter and dispatches events.
+		// This works with React, Vue, Angular, and vanilla HTML forms.
+		js := fmt.Sprintf(`
+(() => {
+  const el = document.querySelector(%q);
+  if (!el) throw new Error("element not found: " + %q);
+  el.focus();
+  const tag = el.tagName.toLowerCase();
+  if (tag === "select") {
+    el.value = %q;
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+  } else if (el.type === "checkbox" || el.type === "radio") {
+    const want = %q;
+    if (want === "true" || want === "1" || want === "on") {
+      if (!el.checked) el.click();
+    } else {
+      if (el.checked) el.click();
+    }
+  } else {
+    const setter = (tag === "textarea")
+      ? Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set
+      : Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
+    if (setter) {
+      setter.call(el, %q);
+    } else {
+      el.value = %q;
+    }
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+  return true;
+})()
+`, sel, sel, val, val, val, val)
+
+		var ok bool
+		actions = append(actions, chromedp.Evaluate(js, &ok, func(p *runtime.EvaluateParams) *runtime.EvaluateParams {
+			return p.WithReturnByValue(true).WithAwaitPromise(true)
+		}))
+	}
+
+	if submitSelector != "" {
+		submitJS := fmt.Sprintf(`
+(() => {
+  const el = document.querySelector(%q);
+  if (!el) throw new Error("submit element not found: " + %q);
+  el.click();
+  return true;
+})()
+`, submitSelector, submitSelector)
+		var ok bool
+		actions = append(actions, chromedp.Evaluate(submitJS, &ok, func(p *runtime.EvaluateParams) *runtime.EvaluateParams {
+			return p.WithReturnByValue(true).WithAwaitPromise(true)
+		}))
+	}
+
+	if err := withTarget(ctx, debugURL, targetID, actions...); err != nil {
+		return fmt.Errorf("fill target: %w", err)
+	}
+	return nil
+}
+
 // withBrowser connects to debugURL at the browser level and returns contexts for CDP commands.
 func withBrowser(ctx context.Context, debugURL string) (context.Context, context.CancelFunc) {
 	allocCtx, allocCancel := chromedp.NewRemoteAllocator(ctx, debugURL, chromedp.NoModifyURL)

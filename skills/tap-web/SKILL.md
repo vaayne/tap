@@ -10,7 +10,8 @@ description: >
   "fetch this page", "read this URL", "get content from",
   "look up on Twitter/Weibo/Reddit/YouTube/etc.", "check stock", "translate",
   "browser session", "open a tab", "navigate to", "take a screenshot",
-  "evaluate javascript", "persistent browser", or any web access task.
+  "evaluate javascript", "persistent browser", "fill form", "form fields",
+  "discover inputs", or any web access task.
 ---
 
 # tap-web
@@ -147,6 +148,9 @@ tap browser tab close [name]                  # Close and remove a tab
 tap browser navigate <url>                    # Navigate the selected tab
 tap browser evaluate <javascript>             # Run JS and print the result
 tap browser screenshot [--output <path>]      # Capture a full-page PNG
+tap browser forms                             # Discover fillable form elements
+tap browser fill <sel> <val> [<sel> <val>...] # Fill form fields
+tap browser fill <sel> <val> --submit <sel>   # Fill and click submit
 ```
 
 All action commands accept `--session <name>` and `--tab <name>` to override defaults.
@@ -159,6 +163,27 @@ When `--session` or `--tab` is omitted, tap resolves automatically:
 - **Tab**: `--tab` flag → selected tab → the only live tracked tab
 
 If ambiguous, tap fails with guidance instead of guessing.
+
+### Example: form discovery and filling
+
+```bash
+tap browser session new login-demo --no-headless
+tap browser tab new page --url https://example.com/login
+
+# Discover fillable elements (inputs, textareas, selects, buttons)
+tap browser forms
+# Returns JSON: selector, type, name, placeholder, label, value, role per element
+
+# Fill fields using the reported selectors
+tap browser fill "#username" "myuser" "#password" "secret"
+
+# Fill and submit in one command
+tap browser fill "#email" "me@example.com" --submit "button[type=submit]"
+
+tap browser session close login-demo
+```
+
+`tap browser fill` uses React-compatible native value setters with proper `input`/`change` event dispatch — works with React, Vue, Angular, and vanilla HTML forms.
 
 ### Example: multi-tab workflow
 

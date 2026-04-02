@@ -50,6 +50,8 @@ tap browser tab close [name]                # Close and remove a tab
 tap browser navigate <url>                  # Navigate the selected tab
 tap browser evaluate <javascript>           # Run JS and print the result
 tap browser screenshot [--output <path>]    # Capture a full-page PNG
+tap browser forms                           # Discover fillable form elements
+tap browser fill <sel> <val> [<sel> <val>]  # Fill form fields
 ```
 
 All action commands accept `--session <name>` and `--tab <name>` to override the defaults.
@@ -164,3 +166,26 @@ tap browser tab new test --url https://example.com
 tap browser evaluate 'document.querySelector(".result").textContent'
 tap browser session close debug
 ```
+
+### Form discovery and filling
+
+```bash
+tap browser session new forms-demo --no-headless
+tap browser tab new page --url https://example.com/login
+
+# Discover fillable elements on the page
+tap browser forms
+# Returns JSON with selector, type, name, placeholder, label, role for each element
+
+# Fill fields using the reported selectors
+tap browser fill "#username" "myuser" "#password" "secret"
+
+# Fill and submit in one command
+tap browser fill "#username" "myuser" "#password" "secret" --submit "button[type=submit]"
+
+tap browser session close forms-demo
+```
+
+`tap browser forms` reports all fillable elements (inputs, textareas, selects, buttons) with their best CSS selector, type, label, placeholder, current value, and role (`text`, `toggle`, `select`, `submit`). Use the selectors directly with `tap browser fill`.
+
+`tap browser fill` uses React-compatible native value setters with proper `input`/`change` event dispatch, so it works with React, Vue, Angular, and vanilla HTML forms.
