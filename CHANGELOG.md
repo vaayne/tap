@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-04-02
+
+### Added
+
+- Lightpanda headless browser as an alternative CDP backend (`--lightpanda` / `--lp` flag), with automatic binary download from GitHub nightly releases
+- Browser wait modes for headed debugging
+- `--lightpanda` support in `tap login` command
+
+### Changed
+
+- `transport.New` and `tap.New` now accept `context.Context` for cancelable browser startup
+- Transport is closed on fetcher initialization failure to avoid leaking child processes
+- Browser package uses standard `log` instead of `slog` for consistent `--quiet`/`--verbose` output
+
 ## [0.1.5] - 2026-04-01
 
 ### Added
@@ -75,7 +89,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - CI workflows for lint, test, and release
 - GoReleaser configuration for cross-platform builds
 
-[Unreleased]: https://github.com/vaayne/tap/compare/v0.1.5...HEAD
+[Unreleased]: https://github.com/vaayne/tap/compare/v0.1.6...HEAD
+[0.1.6]: https://github.com/vaayne/tap/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/vaayne/tap/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/vaayne/tap/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/vaayne/tap/compare/v0.1.2...v0.1.3
