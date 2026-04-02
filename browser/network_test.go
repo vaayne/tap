@@ -36,6 +36,7 @@ func TestMatchURL(t *testing.T) {
 
 		// Pattern with query strings.
 		{"query match", "*/search?q=*", "https://example.com/search?q=hello", true},
+		{"literal question mark", "*/api?key=*", "https://example.com/api?key=123", true},
 
 		// Edge cases.
 		{"url empty pattern nonempty", "https://example.com", "", false},

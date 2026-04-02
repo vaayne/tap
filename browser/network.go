@@ -179,7 +179,11 @@ func WaitForRequest(ctx context.Context, debugURL string, targetID string, filte
 			}
 			rs.failed = true
 			rs.entry.Error = e.ErrorText
-			if rs.gotResp && matchesFilter(rs.entry, filter) {
+			// Match even without ResponseReceived — a request can fail before
+			// getting a response (e.g. DNS failure, connection refused). The
+			// entry still has URL/Method from RequestWillBeSent and the Error
+			// field captures the failure reason.
+			if matchesFilter(rs.entry, filter) {
 				select {
 				case done <- &rs.entry:
 				default:
