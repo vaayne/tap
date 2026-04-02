@@ -123,12 +123,15 @@ func LaunchBrowser(ctx context.Context, config LocalConfig) (*ProcessRecord, err
 		return nil, fmt.Errorf("parse chrome debug URL: %w", err)
 	}
 
+	// Capture PID before Release, which sets Pid to -1.
+	pid := cmd.Process.Pid
+
 	// Release the process handle so Go does not accumulate zombies.
 	// Chrome runs detached (Setpgid) and is managed via PID from metadata.
 	_ = cmd.Process.Release()
 
 	return &ProcessRecord{
-		PID:            cmd.Process.Pid,
+		PID:            pid,
 		DebugURL:       debugURL,
 		OwnershipToken: ownershipToken,
 		StartedAt:      time.Now().UTC(),
@@ -171,7 +174,7 @@ func parseDebugURL(r io.Reader, timeout time.Duration) (string, error) {
 // CheckProcess verifies that the process described by record is alive and
 // its debug endpoint is reachable.
 func CheckProcess(record *ProcessRecord) error {
-	if record == nil || record.PID == 0 {
+	if record == nil || record.PID <= 0 {
 		return errors.New("no process record to check")
 	}
 
@@ -206,7 +209,7 @@ func CheckProcess(record *ProcessRecord) error {
 // KillProcess terminates the Chrome process described by record. It sends
 // SIGTERM first and falls back to SIGKILL after a 5-second grace period.
 func KillProcess(record *ProcessRecord) error {
-	if record == nil || record.PID == 0 {
+	if record == nil || record.PID <= 0 {
 		return nil
 	}
 

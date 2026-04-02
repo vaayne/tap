@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/cdproto/target"
 	"github.com/chromedp/chromedp"
@@ -69,8 +70,15 @@ func CloseTarget(ctx context.Context, debugURL string, targetID string) error {
 	bctx, cancel := withBrowser(ctx, debugURL)
 	defer cancel()
 
+	// Use the browser-level executor because chromedp's tab-level Target.Execute
+	// intercepts and rejects CloseTarget commands.
 	return chromedp.Run(bctx, chromedp.ActionFunc(func(ctx context.Context) error {
-		if err := target.CloseTarget(target.ID(targetID)).Do(ctx); err != nil {
+		c := chromedp.FromContext(bctx)
+		if c == nil || c.Browser == nil {
+			return fmt.Errorf("close target: no browser connection")
+		}
+		browserCtx := cdp.WithExecutor(ctx, c.Browser)
+		if err := target.CloseTarget(target.ID(targetID)).Do(browserCtx); err != nil {
 			return fmt.Errorf("close target: %w", err)
 		}
 		return nil
@@ -124,6 +132,7 @@ func withBrowser(ctx context.Context, debugURL string) (context.Context, context
 }
 
 // withTarget connects to debugURL, attaches to the specific target, runs the actions, and cleans up.
+// It detaches from the target without closing it so the tab survives across calls.
 func withTarget(ctx context.Context, debugURL string, targetID string, actions ...chromedp.Action) error {
 	allocCtx, allocCancel := chromedp.NewRemoteAllocator(ctx, debugURL, chromedp.NoModifyURL)
 	defer allocCancel()
@@ -131,5 +140,13 @@ func withTarget(ctx context.Context, debugURL string, targetID string, actions .
 	taskCtx, taskCancel := chromedp.NewContext(allocCtx, chromedp.WithTargetID(target.ID(targetID)))
 	defer taskCancel()
 
-	return chromedp.Run(taskCtx, actions...)
+	err := chromedp.Run(taskCtx, actions...)
+
+	// Prevent chromedp from closing the target on context cancellation.
+	// We attach to an existing tab we don't own, so we must leave it open.
+	if c := chromedp.FromContext(taskCtx); c != nil && c.Target != nil {
+		c.Target.TargetID = ""
+	}
+
+	return err
 }
