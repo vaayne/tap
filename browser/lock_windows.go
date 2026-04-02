@@ -3,9 +3,11 @@
 package browser
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"golang.org/x/sys/windows"
@@ -38,13 +40,22 @@ func lockFile(path string) (*fileLock, error) {
 		err := windows.LockFileEx(
 			windows.Handle(file.Fd()),
 			windows.LOCKFILE_EXCLUSIVE_LOCK|windows.LOCKFILE_FAIL_IMMEDIATELY,
-			0,          // reserved
-			1,          // lock 1 byte
-			0,          // high-order bytes
+			0, // reserved
+			1, // lock 1 byte
+			0, // high-order bytes
 			ol,
 		)
 		if err == nil {
+			// Prevent GC from finalizing file before LockFileEx completes.
+			runtime.KeepAlive(file)
 			return &fileLock{file: file}, nil
+		}
+
+		// Only retry on ERROR_LOCK_VIOLATION (lock held by another process).
+		// Any other error is unexpected and should be returned immediately.
+		if !errors.Is(err, windows.ERROR_LOCK_VIOLATION) {
+			_ = file.Close()
+			return nil, fmt.Errorf("lock file: %w", err)
 		}
 
 		select {
@@ -62,6 +73,8 @@ func (l *fileLock) Unlock() error {
 	}
 	ol := new(windows.Overlapped)
 	err := windows.UnlockFileEx(windows.Handle(l.file.Fd()), 0, 1, 0, ol)
+	// Prevent GC from finalizing file before UnlockFileEx completes.
+	runtime.KeepAlive(l.file)
 	closeErr := l.file.Close()
 	if err != nil {
 		return err

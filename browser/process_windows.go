@@ -14,6 +14,10 @@ import (
 	"golang.org/x/sys/windows/registry"
 )
 
+// stillActive is the exit code returned by GetExitCodeProcess when the
+// process has not yet terminated (Win32 STILL_ACTIVE / STATUS_PENDING).
+const stillActive = 259
+
 // platformSysProcAttr returns SysProcAttr to run Chrome in a new process group
 // so it is not killed when tap exits.
 func platformSysProcAttr() *syscall.SysProcAttr {
@@ -23,6 +27,10 @@ func platformSysProcAttr() *syscall.SysProcAttr {
 // isProcessAlive checks whether a process with the given PID exists and is
 // still running on Windows.
 func isProcessAlive(pid int) bool {
+	if pid <= 0 {
+		return false
+	}
+
 	h, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, uint32(pid))
 	if err != nil {
 		return false
@@ -33,8 +41,9 @@ func isProcessAlive(pid int) bool {
 	if err := windows.GetExitCodeProcess(h, &exitCode); err != nil {
 		return false
 	}
-	// STILL_ACTIVE (259) means the process has not exited.
-	return exitCode == 259
+	// Note: a process that exits with code 259 would be falsely reported as
+	// alive. This is a known Win32 limitation. Chrome does not exit with 259.
+	return exitCode == stillActive
 }
 
 // killProcessPlatform terminates a process on Windows. It first tries a
@@ -90,12 +99,11 @@ func chromeFallbackPaths() []string {
 }
 
 // chromeLookPathNames returns binary names to search via exec.LookPath on Windows.
+// exec.LookPath appends PATHEXT extensions automatically, so bare names suffice.
 func chromeLookPathNames() []string {
 	return []string{
 		"chrome",
-		"chrome.exe",
 		"chromium",
-		"chromium.exe",
 	}
 }
 
