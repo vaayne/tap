@@ -326,6 +326,41 @@ func FillTarget(ctx context.Context, debugURL string, targetID string, fields []
 	return nil
 }
 
+// withTargetListen connects to debugURL, attaches to the specific target, and
+// returns a long-lived context suitable for event listening. Unlike withTarget,
+// it does NOT run actions or detach automatically — the caller controls the
+// session lifetime.
+//
+// Usage:
+//  1. Call withTargetListen to get taskCtx.
+//  2. Register event listeners with chromedp.ListenTarget(taskCtx, ...).
+//  3. Enable the domain with chromedp.Run(taskCtx, ...).
+//  4. Wait/process events.
+//  5. Call cancel — clears TargetID first (detach-without-close).
+func withTargetListen(ctx context.Context, debugURL string, targetID string) (context.Context, func(), error) {
+	allocCtx, allocCancel := chromedp.NewRemoteAllocator(ctx, debugURL, chromedp.NoModifyURL)
+	taskCtx, taskCancel := chromedp.NewContext(allocCtx, chromedp.WithTargetID(target.ID(targetID)))
+
+	// Run an empty action to force the CDP session to attach to the target.
+	if err := chromedp.Run(taskCtx); err != nil {
+		taskCancel()
+		allocCancel()
+		return nil, nil, fmt.Errorf("attach target for listen: %w", err)
+	}
+
+	cancel := func() {
+		// Clear TargetID BEFORE cancel so chromedp's cancel handler does not
+		// close the tab. Same detach-without-close trick as withTarget.
+		if c := chromedp.FromContext(taskCtx); c != nil && c.Target != nil {
+			c.Target.TargetID = ""
+		}
+		taskCancel()
+		allocCancel()
+	}
+
+	return taskCtx, cancel, nil
+}
+
 // withBrowser connects to debugURL at the browser level and returns contexts for CDP commands.
 func withBrowser(ctx context.Context, debugURL string) (context.Context, context.CancelFunc) {
 	allocCtx, allocCancel := chromedp.NewRemoteAllocator(ctx, debugURL, chromedp.NoModifyURL)
