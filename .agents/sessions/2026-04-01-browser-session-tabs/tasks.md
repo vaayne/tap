@@ -7,11 +7,11 @@
   - [x] Implement session-scoped runtime locking and configurable state-root support
   - [x] Add metadata-focused unit tests
 
-- [ ] Phase 2 — Implement persistent browser runtime and transport support
-  - [ ] Add target-aware CDP helpers in `transport/`
-  - [ ] Implement local browser process launch/reconnect support
-  - [ ] Implement session manager reconciliation logic and crash/restart handling
-  - [ ] Add runtime and reconciliation tests
+- [x] Phase 2 — Implement persistent browser runtime and transport support
+  - [x] Add target-aware CDP helpers in `transport/`
+  - [x] Implement local browser process launch/reconnect support
+  - [x] Implement session manager reconciliation logic and crash/restart handling
+  - [x] Add runtime and reconciliation tests
 
 - [ ] Phase 3 — Expose library API and CLI commands
   - [ ] Add `tap.Client` browser session/tab methods and state-root/session-config options
