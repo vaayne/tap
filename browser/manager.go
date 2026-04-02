@@ -519,6 +519,16 @@ func interceptKey(session, tab string) string {
 	return session + ":" + tab
 }
 
+// cancelIntercept cancels and removes any active interception for the given key.
+func (m *Manager) cancelIntercept(key string) {
+	m.interceptMu.Lock()
+	if prev, ok := m.interceptCancel[key]; ok {
+		prev()
+		delete(m.interceptCancel, key)
+	}
+	m.interceptMu.Unlock()
+}
+
 // NetworkIntercept sets Fetch domain interception rules on a tracked tab.
 // Replaces any previously set rules (cancels the old interception goroutine).
 func (m *Manager) NetworkIntercept(ctx context.Context, sessionName string, tabName string, rules []InterceptRule) error {
@@ -527,14 +537,8 @@ func (m *Manager) NetworkIntercept(ctx context.Context, sessionName string, tabN
 		return err
 	}
 
-	// Cancel any previous interception on this target.
 	key := interceptKey(rt.SessionName, rt.TabName)
-	m.interceptMu.Lock()
-	if prev, ok := m.interceptCancel[key]; ok {
-		prev()
-		delete(m.interceptCancel, key)
-	}
-	m.interceptMu.Unlock()
+	m.cancelIntercept(key)
 
 	cancel, err := SetInterceptRules(ctx, rt.DebugURL, rt.TargetID, rules)
 	if err != nil {
@@ -554,14 +558,7 @@ func (m *Manager) NetworkClearIntercept(ctx context.Context, sessionName string,
 		return err
 	}
 
-	// Cancel the interception goroutine if active.
-	key := interceptKey(rt.SessionName, rt.TabName)
-	m.interceptMu.Lock()
-	if prev, ok := m.interceptCancel[key]; ok {
-		prev()
-		delete(m.interceptCancel, key)
-	}
-	m.interceptMu.Unlock()
+	m.cancelIntercept(interceptKey(rt.SessionName, rt.TabName))
 
 	if err := ClearIntercept(ctx, rt.DebugURL, rt.TargetID); err != nil {
 		return fmt.Errorf("network clear: %w", err)

@@ -4,7 +4,8 @@ import (
 	"testing"
 )
 
-func TestMatchURL(t *testing.T) {	tests := []struct {
+func TestMatchURL(t *testing.T) {
+	tests := []struct {
 		name    string
 		pattern string
 		url     string

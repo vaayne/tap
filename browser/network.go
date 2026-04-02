@@ -35,59 +35,72 @@ type NetworkFilter struct {
 	ResourceTypes []string `json:"resourceTypes,omitempty"`
 }
 
+// compileURLPattern compiles a glob-like URL pattern into a regexp.
+// An empty pattern returns nil (matches everything).
+func compileURLPattern(pattern string) *regexp.Regexp {
+	if pattern == "" {
+		return nil
+	}
+	escaped := regexp.QuoteMeta(pattern)
+	rePattern := "^" + strings.ReplaceAll(escaped, `\*`, `.*`) + "$"
+	return regexp.MustCompile(rePattern)
+}
+
 // matchURL matches a URL against a glob-like pattern where * matches any
 // characters including /. An empty pattern matches everything.
 func matchURL(pattern, url string) bool {
-	if pattern == "" {
+	re := compileURLPattern(pattern)
+	if re == nil {
 		return true
 	}
+	return re.MatchString(url)
+}
 
-	// Escape regex special chars, then replace escaped \* with .*
-	escaped := regexp.QuoteMeta(pattern)
-	rePattern := strings.ReplaceAll(escaped, `\*`, `.*`)
-	rePattern = "^" + rePattern + "$"
+// compiledFilter is a pre-compiled version of NetworkFilter for efficient
+// repeated matching against many entries.
+type compiledFilter struct {
+	urlRe         *regexp.Regexp
+	methods       []string
+	resourceTypes []string
+}
 
-	matched, err := regexp.MatchString(rePattern, url)
-	if err != nil {
+// compileFilter pre-compiles a NetworkFilter for repeated use.
+func compileFilter(f NetworkFilter) compiledFilter {
+	return compiledFilter{
+		urlRe:         compileURLPattern(f.URLPattern),
+		methods:       f.Methods,
+		resourceTypes: f.ResourceTypes,
+	}
+}
+
+// containsFold reports whether any element in slice equals s (case-insensitive).
+func containsFold(slice []string, s string) bool {
+	for _, v := range slice {
+		if strings.EqualFold(v, s) {
+			return true
+		}
+	}
+	return false
+}
+
+// matches checks whether a NetworkEntry matches this compiled filter.
+func (cf compiledFilter) matches(entry NetworkEntry) bool {
+	if cf.urlRe != nil && !cf.urlRe.MatchString(entry.URL) {
 		return false
 	}
-	return matched
+	if len(cf.methods) > 0 && !containsFold(cf.methods, entry.Method) {
+		return false
+	}
+	if len(cf.resourceTypes) > 0 && !containsFold(cf.resourceTypes, entry.ResourceType) {
+		return false
+	}
+	return true
 }
 
 // matchesFilter checks whether a NetworkEntry matches the given filter.
 // An empty/zero filter matches everything.
 func matchesFilter(entry NetworkEntry, filter NetworkFilter) bool {
-	if !matchURL(filter.URLPattern, entry.URL) {
-		return false
-	}
-
-	if len(filter.Methods) > 0 {
-		found := false
-		for _, m := range filter.Methods {
-			if strings.EqualFold(entry.Method, m) {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return false
-		}
-	}
-
-	if len(filter.ResourceTypes) > 0 {
-		found := false
-		for _, rt := range filter.ResourceTypes {
-			if strings.EqualFold(entry.ResourceType, rt) {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return false
-		}
-	}
-
-	return true
+	return compileFilter(filter).matches(entry)
 }
 
 // headersToMap converts CDP Headers (map[string]any) to map[string]string.
@@ -102,6 +115,102 @@ func headersToMap(h network.Headers) map[string]string {
 	return out
 }
 
+// ---------------------------------------------------------------------------
+// Shared request tracker
+// ---------------------------------------------------------------------------
+
+// requestState tracks the lifecycle of a single network request.
+type requestState struct {
+	entry   NetworkEntry
+	gotResp bool
+}
+
+// requestTracker accumulates Network domain events and emits completed entries
+// that match the filter via the onMatch callback.
+type requestTracker struct {
+	filter   compiledFilter
+	onMatch  func(NetworkEntry)
+	requests map[network.RequestID]*requestState
+}
+
+// newRequestTracker creates a tracker with a pre-compiled filter.
+func newRequestTracker(filter NetworkFilter, onMatch func(NetworkEntry)) *requestTracker {
+	return &requestTracker{
+		filter:   compileFilter(filter),
+		onMatch:  onMatch,
+		requests: make(map[network.RequestID]*requestState),
+	}
+}
+
+// handleEvent processes a single CDP Network event.
+func (rt *requestTracker) handleEvent(ev interface{}) {
+	switch e := ev.(type) {
+	case *network.EventRequestWillBeSent:
+		rt.requests[e.RequestID] = &requestState{
+			entry: NetworkEntry{
+				RequestID:    string(e.RequestID),
+				URL:          e.Request.URL,
+				Method:       e.Request.Method,
+				ResourceType: string(e.Type),
+				ReqHeaders:   headersToMap(e.Request.Headers),
+				Timestamp:    time.Now(),
+			},
+		}
+
+	case *network.EventResponseReceived:
+		rs, ok := rt.requests[e.RequestID]
+		if !ok {
+			rs = &requestState{
+				entry: NetworkEntry{
+					RequestID: string(e.RequestID),
+					Timestamp: time.Now(),
+				},
+			}
+			rt.requests[e.RequestID] = rs
+		}
+		rs.entry.Status = e.Response.Status
+		rs.entry.MIMEType = e.Response.MimeType
+		rs.entry.ResHeaders = headersToMap(e.Response.Headers)
+		if rs.entry.URL == "" {
+			rs.entry.URL = e.Response.URL
+		}
+		if rs.entry.ResourceType == "" {
+			rs.entry.ResourceType = string(e.Type)
+		}
+		rs.gotResp = true
+
+	case *network.EventLoadingFinished:
+		rs, ok := rt.requests[e.RequestID]
+		if !ok {
+			return
+		}
+		entry := rs.entry
+		gotResp := rs.gotResp
+		delete(rt.requests, e.RequestID)
+		if gotResp && rt.filter.matches(entry) {
+			rt.onMatch(entry)
+		}
+
+	case *network.EventLoadingFailed:
+		rs, ok := rt.requests[e.RequestID]
+		if !ok {
+			return
+		}
+		entry := rs.entry
+		entry.Error = e.ErrorText
+		delete(rt.requests, e.RequestID)
+		// Match even without ResponseReceived — a request can fail before
+		// getting a response (e.g. DNS failure, connection refused).
+		if rt.filter.matches(entry) {
+			rt.onMatch(entry)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Network domain primitives
+// ---------------------------------------------------------------------------
+
 // WaitForRequest enables the Network domain and blocks until a request matching
 // the filter completes (response received + loading finished/failed). It returns
 // the first matching NetworkEntry. If includeBody is true, the response body is
@@ -115,88 +224,15 @@ func WaitForRequest(ctx context.Context, debugURL string, targetID string, filte
 	}
 	defer cancel()
 
-	type requestState struct {
-		entry    NetworkEntry
-		gotResp  bool
-		finished bool
-		failed   bool
-	}
-
-	requests := make(map[network.RequestID]*requestState)
-	done := make(chan *NetworkEntry, 1)
-
-	chromedp.ListenTarget(taskCtx, func(ev interface{}) {
-		switch e := ev.(type) {
-		case *network.EventRequestWillBeSent:
-			requests[e.RequestID] = &requestState{
-				entry: NetworkEntry{
-					RequestID:    string(e.RequestID),
-					URL:          e.Request.URL,
-					Method:       e.Request.Method,
-					ResourceType: string(e.Type),
-					ReqHeaders:   headersToMap(e.Request.Headers),
-					Timestamp:    time.Now(),
-				},
-			}
-
-		case *network.EventResponseReceived:
-			rs, ok := requests[e.RequestID]
-			if !ok {
-				rs = &requestState{
-					entry: NetworkEntry{
-						RequestID: string(e.RequestID),
-						Timestamp: time.Now(),
-					},
-				}
-				requests[e.RequestID] = rs
-			}
-			rs.entry.Status = e.Response.Status
-			rs.entry.MIMEType = e.Response.MimeType
-			rs.entry.ResHeaders = headersToMap(e.Response.Headers)
-			if rs.entry.URL == "" {
-				rs.entry.URL = e.Response.URL
-			}
-			if rs.entry.ResourceType == "" {
-				rs.entry.ResourceType = string(e.Type)
-			}
-			rs.gotResp = true
-
-		case *network.EventLoadingFinished:
-			rs, ok := requests[e.RequestID]
-			if !ok {
-				return
-			}
-			rs.finished = true
-			entry := rs.entry
-			delete(requests, e.RequestID)
-			if rs.gotResp && matchesFilter(entry, filter) {
-				select {
-				case done <- &entry:
-				default:
-				}
-			}
-
-		case *network.EventLoadingFailed:
-			rs, ok := requests[e.RequestID]
-			if !ok {
-				return
-			}
-			rs.failed = true
-			rs.entry.Error = e.ErrorText
-			// Match even without ResponseReceived — a request can fail before
-			// getting a response (e.g. DNS failure, connection refused). The
-			// entry still has URL/Method from RequestWillBeSent and the Error
-			// field captures the failure reason.
-			entry := rs.entry
-			delete(requests, e.RequestID)
-			if matchesFilter(entry, filter) {
-				select {
-				case done <- &entry:
-				default:
-				}
-			}
+	done := make(chan NetworkEntry, 1)
+	tracker := newRequestTracker(filter, func(entry NetworkEntry) {
+		select {
+		case done <- entry:
+		default:
 		}
 	})
+
+	chromedp.ListenTarget(taskCtx, tracker.handleEvent)
 
 	if err := chromedp.Run(taskCtx, network.Enable()); err != nil {
 		return nil, fmt.Errorf("wait for request: enable network: %w", err)
@@ -211,7 +247,7 @@ func WaitForRequest(ctx context.Context, debugURL string, targetID string, filte
 			}
 			// Non-fatal: body fetch can fail for redirected/cached requests.
 		}
-		return entry, nil
+		return &entry, nil
 	case <-ctx.Done():
 		return nil, fmt.Errorf("wait for request: %w", ctx.Err())
 	}
@@ -255,83 +291,15 @@ func EnableNetworkLog(ctx context.Context, debugURL string, targetID string, fil
 	}
 
 	ch := make(chan NetworkEntry, 256)
-
-	type requestState struct {
-		entry   NetworkEntry
-		gotResp bool
-	}
-
-	requests := make(map[network.RequestID]*requestState)
-
-	// trySend sends an entry to the channel without blocking.
-	trySend := func(entry NetworkEntry) {
+	tracker := newRequestTracker(filter, func(entry NetworkEntry) {
 		select {
 		case ch <- entry:
 		default:
 			// Buffer full — drop entry.
 		}
-	}
-
-	chromedp.ListenTarget(taskCtx, func(ev interface{}) {
-		switch e := ev.(type) {
-		case *network.EventRequestWillBeSent:
-			requests[e.RequestID] = &requestState{
-				entry: NetworkEntry{
-					RequestID:    string(e.RequestID),
-					URL:          e.Request.URL,
-					Method:       e.Request.Method,
-					ResourceType: string(e.Type),
-					ReqHeaders:   headersToMap(e.Request.Headers),
-					Timestamp:     time.Now(),
-				},
-			}
-
-		case *network.EventResponseReceived:
-			rs, ok := requests[e.RequestID]
-			if !ok {
-				rs = &requestState{
-					entry: NetworkEntry{
-						RequestID: string(e.RequestID),
-						Timestamp: time.Now(),
-					},
-				}
-				requests[e.RequestID] = rs
-			}
-			rs.entry.Status = e.Response.Status
-			rs.entry.MIMEType = e.Response.MimeType
-			rs.entry.ResHeaders = headersToMap(e.Response.Headers)
-			if rs.entry.URL == "" {
-				rs.entry.URL = e.Response.URL
-			}
-			if rs.entry.ResourceType == "" {
-				rs.entry.ResourceType = string(e.Type)
-			}
-			rs.gotResp = true
-
-		case *network.EventLoadingFinished:
-			rs, ok := requests[e.RequestID]
-			if !ok {
-				return
-			}
-			entry := rs.entry
-			delete(requests, e.RequestID)
-			if rs.gotResp && matchesFilter(entry, filter) {
-				trySend(entry)
-			}
-
-		case *network.EventLoadingFailed:
-			rs, ok := requests[e.RequestID]
-			if !ok {
-				return
-			}
-			entry := rs.entry
-			entry.Error = e.ErrorText
-			delete(requests, e.RequestID)
-			if matchesFilter(entry, filter) {
-				trySend(entry)
-			}
-		}
 	})
+
+	chromedp.ListenTarget(taskCtx, tracker.handleEvent)
 
 	if err := chromedp.Run(taskCtx, network.Enable()); err != nil {
 		taskCancel()
