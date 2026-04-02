@@ -165,9 +165,10 @@ func FormsTarget(ctx context.Context, debugURL string, targetID string) ([]FormF
     } else if (el.placeholder) {
       selector = tag + "[placeholder=" + JSON.stringify(el.placeholder) + "]";
     } else if (el.type === "submit" || (tag === "button" && !el.type)) {
-      const text = el.textContent.trim().substring(0, 50);
-      if (text) {
-        selector = tag + ":has-text(" + JSON.stringify(text) + ")";
+      const siblings = [...document.querySelectorAll(tag)];
+      const idx = siblings.indexOf(el);
+      if (idx >= 0) {
+        selector = tag + ":nth-of-type(" + (idx + 1) + ")";
       }
     }
 
@@ -199,7 +200,7 @@ func FormsTarget(ctx context.Context, debugURL string, targetID string) ([]FormF
       name: el.name || "",
       id: el.id || "",
       placeholder: el.placeholder || "",
-      value: tag === "select" ? el.options[el.selectedIndex]?.text || "" : el.value || "",
+      value: tag === "select" ? (el.selectedIndex >= 0 ? el.options[el.selectedIndex].text : "") : el.value || "",
       label: label,
       required: el.required || false,
       disabled: el.disabled || false,
@@ -232,7 +233,7 @@ func FillTarget(ctx context.Context, debugURL string, targetID string, fields []
 		js := fmt.Sprintf(`
 (() => {
   const el = document.querySelector(%q);
-  if (!el) throw new Error("element not found: %s");
+  if (!el) throw new Error("element not found: " + %q);
   el.focus();
   const tag = el.tagName.toLowerCase();
   if (tag === "select") {
@@ -270,7 +271,7 @@ func FillTarget(ctx context.Context, debugURL string, targetID string, fields []
 		submitJS := fmt.Sprintf(`
 (() => {
   const el = document.querySelector(%q);
-  if (!el) throw new Error("submit element not found: %s");
+  if (!el) throw new Error("submit element not found: " + %q);
   el.click();
   return true;
 })()
