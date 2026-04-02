@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-04-02
+
+### Added
+
+- Persistent browser sessions and tabs — manage long-lived Chrome sessions with named sessions and multiple tabs (`tap browser session`, `tap browser tab`)
+- Browser forms and fill commands — discover form fields and fill them programmatically (`tap browser action form`, `tap browser action fill`)
+- Browser session state management with file-based store and process lifecycle tracking
+- Browser lock mechanism for safe concurrent access to sessions
+- `docs/browser.md` documentation for the new browser subsystem
+
 ## [0.1.6] - 2026-04-02
 
 ### Added
