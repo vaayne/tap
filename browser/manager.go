@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"sync"
 	"time"
 )
 
@@ -21,11 +22,18 @@ type SessionOptions struct {
 // browser actions using the metadata store and CDP transport layer.
 type Manager struct {
 	store *Store
+
+	// interceptMu guards interceptCancel for concurrent access.
+	interceptMu sync.Mutex
+	// interceptCancel tracks the active Fetch domain interception cancel func
+	// per target (keyed by "session:tab"). When new rules are set, the previous
+	// cancel is called first to prevent goroutine leaks.
+	interceptCancel map[string]func()
 }
 
 // NewManager creates a session manager backed by the given store.
 func NewManager(store *Store) *Manager {
-	return &Manager{store: store}
+	return &Manager{store: store, interceptCancel: make(map[string]func())}
 }
 
 // ---------------------------------------------------------------------------
@@ -456,6 +464,104 @@ func (m *Manager) Fill(ctx context.Context, sessionName string, tabName string, 
 
 	if err := FillTarget(ctx, rt.DebugURL, rt.TargetID, fields, submitSelector); err != nil {
 		return fmt.Errorf("fill: %w", err)
+	}
+	return nil
+}
+
+// NetworkWait blocks until a network request matching the filter completes in a
+// tracked tab. If includeBody is true, the response body is fetched before
+// returning. The caller controls the timeout via ctx.
+func (m *Manager) NetworkWait(ctx context.Context, sessionName string, tabName string, filter NetworkFilter, includeBody bool) (*NetworkEntry, error) {
+	rt, err := m.resolveTarget(sessionName, tabName, "network wait")
+	if err != nil {
+		return nil, err
+	}
+
+	entry, err := WaitForRequest(ctx, rt.DebugURL, rt.TargetID, filter, includeBody)
+	if err != nil {
+		return nil, fmt.Errorf("network wait: %w", err)
+	}
+	return entry, nil
+}
+
+// NetworkGetBody fetches the response body for a completed request by its
+// request ID from a tracked tab.
+func (m *Manager) NetworkGetBody(ctx context.Context, sessionName string, tabName string, requestID string) ([]byte, error) {
+	rt, err := m.resolveTarget(sessionName, tabName, "network body")
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := GetResponseBody(ctx, rt.DebugURL, rt.TargetID, requestID)
+	if err != nil {
+		return nil, fmt.Errorf("network body: %w", err)
+	}
+	return body, nil
+}
+
+// NetworkLog starts capturing network requests for a tracked tab and streams
+// completed entries to the returned channel. Call cancel to stop capturing.
+func (m *Manager) NetworkLog(ctx context.Context, sessionName string, tabName string, filter NetworkFilter) (<-chan NetworkEntry, func(), error) {
+	rt, err := m.resolveTarget(sessionName, tabName, "network log")
+	if err != nil {
+		return nil, nil, err
+	}
+
+	ch, cancel, err := EnableNetworkLog(ctx, rt.DebugURL, rt.TargetID, filter)
+	if err != nil {
+		return nil, nil, fmt.Errorf("network log: %w", err)
+	}
+	return ch, cancel, nil
+}
+
+// interceptKey returns the map key for tracking intercept cancel funcs.
+func interceptKey(session, tab string) string {
+	return session + ":" + tab
+}
+
+// cancelIntercept cancels and removes any active interception for the given key.
+func (m *Manager) cancelIntercept(key string) {
+	m.interceptMu.Lock()
+	if prev, ok := m.interceptCancel[key]; ok {
+		prev()
+		delete(m.interceptCancel, key)
+	}
+	m.interceptMu.Unlock()
+}
+
+// NetworkIntercept sets Fetch domain interception rules on a tracked tab.
+// Replaces any previously set rules (cancels the old interception goroutine).
+func (m *Manager) NetworkIntercept(ctx context.Context, sessionName string, tabName string, rules []InterceptRule) error {
+	rt, err := m.resolveTarget(sessionName, tabName, "network intercept")
+	if err != nil {
+		return err
+	}
+
+	key := interceptKey(rt.SessionName, rt.TabName)
+	m.cancelIntercept(key)
+
+	cancel, err := SetInterceptRules(ctx, rt.DebugURL, rt.TargetID, rules)
+	if err != nil {
+		return fmt.Errorf("network intercept: %w", err)
+	}
+	m.interceptMu.Lock()
+	m.interceptCancel[key] = cancel
+	m.interceptMu.Unlock()
+	return nil
+}
+
+// NetworkClearIntercept removes all Fetch domain interception rules from a
+// tracked tab.
+func (m *Manager) NetworkClearIntercept(ctx context.Context, sessionName string, tabName string) error {
+	rt, err := m.resolveTarget(sessionName, tabName, "network clear")
+	if err != nil {
+		return err
+	}
+
+	m.cancelIntercept(interceptKey(rt.SessionName, rt.TabName))
+
+	if err := ClearIntercept(ctx, rt.DebugURL, rt.TargetID); err != nil {
+		return fmt.Errorf("network clear: %w", err)
 	}
 	return nil
 }

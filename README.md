@@ -194,6 +194,8 @@ tap browser session close work
 
 Both local Chrome and remote CDP endpoints are supported. See [docs/browser.md](docs/browser.md) for the full reference.
 
+Capture and intercept network requests on tracked tabs using CDP Network and Fetch domains. See [docs/network.md](docs/network.md) for the full reference.
+
 ## Writing Scripts
 
 Scripts live in the [tap-sites](https://github.com/vaayne/tap-sites) catalog, organized by site name:
@@ -252,7 +254,8 @@ github.com/vaayne/tap/
 │   ├── main.go         # CLI binary (urfave/cli)
 │   └── sync.go         # Remote script sync + search
 └── docs/
-    └── browser.md      # Persistent browser sessions reference
+    ├── browser.md      # Persistent browser sessions reference
+    └── network.md      # Network interception reference
 ```
 
 ## Roadmap

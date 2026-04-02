@@ -34,9 +34,10 @@ Emoji-prefixed Conventional Commits: `✨ feat:`, `🐛 fix:`, `♻️ refactor:
 ```
 tap.go / options.go   → Client API + functional options
 transport/            → Shared HTTP + CDP browser layer
+browser/              → Persistent sessions, tabs, network interception
 engine/               → QuickJS + browser fallback
 fetch/                → URL → clean content (go-defuddle)
-cmd/tap/              → CLI (site, fetch, sync)
+cmd/tap/              → CLI (site, fetch, sync, browser)
 ```
 
 ## Testing
@@ -51,6 +52,20 @@ Run `go test ./... -timeout 60s -race` before pushing. CI: lint + test on ubuntu
 4. Tag and push: `git tag vx.y.z && git push origin main --tags`.
 5. GoReleaser publishes automatically.
 
+## Documentation
+
+User-facing docs live in three places. Keep them in sync when making changes:
+
+| Location | Purpose | Update when |
+|---|---|---|
+| `README.md` | Project overview, quick start, links to docs | New features, commands, or doc files |
+| `docs/` | Full reference docs (`browser.md`, `network.md`) | Command changes, new flags, behavior changes |
+| `skills/tap-web/` | Agent skill (`SKILL.md` + `references/`) | Command changes, new capabilities |
+
 ## Skills
 
 Agent skills live in `skills/`. See `skills/tap-web/` for web access.
+
+Skill structure uses progressive disclosure:
+- `SKILL.md` — lean quick-reference (loaded on trigger)
+- `references/` — detailed docs loaded on demand by the agent
