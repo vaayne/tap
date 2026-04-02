@@ -262,8 +262,8 @@ github.com/vaayne/tap/
 - [x] `tap login <url>` — interactive browser login with cookie persistence
 - [x] `--pause` flag — manual interaction before script execution
 - [x] `tap browser` — persistent browser sessions, tabs, navigation, JS evaluation, and screenshots
+- [x] `tap browser forms` / `tap browser fill` — form discovery and filling
 - [ ] `tap pdf <url>` — save as PDF
-- [ ] `tap fill <script>` — form automation
 
 ## License
 
