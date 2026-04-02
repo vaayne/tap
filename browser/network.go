@@ -167,9 +167,11 @@ func WaitForRequest(ctx context.Context, debugURL string, targetID string, filte
 				return
 			}
 			rs.finished = true
-			if rs.gotResp && matchesFilter(rs.entry, filter) {
+			entry := rs.entry
+			delete(requests, e.RequestID)
+			if rs.gotResp && matchesFilter(entry, filter) {
 				select {
-				case done <- &rs.entry:
+				case done <- &entry:
 				default:
 				}
 			}
@@ -185,9 +187,11 @@ func WaitForRequest(ctx context.Context, debugURL string, targetID string, filte
 			// getting a response (e.g. DNS failure, connection refused). The
 			// entry still has URL/Method from RequestWillBeSent and the Error
 			// field captures the failure reason.
-			if matchesFilter(rs.entry, filter) {
+			entry := rs.entry
+			delete(requests, e.RequestID)
+			if matchesFilter(entry, filter) {
 				select {
-				case done <- &rs.entry:
+				case done <- &entry:
 				default:
 				}
 			}
@@ -453,16 +457,23 @@ func SetInterceptRules(ctx context.Context, debugURL string, targetID string, ru
 
 			// AddHeaders only — continue with modified headers.
 			if len(matched.AddHeaders) > 0 {
-				headers := []*fetch.HeaderEntry{}
-				// Preserve existing request headers.
+				// Build a case-insensitive map to deduplicate headers.
+				// AddHeaders overrides existing headers with the same name.
+				merged := make(map[string]string)
+				mergedKeys := make(map[string]string) // lowercase → original case
 				for k, v := range e.Request.Headers {
-					headers = append(headers, &fetch.HeaderEntry{
-						Name: k, Value: fmt.Sprintf("%v", v),
-					})
+					lk := strings.ToLower(k)
+					merged[lk] = fmt.Sprintf("%v", v)
+					mergedKeys[lk] = k
 				}
-				// Add/override with new headers.
 				for k, v := range matched.AddHeaders {
-					headers = append(headers, &fetch.HeaderEntry{Name: k, Value: v})
+					lk := strings.ToLower(k)
+					merged[lk] = v
+					mergedKeys[lk] = k // prefer the casing from AddHeaders
+				}
+				headers := make([]*fetch.HeaderEntry, 0, len(merged))
+				for lk, v := range merged {
+					headers = append(headers, &fetch.HeaderEntry{Name: mergedKeys[lk], Value: v})
 				}
 				_ = fetch.ContinueRequest(e.RequestID).WithHeaders(headers).Do(taskCtx)
 				return

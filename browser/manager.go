@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"sync"
 	"time"
 )
 
@@ -22,6 +23,8 @@ type SessionOptions struct {
 type Manager struct {
 	store *Store
 
+	// interceptMu guards interceptCancel for concurrent access.
+	interceptMu sync.Mutex
 	// interceptCancel tracks the active Fetch domain interception cancel func
 	// per target (keyed by "session:tab"). When new rules are set, the previous
 	// cancel is called first to prevent goroutine leaks.
@@ -526,16 +529,20 @@ func (m *Manager) NetworkIntercept(ctx context.Context, sessionName string, tabN
 
 	// Cancel any previous interception on this target.
 	key := interceptKey(rt.SessionName, rt.TabName)
+	m.interceptMu.Lock()
 	if prev, ok := m.interceptCancel[key]; ok {
 		prev()
 		delete(m.interceptCancel, key)
 	}
+	m.interceptMu.Unlock()
 
 	cancel, err := SetInterceptRules(ctx, rt.DebugURL, rt.TargetID, rules)
 	if err != nil {
 		return fmt.Errorf("network intercept: %w", err)
 	}
+	m.interceptMu.Lock()
 	m.interceptCancel[key] = cancel
+	m.interceptMu.Unlock()
 	return nil
 }
 
@@ -549,10 +556,12 @@ func (m *Manager) NetworkClearIntercept(ctx context.Context, sessionName string,
 
 	// Cancel the interception goroutine if active.
 	key := interceptKey(rt.SessionName, rt.TabName)
+	m.interceptMu.Lock()
 	if prev, ok := m.interceptCancel[key]; ok {
 		prev()
 		delete(m.interceptCancel, key)
 	}
+	m.interceptMu.Unlock()
 
 	if err := ClearIntercept(ctx, rt.DebugURL, rt.TargetID); err != nil {
 		return fmt.Errorf("network clear: %w", err)
