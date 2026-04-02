@@ -11,7 +11,8 @@ description: >
   "look up on Twitter/Weibo/Reddit/YouTube/etc.", "check stock", "translate",
   "browser session", "open a tab", "navigate to", "take a screenshot",
   "evaluate javascript", "persistent browser", "fill form", "form fields",
-  "discover inputs", or any web access task.
+  "discover inputs", "intercept requests", "capture network", "block requests",
+  "mock API", "network log", "wait for request", or any web access task.
 ---
 
 # tap-web
@@ -184,6 +185,70 @@ tap browser session close login-demo
 ```
 
 `tap browser fill` uses React-compatible native value setters with proper `input`/`change` event dispatch — works with React, Vue, Angular, and vanilla HTML forms.
+
+### Network interception
+
+Capture, inspect, and intercept network requests on tracked browser tabs using CDP Network and Fetch domains.
+
+```bash
+# Wait for a specific API request to complete
+tap browser network wait --url-pattern "*/api/*" --body --timeout 30s
+
+# Stream all network activity as NDJSON
+tap browser network log --resource-type XHR,Fetch
+
+# Fetch response body by request ID (from wait/log output)
+tap browser network body "1234.56"
+
+# Block ad/tracking requests (process stays alive, Ctrl-C to stop)
+tap browser network intercept --block --url-pattern "*.ads.*"
+
+# Mock an API response
+tap browser network intercept \
+  --url-pattern "*/api/user" \
+  --respond '{"name":"test"}' --status 200
+
+# Add auth headers to API requests
+tap browser network intercept \
+  --url-pattern "*/api/*" \
+  --header "Authorization: Bearer tok_abc123"
+
+# Remove all interception rules
+tap browser network clear
+```
+
+**Network wait flags:**
+
+| Flag | Description | Default |
+|---|---|---|
+| `--url-pattern` | Glob pattern (`*` matches any chars including `/`) | match all |
+| `--method` | HTTP method(s), comma-separated | match all |
+| `--resource-type` | Resource type(s): `XHR`, `Fetch`, `Document`, `Script`, etc. | match all |
+| `--timeout` | Maximum time to wait | `30s` |
+| `--body` | Include response body in output | `false` |
+| `--format` | `pretty`, `json`, `raw` | `pretty` |
+
+**Network intercept flags:**
+
+| Flag | Description |
+|---|---|
+| `--block` | Block matching requests (mutually exclusive with `--respond`) |
+| `--respond` | Mock response body (mutually exclusive with `--block`) |
+| `--status` | Mock response status code (default `200`) |
+| `--content-type` | Mock response Content-Type (default `application/json`) |
+| `--header` | Add/override request header (repeatable, `"Key: Value"`) |
+
+**Common use case — capture SPA API responses:**
+
+```bash
+tap browser session new scrape
+tap browser tab new page --url https://example.com/dashboard
+
+# Wait for the data API call and capture its JSON response
+tap browser network wait --url-pattern "*/api/data*" --body --format json
+
+tap browser session close scrape
+```
 
 ### Example: multi-tab workflow
 
