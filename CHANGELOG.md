@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-04-02
+
+### Added
+
+- CDP network interception for browser tabs — capture, inspect, and intercept network requests on tracked tabs
+- `tap browser network wait` — block until a matching request completes, print the entry
+- `tap browser network body` — fetch response body by request ID
+- `tap browser network log` — stream completed requests as NDJSON
+- `tap browser network intercept` — block, mock, or modify matching requests via Fetch domain
+- `tap browser network clear` — remove all interception rules
+- URL pattern matching with glob syntax (`*` matches any character including `/`)
+- `withTargetListen` CDP helper for long-lived event listening sessions
+- `docs/network.md` full reference documentation
+- `skills/tap-web/references/network.md` agent skill reference
+
+### Changed
+
+- Restructured tap-web skill with progressive disclosure (SKILL.md → 92 lines, details in `references/`)
+- Added documentation sync rule to AGENTS.md
+
 ## [0.1.8] - 2026-04-02
 
 ### Added
