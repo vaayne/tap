@@ -9,6 +9,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/urfave/cli/v3 v3.8.0
 	github.com/vaayne/go-defuddle v0.0.0-20260331111254-c5da35168e90
+	golang.org/x/sys v0.42.0
 )
 
 require (
@@ -21,5 +22,4 @@ require (
 	github.com/gobwas/ws v1.4.0 // indirect
 	github.com/tetratelabs/wazero v1.9.0 // indirect
 	golang.org/x/net v0.47.0 // indirect
-	golang.org/x/sys v0.42.0 // indirect
 )

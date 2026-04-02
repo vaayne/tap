@@ -1,5 +1,3 @@
-//go:build !windows
-
 package browser
 
 import (
@@ -8,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"syscall"
 	"time"
 )
 
@@ -128,8 +125,8 @@ func (m *Manager) CloseSession(_ context.Context, name string) error {
 			_ = KillProcess(proc)
 			// Only remove the profile after confirming the process is gone,
 			// so we don't delete files Chrome is still writing to.
-			if profileDir != "" && (proc.PID <= 0 || syscall.Kill(proc.PID, 0) != nil) {
-				_ = os.RemoveAll(profileDir)
+			if profileDir != "" && (proc.PID <= 0 || !isProcessAlive(proc.PID)) {
+				removeProfileDir(profileDir)
 			}
 		}
 
@@ -600,4 +597,17 @@ func requireLiveTab(tab *TabRecord) error {
 		return fmt.Errorf("tab %q has no target ID", tab.Name)
 	}
 	return nil
+}
+
+// removeProfileDir removes a Chrome profile directory with a retry loop to
+// handle transient file locks (e.g., antivirus or indexing services on Windows).
+func removeProfileDir(dir string) {
+	for range 3 {
+		if err := os.RemoveAll(dir); err == nil {
+			return
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	// Final best-effort attempt.
+	_ = os.RemoveAll(dir)
 }
