@@ -460,6 +460,37 @@ func (m *Manager) Fill(ctx context.Context, sessionName string, tabName string, 
 	return nil
 }
 
+// NetworkWait blocks until a network request matching the filter completes in a
+// tracked tab. If includeBody is true, the response body is fetched before
+// returning. The caller controls the timeout via ctx.
+func (m *Manager) NetworkWait(ctx context.Context, sessionName string, tabName string, filter NetworkFilter, includeBody bool) (*NetworkEntry, error) {
+	rt, err := m.resolveTarget(sessionName, tabName, "network wait")
+	if err != nil {
+		return nil, err
+	}
+
+	entry, err := WaitForRequest(ctx, rt.DebugURL, rt.TargetID, filter, includeBody)
+	if err != nil {
+		return nil, fmt.Errorf("network wait: %w", err)
+	}
+	return entry, nil
+}
+
+// NetworkGetBody fetches the response body for a completed request by its
+// request ID from a tracked tab.
+func (m *Manager) NetworkGetBody(ctx context.Context, sessionName string, tabName string, requestID string) ([]byte, error) {
+	rt, err := m.resolveTarget(sessionName, tabName, "network body")
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := GetResponseBody(ctx, rt.DebugURL, rt.TargetID, requestID)
+	if err != nil {
+		return nil, fmt.Errorf("network body: %w", err)
+	}
+	return body, nil
+}
+
 // ---------------------------------------------------------------------------
 // Reconciliation
 // ---------------------------------------------------------------------------
