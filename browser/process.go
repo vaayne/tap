@@ -116,8 +116,15 @@ func LaunchBrowser(ctx context.Context, config LocalConfig) (*ProcessRecord, err
 
 	// Parse the debug URL from Chrome's stderr output with a timeout.
 	debugURL, err := parseDebugURL(stderrPipe, 10*time.Second)
+
+	// Close the stderr pipe so the scanner goroutine in parseDebugURL can exit.
+	// StderrPipe returns an io.ReadCloser; closing it unblocks any blocked Read.
+	if c, ok := stderrPipe.(io.Closer); ok {
+		_ = c.Close()
+	}
+
 	if err != nil {
-		// Best-effort cleanup: kill and reap to avoid zombies and close pipes.
+		// Best-effort cleanup: kill and reap to avoid zombies.
 		_ = cmd.Process.Kill()
 		_ = cmd.Wait()
 		return nil, fmt.Errorf("parse chrome debug URL: %w", err)

@@ -251,24 +251,41 @@ func (m *Manager) CloseTab(ctx context.Context, sessionName string, tabName stri
 		return fmt.Errorf("close tab: %w", err)
 	}
 	sessionName = resolved
-	return m.store.UpdateSession(sessionName, func(state *State, session *SessionRecord) error {
+
+	// Phase 1: resolve tab info under lock.
+	var debugURL, targetID, resolvedTab string
+	var isLive bool
+	err = m.store.UpdateSession(sessionName, func(_ *State, session *SessionRecord) error {
 		tab, err := session.ResolveTab(tabName)
 		if err != nil {
 			return fmt.Errorf("close tab: %w", err)
 		}
-
-		// Close the CDP target if the tab is still live.
-		if tab.Status == TabStatusLive && tab.TargetID != "" {
-			debugURL, err := resolveDebugURL(session)
+		resolvedTab = tab.Name
+		isLive = tab.Status == TabStatusLive && tab.TargetID != ""
+		if isLive {
+			du, err := resolveDebugURL(session)
 			if err != nil {
 				return fmt.Errorf("close tab: %w", err)
 			}
-			if err := CloseTarget(ctx, debugURL, tab.TargetID); err != nil {
-				return fmt.Errorf("close tab: %w", err)
-			}
+			debugURL = du
+			targetID = tab.TargetID
 		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
 
-		if err := state.DeleteTab(sessionName, tab.Name); err != nil {
+	// Phase 2: close the CDP target outside the lock.
+	if isLive {
+		if err := CloseTarget(ctx, debugURL, targetID); err != nil {
+			return fmt.Errorf("close tab: %w", err)
+		}
+	}
+
+	// Phase 3: remove tab metadata under lock.
+	return m.store.UpdateSession(sessionName, func(state *State, _ *SessionRecord) error {
+		if err := state.DeleteTab(sessionName, resolvedTab); err != nil {
 			return fmt.Errorf("close tab: %w", err)
 		}
 		return nil
@@ -406,23 +423,35 @@ func (m *Manager) Reconcile(ctx context.Context, sessionName string) error {
 		return fmt.Errorf("reconcile: %w", err)
 	}
 	sessionName = resolved
-	return m.store.UpdateSession(sessionName, func(state *State, session *SessionRecord) error {
-		debugURL, err := resolveDebugURL(session)
+
+	// Phase 1: resolve debug URL under lock.
+	var debugURL string
+	err = m.store.UpdateSession(sessionName, func(_ *State, session *SessionRecord) error {
+		du, err := resolveDebugURL(session)
 		if err != nil {
 			return fmt.Errorf("reconcile: %w", err)
 		}
+		debugURL = du
+		return nil
+	})
+	if err != nil {
+		return err
+	}
 
-		targets, err := ListTargets(ctx, debugURL)
-		if err != nil {
-			return fmt.Errorf("reconcile: %w", err)
-		}
+	// Phase 2: list live CDP targets outside the lock.
+	targets, err := ListTargets(ctx, debugURL)
+	if err != nil {
+		return fmt.Errorf("reconcile: %w", err)
+	}
 
-		targetIDs := make([]string, len(targets))
-		for i, t := range targets {
-			targetIDs[i] = t.TargetID
-		}
+	targetIDs := make([]string, len(targets))
+	for i, t := range targets {
+		targetIDs[i] = t.TargetID
+	}
 
-		now := time.Now()
+	// Phase 3: reconcile metadata under lock.
+	now := time.Now()
+	return m.store.UpdateSession(sessionName, func(state *State, _ *SessionRecord) error {
 		if err := state.ReconcileSession(sessionName, targetIDs, now); err != nil {
 			return fmt.Errorf("reconcile: %w", err)
 		}

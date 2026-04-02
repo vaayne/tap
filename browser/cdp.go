@@ -135,18 +135,18 @@ func withBrowser(ctx context.Context, debugURL string) (context.Context, context
 // It detaches from the target without closing it so the tab survives across calls.
 func withTarget(ctx context.Context, debugURL string, targetID string, actions ...chromedp.Action) error {
 	allocCtx, allocCancel := chromedp.NewRemoteAllocator(ctx, debugURL, chromedp.NoModifyURL)
-	defer allocCancel()
 
 	taskCtx, taskCancel := chromedp.NewContext(allocCtx, chromedp.WithTargetID(target.ID(targetID)))
-	defer taskCancel()
 
 	err := chromedp.Run(taskCtx, actions...)
 
-	// Prevent chromedp from closing the target on context cancellation.
-	// We attach to an existing tab we don't own, so we must leave it open.
+	// Clear TargetID BEFORE cancel so chromedp's cancel handler does not
+	// close the tab. We attach to an existing tab we don't own.
 	if c := chromedp.FromContext(taskCtx); c != nil && c.Target != nil {
 		c.Target.TargetID = ""
 	}
+	taskCancel()
+	allocCancel()
 
 	return err
 }
