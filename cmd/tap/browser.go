@@ -83,4 +83,3 @@ func browserStateRoot(cmd *cli.Command) string {
 	}
 	return defaultRoot
 }
-
