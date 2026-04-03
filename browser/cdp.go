@@ -331,6 +331,34 @@ func FillTarget(ctx context.Context, debugURL string, targetID string, fields []
 	return nil
 }
 
+// GetHTMLTarget returns the outerHTML of the element matching sel, or the full
+// page HTML if sel is empty.
+func GetHTMLTarget(ctx context.Context, debugURL string, targetID string, sel string) (string, string, error) {
+	if sel == "" {
+		sel = "html"
+	}
+	js := fmt.Sprintf(`
+(() => {
+  const el = document.querySelector(%q);
+  if (!el) return {html: "", url: location.href};
+  return {html: el.outerHTML, url: location.href};
+})()
+`, sel)
+	var result struct {
+		HTML string `json:"html"`
+		URL  string `json:"url"`
+	}
+	err := withTarget(ctx, debugURL, targetID,
+		chromedp.Evaluate(js, &result, func(p *runtime.EvaluateParams) *runtime.EvaluateParams {
+			return p.WithReturnByValue(true).WithAwaitPromise(true)
+		}),
+	)
+	if err != nil {
+		return "", "", fmt.Errorf("get html target: %w", err)
+	}
+	return result.HTML, result.URL, nil
+}
+
 // KeypressTarget sends key events to the page (not a specific element).
 // The keys string uses chromedp/kb constants: "\r" for Enter, "\t" for Tab,
 // "\u001b" for Escape, etc. Regular characters are sent as-is.

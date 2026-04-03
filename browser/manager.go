@@ -806,6 +806,15 @@ func (m *Manager) Reconcile(ctx context.Context, sessionName string) error {
 // Helpers
 // ---------------------------------------------------------------------------
 
+// ResolveTarget resolves a session and tab to their CDP connection details.
+// Exported for commands that need direct CDP access (e.g., text extraction).
+func (m *Manager) ResolveTarget(sessionName string, tabName string) (ResolvedTarget, error) {
+	return m.resolveTarget(sessionName, tabName, "resolve")
+}
+
+// ResolvedTarget holds the result of resolving a session and tab for CDP I/O.
+type ResolvedTarget = resolvedTarget
+
 // resolvedTarget holds the result of resolving a session and tab for CDP I/O.
 type resolvedTarget struct {
 	DebugURL    string

@@ -111,6 +111,11 @@ func (f *Fetcher) fetchViaBrowser(ctx context.Context, url string, opts *Options
 	return f.parse(html, url, defOpts)
 }
 
+// ParseHTML extracts clean content from raw HTML without fetching.
+func (f *Fetcher) ParseHTML(html, url string, opts *defuddle.Options) (*Result, error) {
+	return f.parse(html, url, opts)
+}
+
 func (f *Fetcher) parse(html, url string, opts *defuddle.Options) (*Result, error) {
 	dr, err := f.parser.Parse(html, url, opts)
 	if err != nil {

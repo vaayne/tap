@@ -10,6 +10,7 @@ import (
 
 	"github.com/chromedp/chromedp/kb"
 	"github.com/urfave/cli/v3"
+	defuddle "github.com/vaayne/go-defuddle"
 	"github.com/vaayne/tap/browser"
 )
 
@@ -146,6 +147,78 @@ session name, tab name, and current timestamp.`,
 				return fmt.Errorf("write screenshot: %w", err)
 			}
 			fmt.Fprintf(os.Stderr, "%s\n", outPath)
+			return nil
+		},
+	}
+}
+
+func browserTextCmd() *cli.Command {
+	return &cli.Command{
+		Name:      "text",
+		Usage:     "Extract clean readable text from the page via defuddle",
+		ArgsUsage: "[selector]",
+		Flags: append(browserActionFlags(false), &cli.StringFlag{
+			Name:    "format",
+			Aliases: []string{"f"},
+			Usage:   "Output format: json, pretty (default), raw",
+			Value:   formatPretty,
+		}),
+		Description: `Extract clean, readable content from the current page using defuddle.
+Strips navigation, ads, scripts, and boilerplate — returns only the main content
+as Markdown (default) or JSON with metadata.
+
+Optionally scope to a CSS selector to extract from a specific section.
+
+This is the most token-efficient way to read page content — far cheaper
+than evaluating outerHTML.`,
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			configureLogging(cmd)
+			sel := cmd.Args().First()
+			mgr, err := newBrowserManager(cmd)
+			if err != nil {
+				return err
+			}
+			rt, err := mgr.ResolveTarget(cmd.String("session"), cmd.String("tab"))
+			if err != nil {
+				return err
+			}
+			html, pageURL, err := browser.GetHTMLTarget(ctx, rt.DebugURL, rt.TargetID, sel)
+			if err != nil {
+				return err
+			}
+			if html == "" {
+				fmt.Fprintln(os.Stderr, "No content found.")
+				return nil
+			}
+			parser, err := defuddle.NewParser()
+			if err != nil {
+				return fmt.Errorf("init parser: %w", err)
+			}
+			defer parser.Close()
+			dr, err := parser.Parse(html, pageURL, &defuddle.Options{Markdown: true})
+			if err != nil {
+				return fmt.Errorf("parse content: %w", err)
+			}
+
+			format := cmd.String("format")
+			if format == "json" || format == "raw" {
+				return printResult(cmd, map[string]any{
+					"title":       dr.Title,
+					"description": dr.Description,
+					"markdown":    dr.Markdown,
+					"wordCount":   dr.WordCount,
+					"url":         pageURL,
+				})
+			}
+			// Default: print markdown directly
+			content := dr.Markdown
+			if content == "" {
+				content = dr.Content
+			}
+			if dr.Title != "" {
+				fmt.Printf("# %s\n\n", dr.Title)
+			}
+			fmt.Println(content)
 			return nil
 		},
 	}

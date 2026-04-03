@@ -36,6 +36,9 @@ tap browser forward
 tap browser reload
 tap browser evaluate <javascript>
 tap browser screenshot [--output <path>]
+tap browser text [selector]                    # Clean readable text (defuddle)
+tap browser text ".main-content"               # Scoped to selector
+tap browser text -f json                       # JSON with title, markdown, wordCount
 tap browser pdf [--output <path>] [--landscape] [--scale 1.0]
 ```
 

@@ -91,6 +91,7 @@ tap browser tab new <name> --url <url>
 tap browser navigate <url>
 tap browser evaluate <js>
 tap browser screenshot
+tap browser text [selector]           # Clean readable text via defuddle (token-efficient)
 tap browser pdf [--output out.pdf]    # Save page as PDF
 tap browser forms
 tap browser fill <sel> <val> [--submit <sel>]
@@ -126,6 +127,29 @@ tap browser network intercept --url-pattern "*/api/*" --respond '{}' --status 20
 tap browser network intercept --url-pattern "*/api/*" --header "Authorization: Bearer tok"
 tap browser network clear                                 # Remove rules
 ```
+
+## Reading page content efficiently
+
+**Never use `evaluate "document.documentElement.outerHTML"` — it dumps 50-200k tokens of raw HTML.**
+
+Pick the cheapest extraction method:
+
+| Method | Tokens | When to use |
+|---|---|---|
+| `tap browser network wait --body` | ~1-5k | API JSON exists (best) |
+| `tap browser text` | ~2-10k | Read article/page content |
+| `tap browser text ".selector"` | ~0.5-3k | Read specific section |
+| `tap browser forms` | ~0.5-2k | Discover form fields |
+| `tap browser evaluate "targeted JS"` | ~0.5-5k | Extract specific data points |
+| `tap browser screenshot` | fixed | Understand page layout |
+| `tap fetch <url>` | ~2-10k | Read page without a session |
+
+**Decision flow:**
+1. API exists? → `network wait --body` (cleanest data)
+2. Need readable content? → `text` or `text ".main"` (defuddle strips boilerplate)
+3. Need form fields? → `forms`
+4. Need specific data? → `evaluate` with targeted selector
+5. Need visual layout? → `screenshot`
 
 ## Tips
 
