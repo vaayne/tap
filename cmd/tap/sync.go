@@ -181,6 +181,7 @@ func syncScripts(dir string, verbose bool) error {
 
 	if len(toDownload) == 0 && len(toDelete) == 0 {
 		fmt.Fprintf(os.Stderr, "Already up to date. (%d scripts)\n", len(manifest.Scripts))
+		touchLastSync(dir)
 		return nil
 	}
 
