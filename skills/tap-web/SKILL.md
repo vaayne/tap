@@ -17,154 +17,76 @@ description: >
 
 # tap-web
 
-Use the `tap` CLI to access websites from the terminal.
+**Before accessing any site, check `$XDG_CONFIG_HOME/tap/site-notes/{domain}.md` for saved knowledge. Update after learning.** See [references/site-notes.md](references/site-notes.md).
 
-## `tap fetch` — Clean content from any URL
-
-```bash
-tap fetch <url>              # Clean markdown
-tap fetch --json <url>       # JSON with metadata
-```
-
-## `tap site` — Structured data via site scripts
-
-**Always discover scripts first. Do not guess names or parameters.**
+## Quick reference
 
 ```bash
-tap site list                         # List all scripts
-tap site search <keyword>             # Search by keyword
-tap site info <script>                # Show params and usage
-tap site <site/action> [key=value]    # Run a script
-tap site <script> -f json | jq '.'   # JSON output
-```
+# Content extraction
+tap fetch <url>                          # Clean markdown from any URL
+tap fetch --json <url>                   # JSON with metadata
 
-To write or contribute a new script, see [references/script-development.md](references/script-development.md).
+# Site scripts — always discover first, never guess
+tap site list | search <kw> | info <s>   # Discover scripts
+tap site <site/action> [key=value]       # Run a script
+tap site -b <script>                     # With auth (browser cookies)
 
-## Login & browser backends
-
-```bash
-tap login https://github.com/login   # Opens browser, press Enter when done
-tap site -b github/notifications     # Use saved cookies
-tap site --pause twitter/search query=claude  # One-off CAPTCHA
+# Login
+tap login <url>                          # Opens browser, press Enter when done
 ```
 
 | Flag | Use when |
 |---|---|
-| `--lp` | JS rendering without auth (fast, no cookies) |
-| `-b` | Auth needed (cookies, login state) |
-| `--pause` | One-off CAPTCHA/interaction (implies `-b --no-headless`) |
+| `--lp` | JS rendering without auth |
+| `-b` | Auth needed (cookies) |
+| `--pause` | One-off CAPTCHA (implies `-b --no-headless`) |
 
-## Session strategy
+## Browser sessions
 
-**Always reuse the `default` session.** Only create named sessions when you need isolation (different accounts, parallel work).
+**Always reuse the `default` session.** Only create named sessions for isolation (parallel subagents, different accounts). Stale recovery: close + recreate with same name — cookies preserved.
 
-```bash
-# Ensure default session exists (skip if already running)
-tap browser session list              # Check first
-tap browser session new default       # Create only if missing
-```
-
-**When to use which:**
-
-| Need | Approach |
-|---|---|
-| Single script with auth | `tap site -b <script>` |
-| Multi-step workflow (navigate, fill, extract) | `tap browser` with `default` session |
-| Parallel browser tasks (subagents) | Each subagent creates its own named session |
-
-**Stale session recovery:** If `default` is unresponsive, close and recreate — same name = same profile directory = cookies preserved.
+See [references/browser.md](references/browser.md) for full commands, session strategy, and recovery.
 
 ```bash
-tap browser session close default
-tap browser session new default
-```
-
-See [references/browser.md](references/browser.md) for full session/tab/action commands and recovery details.
-
-## `tap browser` — Persistent sessions, tabs, and network
-
-Manage long-lived browser instances across CLI invocations.
-
-```bash
-tap browser session new <name>        # Launch Chrome
+tap browser session list | new <name> | close [name]
 tap browser tab new <name> --url <url>
-tap browser navigate <url>
-tap browser evaluate <js>
-tap browser screenshot
-tap browser text [selector]           # Clean readable text via defuddle (token-efficient)
-tap browser pdf [--output out.pdf]    # Save page as PDF
-tap browser forms
-tap browser fill <sel> <val> [--submit <sel>]
-tap browser click <sel>               # Real mouse click
-tap browser type <sel> <text>         # Per-keystroke typing
-tap browser hover <sel>               # Trigger :hover / mouseenter
-tap browser scroll <sel>              # Scroll element into view
-tap browser scroll --x 0 --y 1000    # Scroll to position
-tap browser select <sel> <value>      # Pick <select> option
+# Page
+tap browser navigate <url>              # Go to URL
+tap browser back | forward | reload     # History navigation
+tap browser text [selector]             # Clean text via defuddle (token-efficient)
+tap browser evaluate <js>               # Run JavaScript
+tap browser screenshot | pdf            # Capture output
+# Interaction (real CDP events, human-like)
+tap browser click | hover <sel>         # Mouse actions
+tap browser type <sel> <text>           # Per-keystroke typing
+tap browser scroll <sel>                # Scroll into view
+tap browser select <sel> <value>        # Pick <select> option
+tap browser fill <sel> <val> [--submit] # Set form values
 tap browser wait <sel> [--timeout 30s]  # Wait for element visible
-tap browser keypress Enter            # Send key event (Enter, Tab, Escape, Ctrl+a...)
-tap browser dialog [--accept=false]   # Accept/dismiss alert/confirm/prompt
-tap browser cookies get               # List cookies (includes httpOnly)
-tap browser cookies set <name> <val> [--domain d]
-tap browser cookies clear             # Delete all cookies
-tap browser back                      # History back
-tap browser forward                   # History forward
-tap browser reload                    # Reload page
-tap browser session close [name]
+tap browser keypress Enter              # Keyboard (Enter, Tab, Escape, Ctrl+a...)
+tap browser dialog [--accept=false]     # Handle alert/confirm/prompt
+# State
+tap browser forms                       # Discover form fields
+tap browser cookies get | set | clear   # Cookie management (includes httpOnly)
+# Network — see references/network.md
+tap browser network wait --url-pattern "*/api/*" --body
+tap browser network log --resource-type XHR,Fetch
+tap browser network intercept --block --url-pattern "*.ads.*"
 ```
 
-### Network capture & interception
+## Reading pages efficiently
 
-Capture API responses and intercept requests on tracked tabs via CDP.
-See [references/network.md](references/network.md) for all flags, patterns, and examples.
+**Never use `evaluate "document.documentElement.outerHTML"`.** Pick the cheapest path:
 
-```bash
-tap browser network wait --url-pattern "*/api/*" --body   # Capture API response
-tap browser network log --resource-type XHR,Fetch         # Stream as NDJSON
-tap browser network body <requestId>                      # Fetch body by ID
-tap browser network intercept --block --url-pattern "*.ads.*"  # Block requests
-tap browser network intercept --url-pattern "*/api/*" --respond '{}' --status 200
-tap browser network intercept --url-pattern "*/api/*" --header "Authorization: Bearer tok"
-tap browser network clear                                 # Remove rules
-```
+1. **API exists?** → `network wait --body` (~1-5k tokens)
+2. **Readable content?** → `text [selector]` (~2-10k tokens, defuddle strips boilerplate)
+3. **Form fields?** → `forms` (~0.5-2k tokens)
+4. **Specific data?** → `evaluate` with targeted selector (~0.5-5k tokens)
+5. **Visual layout?** → `screenshot` (fixed cost)
 
-## Reading page content efficiently
+## References
 
-**Never use `evaluate "document.documentElement.outerHTML"` — it dumps 50-200k tokens of raw HTML.**
-
-Pick the cheapest extraction method:
-
-| Method | Tokens | When to use |
-|---|---|---|
-| `tap browser network wait --body` | ~1-5k | API JSON exists (best) |
-| `tap browser text` | ~2-10k | Read article/page content |
-| `tap browser text ".selector"` | ~0.5-3k | Read specific section |
-| `tap browser forms` | ~0.5-2k | Discover form fields |
-| `tap browser evaluate "targeted JS"` | ~0.5-5k | Extract specific data points |
-| `tap browser screenshot` | fixed | Understand page layout |
-| `tap fetch <url>` | ~2-10k | Read page without a session |
-
-**Decision flow:**
-1. API exists? → `network wait --body` (cleanest data)
-2. Need readable content? → `text` or `text ".main"` (defuddle strips boilerplate)
-3. Need form fields? → `forms`
-4. Need specific data? → `evaluate` with targeted selector
-5. Need visual layout? → `screenshot`
-
-## Site notes — remember how sites work
-
-**Before accessing a site, check for notes. After learning something, update them.**
-
-Notes live at `$XDG_CONFIG_HOME/tap/site-notes/{domain}.md` (fallback `~/.config/tap/site-notes/`).
-See [references/site-notes.md](references/site-notes.md) for format, workflow, and what to log.
-
-## Tips
-
-- **Always check site notes before accessing a site.** Update after learning.
-- Reuse the `default` session — don't create new sessions unless you need isolation.
-- Prefer `--lp` over `-b` when you just need JS rendering without auth.
-- Use `tap login` first for auth-required sites, then `-b`.
-- Prefer `tap site` over `tap fetch` when a script exists.
-- Use `tap browser` for multi-step workflows needing state across invocations.
-- Use `tap browser network wait` to capture clean API JSON instead of scraping DOM.
-- Use `tap --local-only site ...` to skip remote cache during script development.
+- [browser.md](references/browser.md) — Sessions, tabs, actions, session strategy
+- [network.md](references/network.md) — Network capture & interception
+- [script-development.md](references/script-development.md) — Writing site scripts
+- [site-notes.md](references/site-notes.md) — Per-site knowledge system
