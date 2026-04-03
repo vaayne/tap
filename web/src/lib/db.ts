@@ -216,14 +216,29 @@ export async function batchUpdate(
 ): Promise<void> {
   const { DB } = env
 
-  // D1 batch supports up to 100 statements; chunk inserts to stay safe
-  const CHUNK_SIZE = 90
+  // D1 batch supports up to 100 statements; chunk inserts to stay safe.
+  // To guarantee atomicity we insert into a temp table first, then
+  // swap via DELETE + INSERT … SELECT in a single batch call.
+  const CHUNK_SIZE = 95
 
-  const deleteStmt = DB.prepare("DELETE FROM scripts")
+  const createTemp = DB.prepare(
+    `CREATE TABLE IF NOT EXISTS _scripts_staging (
+      name TEXT PRIMARY KEY, site TEXT NOT NULL, description TEXT NOT NULL DEFAULT '',
+      domain TEXT NOT NULL DEFAULT '', args TEXT NOT NULL DEFAULT '{}',
+      read_only INTEGER NOT NULL DEFAULT 1, example TEXT NOT NULL DEFAULT '',
+      content TEXT NOT NULL, hash TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+  )
+  const clearTemp = DB.prepare("DELETE FROM _scripts_staging")
+
+  // Phase 1: populate staging table
+  await DB.batch([createTemp, clearTemp])
 
   const insertStmts = scripts.map((s) =>
     DB.prepare(
-      `INSERT INTO scripts (name, site, description, domain, args, read_only, example, content, hash)
+      `INSERT INTO _scripts_staging (name, site, description, domain, args, read_only, example, content, hash)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).bind(
       s.name,
@@ -238,13 +253,19 @@ export async function batchUpdate(
     ),
   )
 
-  // First batch: DELETE + first chunk of inserts
-  const firstChunk = insertStmts.slice(0, CHUNK_SIZE)
-  await DB.batch([deleteStmt, ...firstChunk])
-
-  // Remaining chunks
-  for (let i = CHUNK_SIZE; i < insertStmts.length; i += CHUNK_SIZE) {
+  for (let i = 0; i < insertStmts.length; i += CHUNK_SIZE) {
     const chunk = insertStmts.slice(i, i + CHUNK_SIZE)
     await DB.batch(chunk)
   }
+
+  // Phase 2: atomic swap — single batch so scripts is never empty
+  await DB.batch([
+    DB.prepare("DELETE FROM scripts"),
+    DB.prepare(
+      `INSERT INTO scripts (name, site, description, domain, args, read_only, example, content, hash, created_at, updated_at)
+       SELECT name, site, description, domain, args, read_only, example, content, hash, created_at, updated_at
+       FROM _scripts_staging`,
+    ),
+    DB.prepare("DELETE FROM _scripts_staging"),
+  ])
 }

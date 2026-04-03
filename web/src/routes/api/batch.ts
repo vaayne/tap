@@ -17,12 +17,9 @@ export const Route = createFileRoute("/api/batch")({
           )
         }
 
-        // Check content length before reading body
-        const contentLength = request.headers.get("content-length")
-        if (
-          contentLength &&
-          parseInt(contentLength, 10) > MAX_PAYLOAD_BYTES
-        ) {
+        // Read body as text to enforce size limit regardless of Content-Length
+        const text = await request.text()
+        if (text.length > MAX_PAYLOAD_BYTES) {
           return Response.json(
             { error: "Payload too large (max 500KB)" },
             { status: 413 },
@@ -32,7 +29,7 @@ export const Route = createFileRoute("/api/batch")({
         // Parse body
         let body: { scripts?: unknown }
         try {
-          body = await request.json()
+          body = JSON.parse(text)
         } catch {
           return Response.json(
             { error: "Invalid JSON body" },

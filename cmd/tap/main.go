@@ -145,6 +145,9 @@ func newClient(ctx context.Context, cmd *cli.Command) (*tap.Client, error) {
 	if localOnly {
 		// In local-only mode use the override dir as the sole scripts dir,
 		// and disable the cache path so only local scripts are visible.
+		if err := os.MkdirAll(localOverrideDir, 0o755); err != nil {
+			return nil, fmt.Errorf("create local override dir: %w", err)
+		}
 		opts = append(opts, tap.WithSitesDir(localOverrideDir))
 	} else {
 		opts = append(opts, tap.WithSitesDir(dir))
