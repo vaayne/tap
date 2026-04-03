@@ -38,7 +38,17 @@ browser/              → Persistent sessions, tabs, network interception
 engine/               → QuickJS + browser fallback
 fetch/                → URL → clean content (go-defuddle)
 cmd/tap/              → CLI (site, fetch, sync, browser)
+web/                  → Web UI — TanStack Start + Cloudflare Workers + D1
 ```
+
+## Scripts
+
+Site scripts live in [tap-scripts](https://github.com/vaayne/tap-scripts) (separate repo).
+They auto-sync to D1 on push via GitHub Actions → `POST /api/batch`.
+The CLI caches them locally in `~/.cache/tap/sites/` (refreshed every 24 h).
+
+Local overrides: drop a `.js` file at `~/.config/tap/sites/{site}/{script}.js`.
+It takes precedence over the cache automatically. Use `--local-only` to skip the cache entirely.
 
 ## Testing
 
@@ -60,6 +70,7 @@ User-facing docs live in three places. Keep them in sync when making changes:
 |---|---|---|
 | `README.md` | Project overview, quick start, links to docs | New features, commands, or doc files |
 | `docs/` | Full reference docs (`browser.md`, `network.md`) | Command changes, new flags, behavior changes |
+| `web/` | Web UI source — TanStack Start + Cloudflare Workers | API route changes, D1 schema changes |
 | `skills/tap-web/` | Agent skill (`SKILL.md` + `references/`) | Command changes, new capabilities |
 
 ## Skills

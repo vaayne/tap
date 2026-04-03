@@ -54,6 +54,14 @@ tap site search bilibili
 
 # Manually sync/update scripts
 tap site sync
+
+# Use a local script override (takes precedence over cache)
+# Place script at: ~/.config/tap/sites/{site}/{script}.js
+tap site github/repo vaayne/tap          # uses local version if present
+
+# Only use local scripts, skip cache entirely
+tap --local-only site list
+tap --local-only site github/repo vaayne/tap
 ```
 
 ### Fetch Content
@@ -260,12 +268,12 @@ github.com/vaayne/tap/
 │   └── fetch.go        # URL → clean content via go-defuddle (HTTP → browser fallback)
 ├── script/
 │   ├── parser.go       # Script @meta parser
-│   └── registry.go     # Script directory scanner + index
+│   └── registry.go     # Script scanner — cache + local override (~/.config/tap/sites/)
 ├── cmd/tap/
-│   ├── main.go         # CLI binary (urfave/cli)
-│   └── sync.go         # Remote script sync + search
+│   ├── main.go         # CLI binary (urfave/cli) — --local-only flag
+│   └── sync.go         # Remote script sync + search, local override dir
 ├── web/                # Web UI — TanStack Start + Cloudflare Workers
-│   ├── src/            # React app with API routes
+│   ├── src/            # React app with API routes (incl. POST /api/batch)
 │   ├── migrations/     # D1 database migrations
 │   └── package.json    # Node.js dependencies
 └── docs/
