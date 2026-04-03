@@ -1,15 +1,29 @@
-# Build output
-dist/
-
 # Dependencies
 node_modules/
 
-# Wrangler
+# Build output
+dist/
+.vite/
+.cache/
+coverage/
+
+# Wrangler / Cloudflare
 .wrangler/
 .dev.vars
+.dev.vars.*
+.env
+.env.*
+!.env.example
 
-# Generated types
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Generated files
 worker-configuration.d.ts
 
-# Lock file (committed separately if needed)
-pnpm-lock.yaml
+# OS / editor
+.DS_Store
