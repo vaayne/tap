@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-## [0.3.0] - 2026-04-03
+## [0.3.0] - 2026-04-04
 
 ### Added
 
@@ -19,11 +19,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - `WithLocalOverrideDir` functional option on `tap.Client` for library users
 - `script.NewRegistryWithOverride` for constructing a registry with an override layer
 - `tap.Client.ListScriptsLocalOnly()` returns only locally-overridden scripts
+- `tap browser text` — token-efficient plain-text page reading
+- `tap browser pdf` — save page as PDF
+- `tap browser keypress`, `dialog`, and `cookies` commands
+- 9 human-like browser interaction commands (click, type, hover, scroll, select, screenshot, etc.)
 
 ### Changed
 
 - `script.Registry` now loads the override directory after the main cache, so local scripts always win
 - `AGENTS.md` updated with `web/` in architecture diagram, scripts section, and documentation table
+- CLI help text improved for self-contained discoverability
+- `tap-web` skill condensed to concise quick-reference card with decision-making guide
 ## [0.2.0] - 2026-04-02
 
 ### Added
@@ -151,7 +157,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - CI workflows for lint, test, and release
 - GoReleaser configuration for cross-platform builds
 
-[Unreleased]: https://github.com/vaayne/tap/compare/v0.1.6...HEAD
+[Unreleased]: https://github.com/vaayne/tap/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/vaayne/tap/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/vaayne/tap/compare/v0.1.8...v0.2.0
+[0.1.8]: https://github.com/vaayne/tap/compare/v0.1.7...v0.1.8
+[0.1.7]: https://github.com/vaayne/tap/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/vaayne/tap/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/vaayne/tap/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/vaayne/tap/compare/v0.1.3...v0.1.4
