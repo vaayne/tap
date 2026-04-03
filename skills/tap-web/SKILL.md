@@ -151,8 +151,16 @@ Pick the cheapest extraction method:
 4. Need specific data? → `evaluate` with targeted selector
 5. Need visual layout? → `screenshot`
 
+## Site notes — remember how sites work
+
+**Before accessing a site, check for notes. After learning something, update them.**
+
+Notes live at `$XDG_CONFIG_HOME/tap/site-notes/{domain}.md` (fallback `~/.config/tap/site-notes/`).
+See [references/site-notes.md](references/site-notes.md) for format, workflow, and what to log.
+
 ## Tips
 
+- **Always check site notes before accessing a site.** Update after learning.
 - Reuse the `default` session — don't create new sessions unless you need isolation.
 - Prefer `--lp` over `-b` when you just need JS rendering without auth.
 - Use `tap login` first for auth-required sites, then `-b`.
