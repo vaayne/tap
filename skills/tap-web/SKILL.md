@@ -91,6 +91,7 @@ tap browser tab new <name> --url <url>
 tap browser navigate <url>
 tap browser evaluate <js>
 tap browser screenshot
+tap browser pdf [--output out.pdf]    # Save page as PDF
 tap browser forms
 tap browser fill <sel> <val> [--submit <sel>]
 tap browser click <sel>               # Real mouse click

@@ -468,6 +468,26 @@ func (m *Manager) Fill(ctx context.Context, sessionName string, tabName string, 
 	return nil
 }
 
+// PDFResult holds the PDF data and resolved names.
+type PDFResult struct {
+	Data        []byte
+	SessionName string
+	TabName     string
+}
+
+// PDF saves the current page as PDF from a tracked tab.
+func (m *Manager) PDF(ctx context.Context, sessionName string, tabName string, landscape bool, printBackground bool, scale float64) (*PDFResult, error) {
+	rt, err := m.resolveTarget(sessionName, tabName, "pdf")
+	if err != nil {
+		return nil, err
+	}
+	buf, err := PDFTarget(ctx, rt.DebugURL, rt.TargetID, landscape, printBackground, scale)
+	if err != nil {
+		return nil, fmt.Errorf("pdf: %w", err)
+	}
+	return &PDFResult{Data: buf, SessionName: rt.SessionName, TabName: rt.TabName}, nil
+}
+
 // Click dispatches a real mouse click on the element matching sel in a tracked tab.
 func (m *Manager) Click(ctx context.Context, sessionName string, tabName string, sel string) error {
 	rt, err := m.resolveTarget(sessionName, tabName, "click")

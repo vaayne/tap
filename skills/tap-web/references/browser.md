@@ -36,6 +36,7 @@ tap browser forward
 tap browser reload
 tap browser evaluate <javascript>
 tap browser screenshot [--output <path>]
+tap browser pdf [--output <path>] [--landscape] [--scale 1.0]
 ```
 
 ### Human-like interaction

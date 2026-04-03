@@ -110,6 +110,54 @@ session name, tab name, and current timestamp.`,
 	}
 }
 
+func browserPDFCmd() *cli.Command {
+	return &cli.Command{
+		Name:  "pdf",
+		Usage: "Save the current page as PDF",
+		Flags: append(browserActionFlags(true),
+			&cli.BoolFlag{
+				Name:  "landscape",
+				Usage: "Use landscape orientation",
+			},
+			&cli.BoolFlag{
+				Name:  "background",
+				Usage: "Print background graphics",
+				Value: true,
+			},
+			&cli.Float64Flag{
+				Name:  "scale",
+				Usage: "Scale of the webpage rendering (default 1.0)",
+				Value: 1.0,
+			},
+		),
+		Description: `Save the current page of the resolved tracked tab as a PDF file.
+
+When --output is omitted, tap generates a file name from the session,
+tab name, and timestamp.`,
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			configureLogging(cmd)
+			mgr, err := newBrowserManager(cmd)
+			if err != nil {
+				return err
+			}
+			result, err := mgr.PDF(ctx, cmd.String("session"), cmd.String("tab"),
+				cmd.Bool("landscape"), cmd.Bool("background"), cmd.Float64("scale"))
+			if err != nil {
+				return err
+			}
+			outPath := cmd.String("output")
+			if outPath == "" {
+				outPath = fmt.Sprintf("page-%s-%s-%d.pdf", result.SessionName, result.TabName, time.Now().Unix())
+			}
+			if err := os.WriteFile(outPath, result.Data, 0o644); err != nil {
+				return fmt.Errorf("write pdf: %w", err)
+			}
+			fmt.Fprintf(os.Stderr, "%s\n", outPath)
+			return nil
+		},
+	}
+}
+
 func browserFormsCmd() *cli.Command {
 	return &cli.Command{
 		Name:  "forms",

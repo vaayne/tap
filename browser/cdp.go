@@ -8,6 +8,7 @@ import (
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/dom"
 	"github.com/chromedp/cdproto/input"
+	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/cdproto/target"
 	"github.com/chromedp/chromedp"
@@ -327,6 +328,31 @@ func FillTarget(ctx context.Context, debugURL string, targetID string, fields []
 		return fmt.Errorf("fill target: %w", err)
 	}
 	return nil
+}
+
+// PDFTarget saves the current page as PDF and returns the bytes.
+func PDFTarget(ctx context.Context, debugURL string, targetID string, landscape bool, printBackground bool, scale float64) ([]byte, error) {
+	var buf []byte
+	err := withTarget(ctx, debugURL, targetID,
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			params := page.PrintToPDF().
+				WithLandscape(landscape).
+				WithPrintBackground(printBackground)
+			if scale > 0 {
+				params = params.WithScale(scale)
+			}
+			data, _, err := params.Do(ctx)
+			if err != nil {
+				return err
+			}
+			buf = data
+			return nil
+		}),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("pdf target: %w", err)
+	}
+	return buf, nil
 }
 
 // ClickTarget dispatches a real mouse click on the first element matching sel.
