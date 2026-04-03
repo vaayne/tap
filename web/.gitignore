@@ -6,6 +6,7 @@ node_modules/
 
 # Wrangler
 .wrangler/
+.dev.vars
 
 # Generated types
 worker-configuration.d.ts
