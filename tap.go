@@ -22,6 +22,7 @@ package tap
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/vaayne/tap/engine"
@@ -50,7 +51,7 @@ func New(ctx context.Context, optFns ...Option) (*Client, error) {
 	var reg *script.Registry
 	if opts.sitesDir != "" {
 		var err error
-		reg, err = script.NewRegistry(opts.sitesDir)
+		reg, err = script.NewRegistryWithOverride(opts.sitesDir, opts.localOverrideDir)
 		if err != nil {
 			return nil, fmt.Errorf("load scripts: %w", err)
 		}
@@ -119,6 +120,9 @@ func (c *Client) RunScript(ctx context.Context, name string, args map[string]str
 		return nil, &ScriptNotFoundError{Name: name, Available: c.scriptNames()}
 	}
 
+	if s.LocalOverride {
+		fmt.Fprintf(os.Stderr, "Using local script: %s\n", name)
+	}
 	if args == nil {
 		args = make(map[string]string)
 	}
@@ -178,6 +182,14 @@ func (c *Client) ListScripts() []*script.Script {
 		return nil
 	}
 	return c.registry.List()
+}
+
+// ListScriptsLocalOnly returns only scripts loaded from the local override directory.
+func (c *Client) ListScriptsLocalOnly() []*script.Script {
+	if c.registry == nil {
+		return nil
+	}
+	return c.registry.ListLocalOnly()
 }
 
 // GetScript returns a script by name.
