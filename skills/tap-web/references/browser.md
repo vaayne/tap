@@ -62,6 +62,31 @@ tap browser wait <selector> [--timeout 30s]     # Wait for element visible
 | `select` | Fires focus/input/change events | Native `<select>` elements |
 | `wait` | CDP visibility polling | Wait for dynamic content before acting |
 
+### Keyboard & dialogs
+
+```bash
+tap browser keypress Enter                  # Submit form
+tap browser keypress Tab                    # Move focus
+tap browser keypress Escape                 # Dismiss/close
+tap browser keypress Ctrl+a                 # Select all
+tap browser keypress Ctrl+c                 # Copy
+tap browser dialog                          # Accept pending alert/confirm/prompt
+tap browser dialog --accept=false           # Dismiss dialog
+tap browser dialog --text "answer"          # Fill prompt and accept
+```
+
+Keys: Enter, Tab, Escape, Backspace, Delete, Space, ArrowUp/Down/Left/Right, Home, End, PageUp, PageDown, Ctrl, Alt, Shift, Meta. Modifiers with `+`: `Ctrl+a`, `Shift+Tab`.
+
+### Cookies
+
+```bash
+tap browser cookies get                     # List all (includes httpOnly)
+tap browser cookies get -f json             # JSON output
+tap browser cookies set <name> <value>      # Set cookie
+tap browser cookies set <name> <value> --domain .example.com
+tap browser cookies clear                   # Delete all cookies
+```
+
 ### Forms
 
 ```bash

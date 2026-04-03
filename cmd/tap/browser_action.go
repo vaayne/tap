@@ -5,11 +5,52 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/chromedp/chromedp/kb"
 	"github.com/urfave/cli/v3"
 	"github.com/vaayne/tap/browser"
 )
+
+// resolveKeyName maps human-readable key names to chromedp/kb constants.
+func resolveKeyName(name string) string {
+	// Handle modifier combinations like Ctrl+a
+	if strings.Contains(name, "+") {
+		parts := strings.SplitN(name, "+", 2)
+		modifier := resolveKeyName(parts[0])
+		key := resolveKeyName(parts[1])
+		return modifier + key + modifier
+	}
+
+	keyMap := map[string]string{
+		"enter":      kb.Enter,
+		"return":     kb.Enter,
+		"tab":        kb.Tab,
+		"escape":     kb.Escape,
+		"esc":        kb.Escape,
+		"backspace":  kb.Backspace,
+		"delete":     kb.Delete,
+		"space":      " ",
+		"arrowup":    kb.ArrowUp,
+		"arrowdown":  kb.ArrowDown,
+		"arrowleft":  kb.ArrowLeft,
+		"arrowright": kb.ArrowRight,
+		"home":       kb.Home,
+		"end":        kb.End,
+		"pageup":     kb.PageUp,
+		"pagedown":   kb.PageDown,
+		"ctrl":       kb.Control,
+		"control":    kb.Control,
+		"alt":        kb.Alt,
+		"shift":      kb.Shift,
+		"meta":       kb.Meta,
+	}
+	if v, ok := keyMap[strings.ToLower(name)]; ok {
+		return v
+	}
+	return name
+}
 
 func browserNavigateCmd() *cli.Command {
 	return &cli.Command{
@@ -247,6 +288,178 @@ Examples:
 			if submitSelector != "" {
 				fmt.Fprintf(os.Stderr, "Clicked %s\n", submitSelector)
 			}
+			return nil
+		},
+	}
+}
+
+func browserKeypressCmd() *cli.Command {
+	return &cli.Command{
+		Name:      "keypress",
+		Usage:     "Send keyboard events to the page",
+		ArgsUsage: "<key>",
+		Flags:     browserActionFlags(false),
+		Description: `Send key events to the page. Common keys:
+  Enter, Tab, Escape, Backspace, Delete, ArrowUp, ArrowDown, ArrowLeft, ArrowRight,
+  Space, Home, End, PageUp, PageDown, F1-F12
+
+For modifier combinations, separate with +: Ctrl+a, Ctrl+c, Ctrl+v, Shift+Tab
+
+Regular text is sent as individual keystrokes.`,
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			configureLogging(cmd)
+			key := cmd.Args().First()
+			if key == "" {
+				return fmt.Errorf("key required")
+			}
+			mgr, err := newBrowserManager(cmd)
+			if err != nil {
+				return err
+			}
+			keys := resolveKeyName(key)
+			if err := mgr.Keypress(ctx, cmd.String("session"), cmd.String("tab"), keys); err != nil {
+				return err
+			}
+			fmt.Fprintf(os.Stderr, "Sent key: %s\n", key)
+			return nil
+		},
+	}
+}
+
+func browserDialogCmd() *cli.Command {
+	return &cli.Command{
+		Name:  "dialog",
+		Usage: "Accept or dismiss a JavaScript dialog",
+		Flags: append(browserActionFlags(false),
+			&cli.BoolFlag{
+				Name:  "accept",
+				Usage: "Accept the dialog (default: true)",
+				Value: true,
+			},
+			&cli.StringFlag{
+				Name:  "text",
+				Usage: "Text to enter for prompt dialogs",
+			},
+		),
+		Description: `Handle a pending JavaScript dialog (alert, confirm, prompt, onbeforeunload).
+
+Unhandled dialogs block all CDP commands. Use this to dismiss them.`,
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			configureLogging(cmd)
+			mgr, err := newBrowserManager(cmd)
+			if err != nil {
+				return err
+			}
+			accept := cmd.Bool("accept")
+			text := cmd.String("text")
+			if err := mgr.Dialog(ctx, cmd.String("session"), cmd.String("tab"), accept, text); err != nil {
+				return err
+			}
+			if accept {
+				fmt.Fprintln(os.Stderr, "Dialog accepted")
+			} else {
+				fmt.Fprintln(os.Stderr, "Dialog dismissed")
+			}
+			return nil
+		},
+	}
+}
+
+func browserCookiesCmd() *cli.Command {
+	return &cli.Command{
+		Name:  "cookies",
+		Usage: "Manage browser cookies (includes httpOnly)",
+		Description: `Get, set, or clear cookies for the current page.
+
+Unlike document.cookie, this uses CDP and can access httpOnly cookies.`,
+		Commands: []*cli.Command{
+			browserCookiesGetCmd(),
+			browserCookiesSetCmd(),
+			browserCookiesClearCmd(),
+		},
+	}
+}
+
+func browserCookiesGetCmd() *cli.Command {
+	return &cli.Command{
+		Name:  "get",
+		Usage: "List all cookies for the current page",
+		Flags: append(browserActionFlags(false), &cli.StringFlag{
+			Name:    "format",
+			Aliases: []string{"f"},
+			Usage:   "Output format: json, pretty (default), raw",
+			Value:   formatPretty,
+		}),
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			configureLogging(cmd)
+			mgr, err := newBrowserManager(cmd)
+			if err != nil {
+				return err
+			}
+			cookies, err := mgr.GetCookies(ctx, cmd.String("session"), cmd.String("tab"))
+			if err != nil {
+				return err
+			}
+			if len(cookies) == 0 {
+				fmt.Fprintln(os.Stderr, "No cookies found.")
+				return nil
+			}
+			return printResult(cmd, cookies)
+		},
+	}
+}
+
+func browserCookiesSetCmd() *cli.Command {
+	return &cli.Command{
+		Name:      "set",
+		Usage:     "Set a cookie",
+		ArgsUsage: "<name> <value>",
+		Flags: append(browserActionFlags(false),
+			&cli.StringFlag{
+				Name:  "domain",
+				Usage: "Cookie domain",
+			},
+			&cli.StringFlag{
+				Name:  "path",
+				Usage: "Cookie path",
+				Value: "/",
+			},
+		),
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			configureLogging(cmd)
+			args := cmd.Args().Slice()
+			if len(args) < 2 {
+				return fmt.Errorf("usage: tap browser cookies set <name> <value>")
+			}
+			mgr, err := newBrowserManager(cmd)
+			if err != nil {
+				return err
+			}
+			if err := mgr.SetCookie(ctx, cmd.String("session"), cmd.String("tab"),
+				args[0], args[1], cmd.String("domain"), cmd.String("path")); err != nil {
+				return err
+			}
+			fmt.Fprintf(os.Stderr, "Cookie %q set\n", args[0])
+			return nil
+		},
+	}
+}
+
+func browserCookiesClearCmd() *cli.Command {
+	return &cli.Command{
+		Name:  "clear",
+		Usage: "Delete all cookies for the current page",
+		Flags: browserActionFlags(false),
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			configureLogging(cmd)
+			mgr, err := newBrowserManager(cmd)
+			if err != nil {
+				return err
+			}
+			if err := mgr.ClearCookies(ctx, cmd.String("session"), cmd.String("tab")); err != nil {
+				return err
+			}
+			fmt.Fprintln(os.Stderr, "Cookies cleared")
 			return nil
 		},
 	}

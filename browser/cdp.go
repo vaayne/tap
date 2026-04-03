@@ -8,6 +8,7 @@ import (
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/dom"
 	"github.com/chromedp/cdproto/input"
+	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/cdproto/target"
@@ -326,6 +327,122 @@ func FillTarget(ctx context.Context, debugURL string, targetID string, fields []
 
 	if err := withTarget(ctx, debugURL, targetID, actions...); err != nil {
 		return fmt.Errorf("fill target: %w", err)
+	}
+	return nil
+}
+
+// KeypressTarget sends key events to the page (not a specific element).
+// The keys string uses chromedp/kb constants: "\r" for Enter, "\t" for Tab,
+// "\u001b" for Escape, etc. Regular characters are sent as-is.
+func KeypressTarget(ctx context.Context, debugURL string, targetID string, keys string) error {
+	if err := withTarget(ctx, debugURL, targetID,
+		chromedp.KeyEvent(keys),
+	); err != nil {
+		return fmt.Errorf("keypress target: %w", err)
+	}
+	return nil
+}
+
+// DialogTarget accepts or dismisses a pending JavaScript dialog (alert/confirm/prompt).
+// For prompt dialogs, promptText is entered before accepting.
+func DialogTarget(ctx context.Context, debugURL string, targetID string, accept bool, promptText string) error {
+	err := withTarget(ctx, debugURL, targetID,
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			p := page.HandleJavaScriptDialog(accept)
+			if promptText != "" {
+				p = p.WithPromptText(promptText)
+			}
+			return p.Do(ctx)
+		}),
+	)
+	if err != nil {
+		return fmt.Errorf("dialog target: %w", err)
+	}
+	return nil
+}
+
+// CookieEntry represents a browser cookie for JSON output.
+type CookieEntry struct {
+	Name     string  `json:"name"`
+	Value    string  `json:"value"`
+	Domain   string  `json:"domain"`
+	Path     string  `json:"path"`
+	Expires  float64 `json:"expires"`
+	HTTPOnly bool    `json:"httpOnly"`
+	Secure   bool    `json:"secure"`
+	Session  bool    `json:"session"`
+	SameSite string  `json:"sameSite,omitempty"`
+}
+
+// GetCookiesTarget returns all cookies for the current page.
+func GetCookiesTarget(ctx context.Context, debugURL string, targetID string) ([]CookieEntry, error) {
+	var cookies []CookieEntry
+	err := withTarget(ctx, debugURL, targetID,
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			raw, err := network.GetCookies().Do(ctx)
+			if err != nil {
+				return err
+			}
+			for _, c := range raw {
+				cookies = append(cookies, CookieEntry{
+					Name:     c.Name,
+					Value:    c.Value,
+					Domain:   c.Domain,
+					Path:     c.Path,
+					Expires:  c.Expires,
+					HTTPOnly: c.HTTPOnly,
+					Secure:   c.Secure,
+					Session:  c.Session,
+					SameSite: string(c.SameSite),
+				})
+			}
+			return nil
+		}),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("get cookies target: %w", err)
+	}
+	return cookies, nil
+}
+
+// SetCookieTarget sets a cookie on the page.
+func SetCookieTarget(ctx context.Context, debugURL string, targetID string, name, value, domain, path string) error {
+	err := withTarget(ctx, debugURL, targetID,
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			p := network.SetCookie(name, value)
+			if domain != "" {
+				p = p.WithDomain(domain)
+			}
+			if path != "" {
+				p = p.WithPath(path)
+			}
+			return p.Do(ctx)
+		}),
+	)
+	if err != nil {
+		return fmt.Errorf("set cookie target: %w", err)
+	}
+	return nil
+}
+
+// ClearCookiesTarget deletes all cookies for the current page.
+func ClearCookiesTarget(ctx context.Context, debugURL string, targetID string) error {
+	err := withTarget(ctx, debugURL, targetID,
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			raw, err := network.GetCookies().Do(ctx)
+			if err != nil {
+				return err
+			}
+			for _, c := range raw {
+				if err := network.DeleteCookies(c.Name).WithDomain(c.Domain).WithPath(c.Path).Do(ctx); err != nil {
+					return fmt.Errorf("delete cookie %q: %w", c.Name, err)
+				}
+			}
+			return nil
+		}),
+	)
+	if err != nil {
+		return fmt.Errorf("clear cookies target: %w", err)
 	}
 	return nil
 }

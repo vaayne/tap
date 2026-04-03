@@ -596,6 +596,67 @@ func (m *Manager) Reload(ctx context.Context, sessionName string, tabName string
 	return nil
 }
 
+// Keypress sends key events to the page in a tracked tab.
+func (m *Manager) Keypress(ctx context.Context, sessionName string, tabName string, keys string) error {
+	rt, err := m.resolveTarget(sessionName, tabName, "keypress")
+	if err != nil {
+		return err
+	}
+	if err := KeypressTarget(ctx, rt.DebugURL, rt.TargetID, keys); err != nil {
+		return fmt.Errorf("keypress: %w", err)
+	}
+	return nil
+}
+
+// Dialog accepts or dismisses a pending JavaScript dialog in a tracked tab.
+func (m *Manager) Dialog(ctx context.Context, sessionName string, tabName string, accept bool, promptText string) error {
+	rt, err := m.resolveTarget(sessionName, tabName, "dialog")
+	if err != nil {
+		return err
+	}
+	if err := DialogTarget(ctx, rt.DebugURL, rt.TargetID, accept, promptText); err != nil {
+		return fmt.Errorf("dialog: %w", err)
+	}
+	return nil
+}
+
+// GetCookies returns all cookies for the current page in a tracked tab.
+func (m *Manager) GetCookies(ctx context.Context, sessionName string, tabName string) ([]CookieEntry, error) {
+	rt, err := m.resolveTarget(sessionName, tabName, "cookies get")
+	if err != nil {
+		return nil, err
+	}
+	cookies, err := GetCookiesTarget(ctx, rt.DebugURL, rt.TargetID)
+	if err != nil {
+		return nil, fmt.Errorf("cookies get: %w", err)
+	}
+	return cookies, nil
+}
+
+// SetCookie sets a cookie in a tracked tab.
+func (m *Manager) SetCookie(ctx context.Context, sessionName string, tabName string, name, value, domain, path string) error {
+	rt, err := m.resolveTarget(sessionName, tabName, "cookies set")
+	if err != nil {
+		return err
+	}
+	if err := SetCookieTarget(ctx, rt.DebugURL, rt.TargetID, name, value, domain, path); err != nil {
+		return fmt.Errorf("cookies set: %w", err)
+	}
+	return nil
+}
+
+// ClearCookies deletes all cookies for the current page in a tracked tab.
+func (m *Manager) ClearCookies(ctx context.Context, sessionName string, tabName string) error {
+	rt, err := m.resolveTarget(sessionName, tabName, "cookies clear")
+	if err != nil {
+		return err
+	}
+	if err := ClearCookiesTarget(ctx, rt.DebugURL, rt.TargetID); err != nil {
+		return fmt.Errorf("cookies clear: %w", err)
+	}
+	return nil
+}
+
 // NetworkWait blocks until a network request matching the filter completes in a
 // tracked tab. If includeBody is true, the response body is fetched before
 // returning. The caller controls the timeout via ctx.

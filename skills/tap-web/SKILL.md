@@ -101,6 +101,11 @@ tap browser scroll <sel>              # Scroll element into view
 tap browser scroll --x 0 --y 1000    # Scroll to position
 tap browser select <sel> <value>      # Pick <select> option
 tap browser wait <sel> [--timeout 30s]  # Wait for element visible
+tap browser keypress Enter            # Send key event (Enter, Tab, Escape, Ctrl+a...)
+tap browser dialog [--accept=false]   # Accept/dismiss alert/confirm/prompt
+tap browser cookies get               # List cookies (includes httpOnly)
+tap browser cookies set <name> <val> [--domain d]
+tap browser cookies clear             # Delete all cookies
 tap browser back                      # History back
 tap browser forward                   # History forward
 tap browser reload                    # Reload page
