@@ -9,15 +9,23 @@ import (
 
 // Registry indexes scripts by their meta name.
 type Registry struct {
-	scripts map[string]*Script
-	dir     string
+	scripts         map[string]*Script
+	dir             string
+	localOverrideDir string // checked first; empty = disabled
 }
 
-// NewRegistry scans a directory for .js script files and indexes them by meta.name.
+// NewRegistry scans a directory for .js script files and indexes them by meta name.
 func NewRegistry(dir string) (*Registry, error) {
+	return NewRegistryWithOverride(dir, "")
+}
+
+// NewRegistryWithOverride is like NewRegistry but also checks localOverrideDir
+// before the main cache dir. Scripts found there shadow the cached versions.
+func NewRegistryWithOverride(dir, localOverrideDir string) (*Registry, error) {
 	r := &Registry{
-		scripts: make(map[string]*Script),
-		dir:     dir,
+		scripts:         make(map[string]*Script),
+		dir:             dir,
+		localOverrideDir: localOverrideDir,
 	}
 	if err := r.scan(); err != nil {
 		return nil, err
@@ -26,8 +34,26 @@ func NewRegistry(dir string) (*Registry, error) {
 }
 
 func (r *Registry) scan() error {
-	return filepath.Walk(r.dir, func(path string, info os.FileInfo, err error) error {
+	// Load main cache dir first.
+	if err := r.scanDir(r.dir, false); err != nil {
+		return err
+	}
+	// Load local override dir second — overwrites any same-named cache entry.
+	if r.localOverrideDir != "" {
+		if err := r.scanDir(r.localOverrideDir, true); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *Registry) scanDir(dir string, isOverride bool) error {
+	return filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
+			// Ignore missing override dir — it may not exist yet.
+			if os.IsNotExist(err) && isOverride {
+				return filepath.SkipDir
+			}
 			return err
 		}
 		if info.IsDir() || filepath.Ext(path) != ".js" {
@@ -46,6 +72,7 @@ func (r *Registry) scan() error {
 		}
 
 		s.Path = path
+		s.LocalOverride = isOverride
 		r.scripts[s.Meta.Name] = s
 		return nil
 	})
@@ -62,6 +89,20 @@ func (r *Registry) List() []*Script {
 	scripts := make([]*Script, 0, len(r.scripts))
 	for _, s := range r.scripts {
 		scripts = append(scripts, s)
+	}
+	sort.Slice(scripts, func(i, j int) bool {
+		return scripts[i].Meta.Name < scripts[j].Meta.Name
+	})
+	return scripts
+}
+
+// ListLocalOnly returns only scripts loaded from the local override directory.
+func (r *Registry) ListLocalOnly() []*Script {
+	scripts := make([]*Script, 0)
+	for _, s := range r.scripts {
+		if s.LocalOverride {
+			scripts = append(scripts, s)
+		}
 	}
 	sort.Slice(scripts, func(i, j int) bool {
 		return scripts[i].Meta.Name < scripts[j].Meta.Name
