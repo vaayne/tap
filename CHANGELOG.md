@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-04-03
+
+### Added
+
+- **`web/`** — Web UI source moved into the tap monorepo (`tap/web/`); full TanStack Start + Cloudflare Workers + D1 app
+- **`POST /api/batch`** — new API endpoint that accepts a full script payload from tap-scripts, validates authentication via `X-Tap-Secret`, and atomically replaces all D1 scripts in a single batch
+- **`tap-scripts` repository** — standalone repo with 106 site scripts, `validate.ts`, `deploy.ts`, and a GitHub Action that auto-syncs to D1 on every push to main
+- **Local script overrides** — drop a `.js` file at `~/.config/tap/sites/{site}/{script}.js` to shadow the cached version; a warning is printed when the local copy is used
+- **`--local-only` flag** — skips the cache and auto-sync; only scripts in `~/.config/tap/sites/` are visible
+- `WithLocalOverrideDir` functional option on `tap.Client` for library users
+- `script.NewRegistryWithOverride` for constructing a registry with an override layer
+- `tap.Client.ListScriptsLocalOnly()` returns only locally-overridden scripts
+
+### Changed
+
+- `script.Registry` now loads the override directory after the main cache, so local scripts always win
+- `AGENTS.md` updated with `web/` in architecture diagram, scripts section, and documentation table
 ## [0.2.0] - 2026-04-02
 
 ### Added

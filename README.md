@@ -4,6 +4,17 @@ Tap into any website from your terminal.
 
 A Go library and CLI toolkit that runs JavaScript scripts against real websites — fast via QuickJS, with full browser fallback when needed. Also extracts clean content from any URL via [go-defuddle](https://github.com/vaayne/go-defuddle).
 
+## Repository Structure
+
+This is a monorepo containing:
+
+- **`cmd/tap/`** — Go CLI implementation
+- **`web/`** — Web UI for browsing scripts (TanStack + Cloudflare Workers)
+- **`script/`** — Go script registry and parser
+- **`engine/`** — QuickJS and browser automation engines
+- **`transport/`** — HTTP and CDP transport layer
+- **`tap.go`** — Library API
+
 ## Install
 
 ### CLI
@@ -43,6 +54,14 @@ tap site search bilibili
 
 # Manually sync/update scripts
 tap site sync
+
+# Use a local script override (takes precedence over cache)
+# Place script at: ~/.config/tap/sites/{site}/{script}.js
+tap site github/repo vaayne/tap          # uses local version if present
+
+# Only use local scripts, skip cache entirely
+tap --local-only site list
+tap --local-only site github/repo vaayne/tap
 ```
 
 ### Fetch Content
@@ -198,7 +217,7 @@ Capture and intercept network requests on tracked tabs using CDP Network and Fet
 
 ## Writing Scripts
 
-Scripts live in the [tap-sites](https://github.com/vaayne/tap-sites) catalog, organized by site name:
+Scripts live in the [tap-scripts](https://github.com/vaayne/tap-scripts) repository, organized by site name. See that repo for contribution guidelines and script authoring documentation.
 
 ```javascript
 /* @meta
@@ -249,10 +268,14 @@ github.com/vaayne/tap/
 │   └── fetch.go        # URL → clean content via go-defuddle (HTTP → browser fallback)
 ├── script/
 │   ├── parser.go       # Script @meta parser
-│   └── registry.go     # Script directory scanner + index
+│   └── registry.go     # Script scanner — cache + local override (~/.config/tap/sites/)
 ├── cmd/tap/
-│   ├── main.go         # CLI binary (urfave/cli)
-│   └── sync.go         # Remote script sync + search
+│   ├── main.go         # CLI binary (urfave/cli) — --local-only flag
+│   └── sync.go         # Remote script sync + search, local override dir
+├── web/                # Web UI — TanStack Start + Cloudflare Workers
+│   ├── src/            # React app with API routes (incl. POST /api/batch)
+│   ├── migrations/     # D1 database migrations
+│   └── package.json    # Node.js dependencies
 └── docs/
     ├── browser.md      # Persistent browser sessions reference
     └── network.md      # Network interception reference

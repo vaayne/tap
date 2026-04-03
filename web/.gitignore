@@ -1,0 +1,14 @@
+# Build output
+dist/
+
+# Dependencies
+node_modules/
+
+# Wrangler
+.wrangler/
+
+# Generated types
+worker-configuration.d.ts
+
+# Lock file (committed separately if needed)
+pnpm-lock.yaml

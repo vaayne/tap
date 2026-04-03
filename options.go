@@ -8,8 +8,9 @@ import (
 
 // options holds the resolved configuration for a Client.
 type options struct {
-	sitesDir     string
-	wsURL        string
+	sitesDir         string
+	localOverrideDir string
+	wsURL            string
 	profileDir   string
 	forceBrowser bool
 	headless     bool
@@ -26,6 +27,15 @@ func defaultOptions() options {
 
 // Option configures a Client.
 type Option func(*options)
+
+// WithLocalOverrideDir sets a directory that is checked before the main sites
+// cache. Scripts found here shadow cached versions and are flagged as local
+// overrides. Mirrors the path structure: {dir}/{site}/{script}.js
+func WithLocalOverrideDir(dir string) Option {
+	return func(o *options) {
+		o.localOverrideDir = dir
+	}
+}
 
 // WithSitesDir sets the directory containing site scripts.
 func WithSitesDir(dir string) Option {

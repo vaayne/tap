@@ -25,10 +25,11 @@ type Meta struct {
 
 // Script represents a parsed site script with metadata and function body.
 type Script struct {
-	Meta Meta
-	Body string // the async function body
-	Raw  string // full file content
-	Path string // file path
+	Meta          Meta
+	Body          string // the async function body
+	Raw           string // full file content
+	Path          string // file path
+	LocalOverride bool   // true when loaded from local override dir
 }
 
 // Parse parses a script file content, extracting @meta JSON and the function body.
