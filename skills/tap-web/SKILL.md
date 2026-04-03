@@ -12,7 +12,8 @@ description: >
   "translate", "browser session", "open a tab", "navigate to", "take a screenshot",
   "evaluate javascript", "persistent browser", "fill form", "form fields",
   "discover inputs", "intercept requests", "capture network", "block requests",
-  "mock API", "network log", "wait for request", or any web access task.
+  "mock API", "network log", "wait for request", "save as PDF", "export PDF",
+  or any web access task.
 ---
 
 # tap-web
@@ -27,8 +28,12 @@ tap fetch <url>                          # Clean markdown from any URL
 tap fetch --json <url>                   # JSON with metadata
 
 # Site scripts — always discover first, never guess
-tap site list | search <kw> | info <s>   # Discover scripts
+tap site list                            # List all local scripts
+tap site search <kw>                     # Search remote catalog
+tap site info <script>                   # Show script details
+tap site sync                            # Force re-sync from remote
 tap site <site/action> [key=value]       # Run a script
+tap site <site/action> -f json           # Run with JSON output
 tap site -b <script>                     # With auth (browser cookies)
 
 # Login
@@ -37,18 +42,24 @@ tap login <url>                          # Opens browser, press Enter when done
 
 | Flag | Use when |
 |---|---|
-| `--lp` | JS rendering without auth |
-| `-b` | Auth needed (cookies) |
-| `--pause` | One-off CAPTCHA (implies `-b --no-headless`) |
+| `--lp` | JS rendering without auth (implies `-b`, prefer over `-b` alone when no auth needed) |
+| `-b` | Auth needed — run `tap login <url>` first to save cookies |
+| `--pause` | One-off CAPTCHA (implies `-b --no-headless`). **Requires interactive terminal — agents use `--delay` or `--wait-selector` instead** |
+| `--delay <dur>` | Wait fixed duration after navigation (e.g., `--delay 3s`) |
+| `--wait-selector <sel>` | Wait until CSS selector visible before continuing |
+| `--wait-js <expr>` | Wait until JS expression truthy before continuing |
+| `--timeout <dur>` | Global execution timeout (e.g., `--timeout 30s`, `-t 2m`) |
+
+Prefer `tap site` over `tap fetch` when a script exists — structured data, less tokens.
 
 ## Browser sessions
 
-**Always reuse the `default` session.** Only create named sessions for isolation (parallel subagents, different accounts). Stale recovery: close + recreate with same name — cookies preserved.
+**Always reuse the `default` session.** Only create named sessions for isolation (parallel subagents, different accounts). Stale recovery: close + recreate with same name. Note: closing a session deletes its profile directory (including cookies) — use `tap login` for persistent auth that survives session close.
 
 See [references/browser.md](references/browser.md) for full commands, session strategy, and recovery.
 
 ```bash
-tap browser session list | new <name> | close [name]
+tap browser session list | new <name> | info [name] | close [name]
 tap browser tab new <name> --url <url>
 # Page
 tap browser navigate <url>              # Go to URL

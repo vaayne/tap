@@ -43,6 +43,8 @@ tap browser network log --resource-type XHR,Fetch | jq '.url'
 
 Runs until `--timeout` or Ctrl-C. Same filter flags as `wait` (except `--body`).
 
+**Always pass `--timeout` — default is infinite.** Without it, `log` runs forever and agents will hang.
+
 ### intercept — Block, mock, or modify requests
 
 Process stays alive while active. Ctrl-C to stop. Rules are **replace-all** per call.

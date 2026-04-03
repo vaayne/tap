@@ -39,7 +39,7 @@ tap browser screenshot [--output <path>]
 tap browser text [selector]                    # Clean readable text (defuddle)
 tap browser text ".main-content"               # Scoped to selector
 tap browser text -f json                       # JSON with title, markdown, wordCount
-tap browser pdf [--output <path>] [--landscape] [--scale 1.0]
+tap browser pdf [--output <path>] [--landscape] [--background] [--scale 1.0]
 ```
 
 ### Human-like interaction
@@ -86,7 +86,7 @@ Keys: Enter, Tab, Escape, Backspace, Delete, Space, ArrowUp/Down/Left/Right, Hom
 tap browser cookies get                     # List all (includes httpOnly)
 tap browser cookies get -f json             # JSON output
 tap browser cookies set <name> <value>      # Set cookie
-tap browser cookies set <name> <value> --domain .example.com
+tap browser cookies set <name> <value> --domain .example.com --path /
 tap browser cookies clear                   # Delete all cookies
 ```
 
@@ -98,18 +98,16 @@ tap browser fill <sel> <val> [<sel> <val>...]
 tap browser fill <sel> <val> --submit <sel>
 ```
 
+`tap browser forms` returns JSON with each element's `selector`, `type`, `name`, `placeholder`, `label`, `value`, `role`.
+
+`tap browser fill` uses React-compatible native setters — works with React, Vue, Angular, vanilla HTML.
+
 ## Resolution
 
 When `--session`/`--tab` omitted, tap resolves automatically:
 
 - **Session**: flag → selected → the only session
 - **Tab**: flag → selected tab → the only live tab
-
-## Forms
-
-`tap browser forms` returns JSON with each element's `selector`, `type`, `name`, `placeholder`, `label`, `value`, `role`.
-
-`tap browser fill` uses React-compatible native setters — works with React, Vue, Angular, vanilla HTML.
 
 ## Session Strategy
 
@@ -125,11 +123,12 @@ tap browser tab new main --url <start-url>  # Open a tab
 
 ### Recover a stale session
 
-If `default` is unresponsive (Chrome crashed, PID gone), close and recreate. Cookies are preserved because the profile directory survives:
+If `default` is unresponsive (Chrome crashed, PID gone), close and recreate. **Note: closing deletes the profile directory (including cookies).** Use `tap login` for persistent auth that survives session close.
 
 ```bash
 tap browser session close default
 tap browser session new default
+# Re-login if needed: tap login <url>
 ```
 
 ### When to create a named session
