@@ -11,21 +11,25 @@ func browserCmd() *cli.Command {
 	return &cli.Command{
 		Name:  "browser",
 		Usage: "Manage persistent browser sessions and tracked tabs",
-		Description: `Persistent browser automation lives under the "browser" namespace.
+		Description: `Persistent browser automation with named sessions and tracked tabs.
 
-Session resolution order:
-  1. --session
-  2. the selected session from 'tap browser session select'
-  3. the only available session, when exactly one exists
+Quick start:
+  tap browser session new default          Start a headless browser
+  tap browser tab new main --url <url>     Open a tracked tab
+  tap browser text                         Extract clean content (Markdown)
+  tap browser click "button.submit"        Interact with elements
+  tap browser screenshot                   Capture the page
 
-Tab resolution order:
-  1. --tab
-  2. the selected tab within the resolved session
-  3. the only live tracked tab, when exactly one exists
+Commands are grouped by function:
+  Session & Tab:  session, tab
+  Navigation:     navigate, back, forward, reload
+  Page Content:   text, evaluate, screenshot, pdf
+  Interaction:    click, type, fill, hover, scroll, select, wait, keypress, dialog
+  State:          forms, cookies
+  Network:        network (wait, log, body, intercept, clear)
 
-Tracked tabs are named browser targets stored in tap metadata. Untracked live
-browser tabs are ignored by default. When a tracked target disappears, tap marks
-it stale and clears selected-tab state instead of silently adopting a new tab.`,
+Session resolution: --session flag → selected session → the only session.
+Tab resolution: --tab flag → selected tab → the only live tracked tab.`,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:    "state-root",
@@ -34,28 +38,28 @@ it stale and clears selected-tab state instead of silently adopting a new tab.`,
 			},
 		},
 		Commands: []*cli.Command{
-			browserSessionCmd(),
-			browserTabCmd(),
-			browserNavigateCmd(),
-			browserEvaluateCmd(),
-			browserScreenshotCmd(),
-			browserTextCmd(),
-			browserPDFCmd(),
-			browserFormsCmd(),
-			browserFillCmd(),
-			browserClickCmd(),
-			browserTypeCmd(),
-			browserHoverCmd(),
-			browserScrollCmd(),
-			browserSelectCmd(),
-			browserWaitCmd(),
-			browserKeypressCmd(),
-			browserDialogCmd(),
-			browserCookiesCmd(),
-			browserBackCmd(),
-			browserForwardCmd(),
-			browserReloadCmd(),
-			browserNetworkCmd(),
+			withCategory("Session & Tab", browserSessionCmd()),
+			withCategory("Session & Tab", browserTabCmd()),
+			withCategory("Navigation", browserNavigateCmd()),
+			withCategory("Navigation", browserBackCmd()),
+			withCategory("Navigation", browserForwardCmd()),
+			withCategory("Navigation", browserReloadCmd()),
+			withCategory("Page Content", browserTextCmd()),
+			withCategory("Page Content", browserEvaluateCmd()),
+			withCategory("Page Content", browserScreenshotCmd()),
+			withCategory("Page Content", browserPDFCmd()),
+			withCategory("Interaction", browserClickCmd()),
+			withCategory("Interaction", browserTypeCmd()),
+			withCategory("Interaction", browserFillCmd()),
+			withCategory("Interaction", browserHoverCmd()),
+			withCategory("Interaction", browserScrollCmd()),
+			withCategory("Interaction", browserSelectCmd()),
+			withCategory("Interaction", browserWaitCmd()),
+			withCategory("Interaction", browserKeypressCmd()),
+			withCategory("Interaction", browserDialogCmd()),
+			withCategory("State", browserFormsCmd()),
+			withCategory("State", browserCookiesCmd()),
+			withCategory("Network", browserNetworkCmd()),
 		},
 	}
 }
@@ -87,6 +91,11 @@ func browserActionFlags(includeOutput bool) []cli.Flag {
 		})
 	}
 	return flags
+}
+
+func withCategory(cat string, cmd *cli.Command) *cli.Command {
+	cmd.Category = cat
+	return cmd
 }
 
 func browserStateRoot(cmd *cli.Command) string {

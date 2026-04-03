@@ -45,9 +45,9 @@ tap login <url>                          # Opens browser, press Enter when done
 | `--lp` | JS rendering without auth (implies `-b`, prefer over `-b` alone when no auth needed) |
 | `-b` | Auth needed — run `tap login <url>` first to save cookies |
 | `--pause` | One-off CAPTCHA (implies `-b --no-headless`). **Requires interactive terminal — agents use `--delay` or `--wait-selector` instead** |
-| `--delay <dur>` | Wait fixed duration after navigation (e.g., `--delay 3s`) |
-| `--wait-selector <sel>` | Wait until CSS selector visible before continuing |
-| `--wait-js <expr>` | Wait until JS expression truthy before continuing |
+| `--delay <dur>` | Wait fixed duration after navigation (e.g., `--delay 3s`, implies `-b`) |
+| `--wait-selector <sel>` | Wait until CSS selector visible before continuing (implies `-b`) |
+| `--wait-js <expr>` | Wait until JS expression truthy before continuing (implies `-b`) |
 | `--timeout <dur>` | Global execution timeout (e.g., `--timeout 30s`, `-t 2m`) |
 
 Prefer `tap site` over `tap fetch` when a script exists — structured data, less tokens.

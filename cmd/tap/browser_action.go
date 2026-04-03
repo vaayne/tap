@@ -56,9 +56,14 @@ func resolveKeyName(name string) string {
 func browserNavigateCmd() *cli.Command {
 	return &cli.Command{
 		Name:      "navigate",
-		Usage:     "Navigate a tracked browser tab",
+		Usage:     "Navigate a tracked browser tab to a URL",
 		ArgsUsage: "<url>",
 		Flags:     browserActionFlags(false),
+		Description: `Navigate the resolved tracked tab to the given URL.
+
+Examples:
+  tap browser navigate https://example.com
+  tap browser navigate --session dev --tab main https://example.com`,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			configureLogging(cmd)
 			url := cmd.Args().First()
@@ -93,7 +98,12 @@ func browserEvaluateCmd() *cli.Command {
 		}),
 		Description: `Evaluate JavaScript in the resolved tracked tab.
 
-Output formatting follows the same pretty/json/raw conventions used by 'tap site'.`,
+Output formatting follows the same pretty/json/raw conventions used by 'tap site'.
+
+Examples:
+  tap browser evaluate "document.title"
+  tap browser evaluate "document.querySelectorAll('a').length"
+  tap browser evaluate "JSON.stringify(performance.timing)" -f json`,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			configureLogging(cmd)
 			js := cmd.Args().First()
@@ -124,7 +134,12 @@ func browserScreenshotCmd() *cli.Command {
 		Description: `Capture a screenshot from the resolved tracked tab.
 
 When --output is omitted, tap will generate a deterministic file path from the
-session name, tab name, and current timestamp.`,
+session name, tab name, and current timestamp.
+
+Examples:
+  tap browser screenshot
+  tap browser screenshot --output page.png
+  tap browser screenshot --session dev --tab main`,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			configureLogging(cmd)
 			mgr, err := newBrowserManager(cmd)
@@ -170,7 +185,12 @@ as Markdown (default) or JSON with metadata.
 Optionally scope to a CSS selector to extract from a specific section.
 
 This is the most token-efficient way to read page content — far cheaper
-than evaluating outerHTML.`,
+than evaluating outerHTML.
+
+Examples:
+  tap browser text                       Extract main content as Markdown
+  tap browser text "#article"            Extract from a specific section
+  tap browser text -f json               Include metadata (title, word count)`,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			configureLogging(cmd)
 			sel := cmd.Args().First()
@@ -247,7 +267,12 @@ func browserPDFCmd() *cli.Command {
 		Description: `Save the current page of the resolved tracked tab as a PDF file.
 
 When --output is omitted, tap generates a file name from the session,
-tab name, and timestamp.`,
+tab name, and timestamp.
+
+Examples:
+  tap browser pdf
+  tap browser pdf --output report.pdf --landscape
+  tap browser pdf --scale 0.8 --background=false`,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			configureLogging(cmd)
 			mgr, err := newBrowserManager(cmd)
@@ -487,6 +512,11 @@ func browserCookiesSetCmd() *cli.Command {
 		Name:      "set",
 		Usage:     "Set a cookie",
 		ArgsUsage: "<name> <value>",
+		Description: `Set a browser cookie via CDP (can set httpOnly cookies).
+
+Examples:
+  tap browser cookies set "session_id" "abc123"
+  tap browser cookies set "token" "xyz" --domain .example.com --path /api`,
 		Flags: append(browserActionFlags(false),
 			&cli.StringFlag{
 				Name:  "domain",
@@ -548,7 +578,11 @@ func browserClickCmd() *cli.Command {
 on the first visible element matching the CSS selector.
 
 Unlike JavaScript .click(), this triggers hover states and works with
-sites that listen on mousedown or have hover-triggered menus.`,
+sites that listen on mousedown or have hover-triggered menus.
+
+Examples:
+  tap browser click "button.submit"
+  tap browser click "a[href='/login']"`,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			configureLogging(cmd)
 			sel := cmd.Args().First()
@@ -578,7 +612,11 @@ func browserTypeCmd() *cli.Command {
 keyDown/keyUp events for each character — behaving like a real user typing.
 
 Use this instead of 'fill' when the site validates per-keystroke input
-or has anti-bot detection.`,
+or has anti-bot detection.
+
+Examples:
+  tap browser type "#search" "golang tutorials"
+  tap browser type "input[name=q]" "hello world"`,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			configureLogging(cmd)
 			args := cmd.Args().Slice()
@@ -606,7 +644,11 @@ func browserHoverCmd() *cli.Command {
 		Flags:     browserActionFlags(false),
 		Description: `Move the mouse to the center of the first visible element matching
 the CSS selector. Dispatches real mouseMoved events that trigger
-CSS :hover states and mouseenter/mouseover listeners.`,
+CSS :hover states and mouseenter/mouseover listeners.
+
+Examples:
+  tap browser hover "nav.menu > li:first-child"
+  tap browser hover ".dropdown-trigger"`,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			configureLogging(cmd)
 			sel := cmd.Args().First()
@@ -644,7 +686,12 @@ func browserScrollCmd() *cli.Command {
 		Description: `Scroll the element matching the CSS selector into view. If no selector
 is provided, scroll to the absolute pixel position given by --x and --y.
 
-Use this to trigger lazy-loaded content or scroll-based UI updates.`,
+Use this to trigger lazy-loaded content or scroll-based UI updates.
+
+Examples:
+  tap browser scroll "#comments"
+  tap browser scroll --y 1000
+  tap browser scroll --x 0 --y 99999`,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			configureLogging(cmd)
 			sel := cmd.Args().First()
@@ -738,6 +785,11 @@ func browserBackCmd() *cli.Command {
 		Name:  "back",
 		Usage: "Navigate back in history",
 		Flags: browserActionFlags(false),
+		Description: `Navigate the resolved tracked tab back one entry in browser history.
+
+Examples:
+  tap browser back
+  tap browser back --session dev --tab main`,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			configureLogging(cmd)
 			mgr, err := newBrowserManager(cmd)
@@ -758,6 +810,11 @@ func browserForwardCmd() *cli.Command {
 		Name:  "forward",
 		Usage: "Navigate forward in history",
 		Flags: browserActionFlags(false),
+		Description: `Navigate the resolved tracked tab forward one entry in browser history.
+
+Examples:
+  tap browser forward
+  tap browser forward --session dev --tab main`,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			configureLogging(cmd)
 			mgr, err := newBrowserManager(cmd)
@@ -778,6 +835,11 @@ func browserReloadCmd() *cli.Command {
 		Name:  "reload",
 		Usage: "Reload the current page",
 		Flags: browserActionFlags(false),
+		Description: `Reload the current page of the resolved tracked tab.
+
+Examples:
+  tap browser reload
+  tap browser reload --session dev --tab main`,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			configureLogging(cmd)
 			mgr, err := newBrowserManager(cmd)

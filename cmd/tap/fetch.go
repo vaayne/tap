@@ -14,6 +14,14 @@ func fetchCmd() *cli.Command {
 		Name:      "fetch",
 		Usage:     "Fetch and extract clean content from a URL",
 		ArgsUsage: "<url>",
+		Description: `Fetch a URL and extract the main content as clean Markdown, stripping ads,
+navigation, scripts, and boilerplate via go-defuddle.
+
+Examples:
+  tap fetch https://example.com/article          Clean Markdown output
+  tap fetch --json https://example.com/article   Full metadata as JSON
+  tap fetch -b https://example.com               Use browser for JS-rendered pages
+  tap fetch --lp https://example.com             Use Lightpanda (fast headless, no auth)`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:  "json",

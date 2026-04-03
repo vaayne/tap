@@ -21,7 +21,28 @@ func main() {
 		Name:    "tap",
 		Usage:   "Tap into any website from your terminal",
 		Version: version,
-		Flags:   globalFlags(),
+		Description: `Tap runs site-specific JS scripts against websites and extracts clean content
+from URLs. Scripts execute in QuickJS (fast, no browser) with automatic fallback
+to a real Chrome browser when auth or JS rendering is needed.
+
+Quick start:
+  tap fetch https://example.com          Extract article as clean Markdown
+  tap fetch --json https://example.com   Full metadata as JSON
+  tap site list                          List available site scripts
+  tap site hackernews/top                Run a script
+  tap site -b twitter/search query=go    Run with browser cookies (auth)
+  tap login https://github.com/login     Log in via visible browser, save cookies
+
+Browser automation:
+  tap browser session new default        Start a persistent browser
+  tap browser tab new main --url https://example.com
+  tap browser text                       Extract clean page text (token-efficient)
+  tap browser screenshot                 Capture the current page
+  tap browser click "button.submit"      Interact with elements
+  tap browser network wait --url-pattern "*/api/*" --body
+
+Use 'tap <command> --help' for details on any command.`,
+		Flags: globalFlags(),
 		Commands: []*cli.Command{
 			browserCmd(),
 			siteCmd(),
@@ -56,7 +77,7 @@ func globalFlags() []cli.Flag {
 		},
 		&cli.StringFlag{
 			Name:    "ws-url",
-			Usage:   "Remote CDP WebSocket URL",
+			Usage:   "Remote Chrome DevTools Protocol WebSocket URL (e.g. ws://localhost:9222)",
 			Sources: cli.EnvVars("TAP_WS_URL"),
 		},
 		&cli.StringFlag{
@@ -77,7 +98,7 @@ func globalFlags() []cli.Flag {
 		&cli.BoolFlag{
 			Name:    "lightpanda",
 			Aliases: []string{"lp"},
-			Usage:   "Use Lightpanda headless browser instead of Chrome (implies --browser)",
+			Usage:   "Use Lightpanda (lightweight headless browser) instead of Chrome (implies --browser)",
 			Sources: cli.EnvVars("TAP_LIGHTPANDA"),
 		},
 		&cli.BoolFlag{
@@ -86,20 +107,20 @@ func globalFlags() []cli.Flag {
 		},
 		&cli.DurationFlag{
 			Name:  "delay",
-			Usage: "Wait a fixed duration after navigation before continuing (implies --no-headless and --browser)",
+			Usage: "Wait a fixed duration after navigation before continuing (implies --browser)",
 		},
 		&cli.StringFlag{
 			Name:  "wait-selector",
-			Usage: "Wait until a CSS selector becomes visible before continuing (implies --no-headless and --browser)",
+			Usage: "Wait until a CSS selector becomes visible before continuing (implies --browser)",
 		},
 		&cli.StringFlag{
 			Name:  "wait-js",
-			Usage: "Wait until a JavaScript expression becomes truthy before continuing (implies --no-headless and --browser)",
+			Usage: "Wait until a JavaScript expression becomes truthy before continuing (implies --browser)",
 		},
 		&cli.DurationFlag{
 			Name:    "timeout",
 			Aliases: []string{"t"},
-			Usage:   "Execution timeout (e.g., 30s, 2m)",
+			Usage:   "Execution timeout; 0 means no timeout (e.g. 30s, 2m)",
 			Value:   0,
 			Sources: cli.EnvVars("TAP_TIMEOUT"),
 		},
@@ -171,7 +192,7 @@ func newClient(ctx context.Context, cmd *cli.Command) (*tap.Client, error) {
 	if cmd.Bool("browser") || hasPauseMode(cmd) {
 		opts = append(opts, tap.WithForceBrowser(true))
 	}
-	if cmd.Bool("no-headless") || hasPauseMode(cmd) {
+	if cmd.Bool("no-headless") || cmd.Bool("pause") {
 		opts = append(opts, tap.WithHeadless(false))
 	}
 	if pauseFn != nil {

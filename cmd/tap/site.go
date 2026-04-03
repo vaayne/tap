@@ -16,6 +16,22 @@ func siteCmd() *cli.Command {
 		Name:      "site",
 		Usage:     "Run site scripts",
 		ArgsUsage: "<script-name> [key=value ...]",
+		Description: `Run site-specific JavaScript scripts that extract structured data from websites.
+
+Scripts are organized as site/action (e.g. hackernews/top, google/search) and
+execute in QuickJS with automatic browser fallback when cookies or DOM are needed.
+
+Scripts auto-sync from the remote catalog every 24 hours into ~/.cache/tap/sites/.
+Local overrides in ~/.config/tap/sites/ take precedence over cached scripts.
+
+Examples:
+  tap site list                              List all available scripts
+  tap site hackernews/search query=golang    Run a script with arguments
+  tap site -b twitter/search query=go        Run with browser cookies (auth)
+  tap site info hackernews/search            Show script details and args
+  tap site search "weather"                  Search the online catalog
+  tap site sync                              Force-refresh the script cache
+  tap site hackernews/top -f json            Output as JSON`,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:    "format",

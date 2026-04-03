@@ -40,7 +40,12 @@ func browserSessionNewCmd() *cli.Command {
 Without --ws-url, tap will manage a local browser process for the session.
 With --ws-url, tap persists the remote endpoint in session metadata and validates
 connection/auth/TLS at creation time. Later commands reconnect through the saved
-endpoint rather than a new global --ws-url value.`,
+endpoint rather than a new global --ws-url value.
+
+Examples:
+  tap browser session new default                            Local headless browser
+  tap browser session new visible --no-headless              Visible local browser
+  tap browser session new remote --ws-url ws://host:9222     Remote browser`,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "ws-url",
