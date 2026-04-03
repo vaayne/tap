@@ -5,6 +5,7 @@ import type {
   ScriptDetail,
   ScriptArg,
   SyncManifestItem,
+  BatchScript,
 } from "./types"
 
 function parseArgs(argsJson: string): Record<string, ScriptArg> {
@@ -204,4 +205,46 @@ export async function listSites(): Promise<string[]> {
     "SELECT DISTINCT site FROM scripts ORDER BY site",
   ).all<{ site: string }>()
   return result.results.map((row) => row.site)
+}
+
+/**
+ * Replaces all scripts in D1 with the provided list.
+ * Uses a DELETE-then-INSERT pattern batched through D1's batch API.
+ */
+export async function batchUpdate(
+  scripts: BatchScript[],
+): Promise<void> {
+  const { DB } = env
+
+  // D1 batch supports up to 100 statements; chunk inserts to stay safe
+  const CHUNK_SIZE = 90
+
+  const deleteStmt = DB.prepare("DELETE FROM scripts")
+
+  const insertStmts = scripts.map((s) =>
+    DB.prepare(
+      `INSERT INTO scripts (name, site, description, domain, args, read_only, example, content, hash)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      s.name,
+      s.site,
+      s.description,
+      s.domain,
+      s.args,
+      s.readOnly ? 1 : 0,
+      s.example,
+      s.content,
+      s.hash,
+    ),
+  )
+
+  // First batch: DELETE + first chunk of inserts
+  const firstChunk = insertStmts.slice(0, CHUNK_SIZE)
+  await DB.batch([deleteStmt, ...firstChunk])
+
+  // Remaining chunks
+  for (let i = CHUNK_SIZE; i < insertStmts.length; i += CHUNK_SIZE) {
+    const chunk = insertStmts.slice(i, i + CHUNK_SIZE)
+    await DB.batch(chunk)
+  }
 }
