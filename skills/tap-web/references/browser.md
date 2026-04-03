@@ -49,18 +49,59 @@ When `--session`/`--tab` omitted, tap resolves automatically:
 
 `tap browser fill` uses React-compatible native setters — works with React, Vue, Angular, vanilla HTML.
 
+## Session Strategy
+
+**Always reuse the `default` session.** The profile directory is derived from the session name, so same name = same profile = same cookies. Only create named sessions for isolation (parallel subagents, different accounts).
+
+### Bootstrap the default session
+
+```bash
+tap browser session list                    # Check if default exists
+tap browser session new default             # Create if missing
+tap browser tab new main --url <start-url>  # Open a tab
+```
+
+### Recover a stale session
+
+If `default` is unresponsive (Chrome crashed, PID gone), close and recreate. Cookies are preserved because the profile directory survives:
+
+```bash
+tap browser session close default
+tap browser session new default
+```
+
+### When to create a named session
+
+- **Parallel subagents** — each agent needs its own Chrome (profile lock). Give each a unique name.
+- **Account isolation** — different login states that must not interfere.
+
+```bash
+tap browser session new research-a
+tap browser session new research-b
+```
+
+### When to use `-b` vs persistent sessions
+
+| Need | Use |
+|---|---|
+| Single script with auth | `tap site -b <script>` — ephemeral, no session needed |
+| Multi-step workflow | `tap browser` with `default` session |
+| Network interception + scripting | `tap browser` — intercept rules need a persistent session |
+
 ## Examples
 
 ```bash
-# Multi-tab workflow
-tap browser session new research
+# Reuse default session for a workflow
+tap browser session new default
 tap browser tab new docs --url https://go.dev/doc
+tap browser evaluate 'document.title'
+
+# Open a second tab in the same session
 tap browser tab new api --url https://pkg.go.dev
 tap browser tab select docs
-tap browser evaluate 'document.title'
-tap browser session close research
+tap browser evaluate 'document.querySelectorAll("a").length'
 
-# Form filling
+# Form filling (visible browser for manual CAPTCHA)
 tap browser session new login --no-headless
 tap browser tab new page --url https://example.com/login
 tap browser forms

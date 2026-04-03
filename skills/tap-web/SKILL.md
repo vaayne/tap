@@ -54,10 +54,36 @@ tap site --pause twitter/search query=claude  # One-off CAPTCHA
 | `-b` | Auth needed (cookies, login state) |
 | `--pause` | One-off CAPTCHA/interaction (implies `-b --no-headless`) |
 
+## Session strategy
+
+**Always reuse the `default` session.** Only create named sessions when you need isolation (different accounts, parallel work).
+
+```bash
+# Ensure default session exists (skip if already running)
+tap browser session list              # Check first
+tap browser session new default       # Create only if missing
+```
+
+**When to use which:**
+
+| Need | Approach |
+|---|---|
+| Single script with auth | `tap site -b <script>` |
+| Multi-step workflow (navigate, fill, extract) | `tap browser` with `default` session |
+| Parallel browser tasks (subagents) | Each subagent creates its own named session |
+
+**Stale session recovery:** If `default` is unresponsive, close and recreate — same name = same profile directory = cookies preserved.
+
+```bash
+tap browser session close default
+tap browser session new default
+```
+
+See [references/browser.md](references/browser.md) for full session/tab/action commands and recovery details.
+
 ## `tap browser` — Persistent sessions, tabs, and network
 
 Manage long-lived browser instances across CLI invocations.
-See [references/browser.md](references/browser.md) for full session/tab/action commands.
 
 ```bash
 tap browser session new <name>        # Launch Chrome
@@ -87,6 +113,7 @@ tap browser network clear                                 # Remove rules
 
 ## Tips
 
+- Reuse the `default` session — don't create new sessions unless you need isolation.
 - Prefer `--lp` over `-b` when you just need JS rendering without auth.
 - Use `tap login` first for auth-required sites, then `-b`.
 - Prefer `tap site` over `tap fetch` when a script exists.
