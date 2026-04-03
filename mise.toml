@@ -38,10 +38,10 @@ run = "goreleaser release --snapshot --clean"
 description = "Tidy go modules"
 run = "go mod tidy"
 
-[tasks.web.build]
+[tasks."web:build"]
 description = "Build web UI"
 run = "cd web && pnpm build"
 
-[tasks.web.dev]
+[tasks."web:dev"]
 description = "Start web UI dev server"
 run = "cd web && pnpm dev"
