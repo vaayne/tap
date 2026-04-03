@@ -20,6 +20,21 @@ description: >
 
 **Before accessing any site, check `$XDG_CONFIG_HOME/tap/site-notes/{domain}.md` for saved knowledge. Update after learning.** See [references/site-notes.md](references/site-notes.md).
 
+## Pick the right tool
+
+tap has three tiers — always start from the top and escalate only when needed:
+
+| Tier | Tool | What it's for | When to use |
+|---|---|---|---|
+| **1. Script** | `tap site` | Structured data from known sites | A script exists for the site (check `tap site list` / `search` first). Fastest, least tokens, returns clean JSON. |
+| **2. Fetch** | `tap fetch` | Clean article/page content | Reading a URL's main content as Markdown. No interaction needed. Works for blogs, docs, news. |
+| **3. Browser** | `tap browser` | Full browser automation | Multi-step workflows, form filling, JS-heavy SPAs, network interception, screenshots. Most powerful but most expensive. |
+
+**Decision flow:**
+1. Is there a site script? → `tap site` (always check first — never guess script names)
+2. Just need to read a page? → `tap fetch <url>` (add `--lp` if JS-rendered, `-b` if auth needed)
+3. Need to interact, navigate multiple pages, or capture network? → `tap browser`
+
 ## Quick reference
 
 ```bash
@@ -49,8 +64,6 @@ tap login <url>                          # Opens browser, press Enter when done
 | `--wait-selector <sel>` | Wait until CSS selector visible before continuing (implies `-b`) |
 | `--wait-js <expr>` | Wait until JS expression truthy before continuing (implies `-b`) |
 | `--timeout <dur>` | Global execution timeout (e.g., `--timeout 30s`, `-t 2m`) |
-
-Prefer `tap site` over `tap fetch` when a script exists — structured data, less tokens.
 
 ## Browser sessions
 
