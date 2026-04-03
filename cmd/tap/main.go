@@ -113,6 +113,10 @@ func globalFlags() []cli.Flag {
 			Usage:   "Suppress all log output",
 		},
 		&cli.BoolFlag{
+			Name:  "local-only",
+			Usage: "Only use scripts from local override dir (~/.config/tap/sites/), skip cache",
+		},
+		&cli.BoolFlag{
 			Name:    "no-color",
 			Usage:   "Disable colored output",
 			Sources: cli.EnvVars("NO_COLOR"),
@@ -128,12 +132,24 @@ func newClient(ctx context.Context, cmd *cli.Command) (*tap.Client, error) {
 		dir = defaultSitesDir()
 	}
 
-	// Auto-sync if no local scripts exist
-	if err := ensureScripts(dir, cmd.Bool("verbose")); err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: auto-sync failed: %v\n", err)
+	localOnly := cmd.Bool("local-only")
+	localOverrideDir := defaultLocalOverrideDir()
+
+	// Auto-sync if no local scripts exist (skip when --local-only)
+	if !localOnly {
+		if err := ensureScripts(dir, cmd.Bool("verbose")); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: auto-sync failed: %v\n", err)
+		}
 	}
 
-	opts = append(opts, tap.WithSitesDir(dir))
+	if localOnly {
+		// In local-only mode use the override dir as the sole scripts dir,
+		// and disable the cache path so only local scripts are visible.
+		opts = append(opts, tap.WithSitesDir(localOverrideDir))
+	} else {
+		opts = append(opts, tap.WithSitesDir(dir))
+		opts = append(opts, tap.WithLocalOverrideDir(localOverrideDir))
+	}
 	if url := cmd.String("ws-url"); url != "" {
 		opts = append(opts, tap.WithWSURL(url))
 	}

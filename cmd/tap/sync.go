@@ -37,6 +37,19 @@ func defaultSitesDir() string {
 	return filepath.Join(home, ".cache", "tap", "sites")
 }
 
+// defaultLocalOverrideDir returns the local override directory for site scripts.
+// Uses $XDG_CONFIG_HOME/tap/sites, falling back to ~/.config/tap/sites.
+func defaultLocalOverrideDir() string {
+	if dir := os.Getenv("XDG_CONFIG_HOME"); dir != "" {
+		return filepath.Join(dir, "tap", "sites")
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		home = "."
+	}
+	return filepath.Join(home, ".config", "tap", "sites")
+}
+
 // syncManifestItem represents a single script in the remote manifest.
 type syncManifestItem struct {
 	Name      string `json:"name"`
