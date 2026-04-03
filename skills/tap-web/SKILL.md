@@ -38,6 +38,8 @@ tap site <site/action> [key=value]    # Run a script
 tap site <script> -f json | jq '.'   # JSON output
 ```
 
+To write or contribute a new script, see [references/script-development.md](references/script-development.md).
+
 ## Login & browser backends
 
 ```bash
@@ -90,3 +92,4 @@ tap browser network clear                                 # Remove rules
 - Prefer `tap site` over `tap fetch` when a script exists.
 - Use `tap browser` for multi-step workflows needing state across invocations.
 - Use `tap browser network wait` to capture clean API JSON instead of scraping DOM.
+- Use `tap --local-only site ...` to skip remote cache during script development.
