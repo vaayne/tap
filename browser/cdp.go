@@ -3,8 +3,11 @@ package browser
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/chromedp/cdproto/cdp"
+	"github.com/chromedp/cdproto/dom"
+	"github.com/chromedp/cdproto/input"
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/cdproto/target"
 	"github.com/chromedp/chromedp"
@@ -322,6 +325,145 @@ func FillTarget(ctx context.Context, debugURL string, targetID string, fields []
 
 	if err := withTarget(ctx, debugURL, targetID, actions...); err != nil {
 		return fmt.Errorf("fill target: %w", err)
+	}
+	return nil
+}
+
+// ClickTarget dispatches a real mouse click on the first element matching sel.
+// chromedp.Click sends the full mouseMoved → mousePressed → mouseReleased sequence.
+func ClickTarget(ctx context.Context, debugURL string, targetID string, sel string) error {
+	if err := withTarget(ctx, debugURL, targetID,
+		chromedp.Click(sel, chromedp.ByQuery, chromedp.NodeVisible),
+	); err != nil {
+		return fmt.Errorf("click target: %w", err)
+	}
+	return nil
+}
+
+// TypeTarget sends individual key events to the element matching sel.
+// Unlike FillTarget which sets .value directly, this dispatches keyDown/keyUp
+// per character — behaving like a real user typing.
+func TypeTarget(ctx context.Context, debugURL string, targetID string, sel string, text string) error {
+	if err := withTarget(ctx, debugURL, targetID,
+		chromedp.Click(sel, chromedp.ByQuery, chromedp.NodeVisible),
+		chromedp.SendKeys(sel, text, chromedp.ByQuery),
+	); err != nil {
+		return fmt.Errorf("type target: %w", err)
+	}
+	return nil
+}
+
+// HoverTarget moves the mouse to the center of the element matching sel,
+// dispatching mouseMoved events that trigger CSS :hover states and mouseenter listeners.
+func HoverTarget(ctx context.Context, debugURL string, targetID string, sel string) error {
+	var nodes []*cdp.Node
+	if err := withTarget(ctx, debugURL, targetID,
+		chromedp.Nodes(sel, &nodes, chromedp.ByQuery, chromedp.NodeVisible),
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			if len(nodes) == 0 {
+				return fmt.Errorf("no element matching %q", sel)
+			}
+			box, err := dom.GetBoxModel().WithNodeID(nodes[0].NodeID).Do(ctx)
+			if err != nil {
+				return fmt.Errorf("get box model: %w", err)
+			}
+			c := box.Content
+			x := (c[0] + c[2] + c[4] + c[6]) / 4
+			y := (c[1] + c[3] + c[5] + c[7]) / 4
+			return chromedp.MouseEvent(input.MouseMoved, x, y).Do(ctx)
+		}),
+	); err != nil {
+		return fmt.Errorf("hover target: %w", err)
+	}
+	return nil
+}
+
+// ScrollTarget scrolls the element matching sel into view. If sel is empty,
+// scrolls to the given x,y pixel coordinates.
+func ScrollTarget(ctx context.Context, debugURL string, targetID string, sel string, x, y float64) error {
+	var actions []chromedp.Action
+	if sel != "" {
+		actions = append(actions, chromedp.ScrollIntoView(sel, chromedp.ByQuery))
+	} else {
+		js := fmt.Sprintf("window.scrollTo(%f, %f)", x, y)
+		var ignore any
+		actions = append(actions, chromedp.Evaluate(js, &ignore))
+	}
+	if err := withTarget(ctx, debugURL, targetID, actions...); err != nil {
+		return fmt.Errorf("scroll target: %w", err)
+	}
+	return nil
+}
+
+// SelectTarget selects an option in a <select> element by value, dispatching
+// focus, input, and change events.
+func SelectTarget(ctx context.Context, debugURL string, targetID string, sel string, value string) error {
+	js := fmt.Sprintf(`
+(() => {
+  const el = document.querySelector(%q);
+  if (!el) throw new Error("element not found: " + %q);
+  if (el.tagName.toLowerCase() !== "select") throw new Error("element is not a <select>");
+  el.focus();
+  el.value = %q;
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+  el.dispatchEvent(new Event("change", { bubbles: true }));
+  return true;
+})()
+`, sel, sel, value)
+	var ok bool
+	if err := withTarget(ctx, debugURL, targetID,
+		chromedp.Evaluate(js, &ok, func(p *runtime.EvaluateParams) *runtime.EvaluateParams {
+			return p.WithReturnByValue(true).WithAwaitPromise(true)
+		}),
+	); err != nil {
+		return fmt.Errorf("select target: %w", err)
+	}
+	return nil
+}
+
+// WaitForTarget waits until the element matching sel is visible in the tab.
+// The caller controls the deadline via ctx.
+func WaitForTarget(ctx context.Context, debugURL string, targetID string, sel string, timeout time.Duration) error {
+	waitCtx := ctx
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		waitCtx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
+	if err := withTarget(waitCtx, debugURL, targetID,
+		chromedp.WaitVisible(sel, chromedp.ByQuery),
+	); err != nil {
+		return fmt.Errorf("wait for target: %w", err)
+	}
+	return nil
+}
+
+// BackTarget navigates the tab backwards in history.
+func BackTarget(ctx context.Context, debugURL string, targetID string) error {
+	if err := withTarget(ctx, debugURL, targetID,
+		chromedp.NavigateBack(),
+	); err != nil {
+		return fmt.Errorf("back target: %w", err)
+	}
+	return nil
+}
+
+// ForwardTarget navigates the tab forwards in history.
+func ForwardTarget(ctx context.Context, debugURL string, targetID string) error {
+	if err := withTarget(ctx, debugURL, targetID,
+		chromedp.NavigateForward(),
+	); err != nil {
+		return fmt.Errorf("forward target: %w", err)
+	}
+	return nil
+}
+
+// ReloadTarget reloads the current page in the tab.
+func ReloadTarget(ctx context.Context, debugURL string, targetID string) error {
+	if err := withTarget(ctx, debugURL, targetID,
+		chromedp.Reload(),
+	); err != nil {
+		return fmt.Errorf("reload target: %w", err)
 	}
 	return nil
 }

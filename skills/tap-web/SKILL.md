@@ -93,6 +93,16 @@ tap browser evaluate <js>
 tap browser screenshot
 tap browser forms
 tap browser fill <sel> <val> [--submit <sel>]
+tap browser click <sel>               # Real mouse click
+tap browser type <sel> <text>         # Per-keystroke typing
+tap browser hover <sel>               # Trigger :hover / mouseenter
+tap browser scroll <sel>              # Scroll element into view
+tap browser scroll --x 0 --y 1000    # Scroll to position
+tap browser select <sel> <value>      # Pick <select> option
+tap browser wait <sel> [--timeout 30s]  # Wait for element visible
+tap browser back                      # History back
+tap browser forward                   # History forward
+tap browser reload                    # Reload page
 tap browser session close [name]
 ```
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/urfave/cli/v3"
@@ -198,6 +199,261 @@ Examples:
 			if submitSelector != "" {
 				fmt.Fprintf(os.Stderr, "Clicked %s\n", submitSelector)
 			}
+			return nil
+		},
+	}
+}
+
+func browserClickCmd() *cli.Command {
+	return &cli.Command{
+		Name:      "click",
+		Usage:     "Click an element by CSS selector",
+		ArgsUsage: "<selector>",
+		Flags:     browserActionFlags(false),
+		Description: `Dispatch a real mouse click (mouseMoved → mousePressed → mouseReleased)
+on the first visible element matching the CSS selector.
+
+Unlike JavaScript .click(), this triggers hover states and works with
+sites that listen on mousedown or have hover-triggered menus.`,
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			configureLogging(cmd)
+			sel := cmd.Args().First()
+			if sel == "" {
+				return fmt.Errorf("CSS selector required")
+			}
+			mgr, err := newBrowserManager(cmd)
+			if err != nil {
+				return err
+			}
+			if err := mgr.Click(ctx, cmd.String("session"), cmd.String("tab"), sel); err != nil {
+				return err
+			}
+			fmt.Fprintf(os.Stderr, "Clicked %s\n", sel)
+			return nil
+		},
+	}
+}
+
+func browserTypeCmd() *cli.Command {
+	return &cli.Command{
+		Name:      "type",
+		Usage:     "Type text into an element with real key events",
+		ArgsUsage: "<selector> <text>",
+		Flags:     browserActionFlags(false),
+		Description: `Focus the element matching the CSS selector and send individual
+keyDown/keyUp events for each character — behaving like a real user typing.
+
+Use this instead of 'fill' when the site validates per-keystroke input
+or has anti-bot detection.`,
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			configureLogging(cmd)
+			args := cmd.Args().Slice()
+			if len(args) < 2 {
+				return fmt.Errorf("usage: tap browser type <selector> <text>")
+			}
+			mgr, err := newBrowserManager(cmd)
+			if err != nil {
+				return err
+			}
+			if err := mgr.Type(ctx, cmd.String("session"), cmd.String("tab"), args[0], args[1]); err != nil {
+				return err
+			}
+			fmt.Fprintf(os.Stderr, "Typed into %s\n", args[0])
+			return nil
+		},
+	}
+}
+
+func browserHoverCmd() *cli.Command {
+	return &cli.Command{
+		Name:      "hover",
+		Usage:     "Move mouse to an element to trigger hover state",
+		ArgsUsage: "<selector>",
+		Flags:     browserActionFlags(false),
+		Description: `Move the mouse to the center of the first visible element matching
+the CSS selector. Dispatches real mouseMoved events that trigger
+CSS :hover states and mouseenter/mouseover listeners.`,
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			configureLogging(cmd)
+			sel := cmd.Args().First()
+			if sel == "" {
+				return fmt.Errorf("CSS selector required")
+			}
+			mgr, err := newBrowserManager(cmd)
+			if err != nil {
+				return err
+			}
+			if err := mgr.Hover(ctx, cmd.String("session"), cmd.String("tab"), sel); err != nil {
+				return err
+			}
+			fmt.Fprintf(os.Stderr, "Hovered %s\n", sel)
+			return nil
+		},
+	}
+}
+
+func browserScrollCmd() *cli.Command {
+	return &cli.Command{
+		Name:      "scroll",
+		Usage:     "Scroll to an element or position",
+		ArgsUsage: "[selector]",
+		Flags: append(browserActionFlags(false),
+			&cli.Float64Flag{
+				Name:  "x",
+				Usage: "Absolute X pixel position (when no selector given)",
+			},
+			&cli.Float64Flag{
+				Name:  "y",
+				Usage: "Absolute Y pixel position (when no selector given)",
+			},
+		),
+		Description: `Scroll the element matching the CSS selector into view. If no selector
+is provided, scroll to the absolute pixel position given by --x and --y.
+
+Use this to trigger lazy-loaded content or scroll-based UI updates.`,
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			configureLogging(cmd)
+			sel := cmd.Args().First()
+			mgr, err := newBrowserManager(cmd)
+			if err != nil {
+				return err
+			}
+			x := cmd.Float64("x")
+			y := cmd.Float64("y")
+			if sel == "" && x == 0 && y == 0 {
+				return fmt.Errorf("provide a CSS selector or --x/--y position")
+			}
+			if err := mgr.Scroll(ctx, cmd.String("session"), cmd.String("tab"), sel, x, y); err != nil {
+				return err
+			}
+			if sel != "" {
+				fmt.Fprintf(os.Stderr, "Scrolled to %s\n", sel)
+			} else {
+				fmt.Fprintf(os.Stderr, "Scrolled to (%s, %s)\n", strconv.FormatFloat(x, 'f', -1, 64), strconv.FormatFloat(y, 'f', -1, 64))
+			}
+			return nil
+		},
+	}
+}
+
+func browserSelectCmd() *cli.Command {
+	return &cli.Command{
+		Name:      "select",
+		Usage:     "Select an option in a <select> element",
+		ArgsUsage: "<selector> <value>",
+		Flags:     browserActionFlags(false),
+		Description: `Select an option by value in a <select> element, dispatching
+focus, input, and change events. Works with native HTML selects.
+
+For custom dropdown components (React Select, etc.), use 'click' instead.`,
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			configureLogging(cmd)
+			args := cmd.Args().Slice()
+			if len(args) < 2 {
+				return fmt.Errorf("usage: tap browser select <selector> <value>")
+			}
+			mgr, err := newBrowserManager(cmd)
+			if err != nil {
+				return err
+			}
+			if err := mgr.Select(ctx, cmd.String("session"), cmd.String("tab"), args[0], args[1]); err != nil {
+				return err
+			}
+			fmt.Fprintf(os.Stderr, "Selected %q in %s\n", args[1], args[0])
+			return nil
+		},
+	}
+}
+
+func browserWaitCmd() *cli.Command {
+	return &cli.Command{
+		Name:      "wait",
+		Usage:     "Wait for an element to become visible",
+		ArgsUsage: "<selector>",
+		Flags: append(browserActionFlags(false),
+			&cli.DurationFlag{
+				Name:  "timeout",
+				Usage: "Max time to wait",
+				Value: 30 * time.Second,
+			},
+		),
+		Description: `Wait until the first element matching the CSS selector becomes visible.
+Uses CDP's built-in visibility polling — more reliable than JS-based polling.`,
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			configureLogging(cmd)
+			sel := cmd.Args().First()
+			if sel == "" {
+				return fmt.Errorf("CSS selector required")
+			}
+			mgr, err := newBrowserManager(cmd)
+			if err != nil {
+				return err
+			}
+			timeout := cmd.Duration("timeout")
+			if err := mgr.WaitFor(ctx, cmd.String("session"), cmd.String("tab"), sel, timeout); err != nil {
+				return err
+			}
+			fmt.Fprintf(os.Stderr, "Element %s is visible\n", sel)
+			return nil
+		},
+	}
+}
+
+func browserBackCmd() *cli.Command {
+	return &cli.Command{
+		Name:  "back",
+		Usage: "Navigate back in history",
+		Flags: browserActionFlags(false),
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			configureLogging(cmd)
+			mgr, err := newBrowserManager(cmd)
+			if err != nil {
+				return err
+			}
+			if err := mgr.Back(ctx, cmd.String("session"), cmd.String("tab")); err != nil {
+				return err
+			}
+			fmt.Fprintln(os.Stderr, "Navigated back")
+			return nil
+		},
+	}
+}
+
+func browserForwardCmd() *cli.Command {
+	return &cli.Command{
+		Name:  "forward",
+		Usage: "Navigate forward in history",
+		Flags: browserActionFlags(false),
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			configureLogging(cmd)
+			mgr, err := newBrowserManager(cmd)
+			if err != nil {
+				return err
+			}
+			if err := mgr.Forward(ctx, cmd.String("session"), cmd.String("tab")); err != nil {
+				return err
+			}
+			fmt.Fprintln(os.Stderr, "Navigated forward")
+			return nil
+		},
+	}
+}
+
+func browserReloadCmd() *cli.Command {
+	return &cli.Command{
+		Name:  "reload",
+		Usage: "Reload the current page",
+		Flags: browserActionFlags(false),
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			configureLogging(cmd)
+			mgr, err := newBrowserManager(cmd)
+			if err != nil {
+				return err
+			}
+			if err := mgr.Reload(ctx, cmd.String("session"), cmd.String("tab")); err != nil {
+				return err
+			}
+			fmt.Fprintln(os.Stderr, "Reloaded")
 			return nil
 		},
 	}

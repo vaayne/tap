@@ -27,10 +27,43 @@ tap browser tab close [name]
 
 All accept `--session` and `--tab` to override defaults.
 
+### Page actions
+
 ```bash
 tap browser navigate <url>
+tap browser back
+tap browser forward
+tap browser reload
 tap browser evaluate <javascript>
 tap browser screenshot [--output <path>]
+```
+
+### Human-like interaction
+
+These dispatch real CDP events (mouse moves, key presses) — indistinguishable from a real user.
+
+```bash
+tap browser click <selector>                    # Full mouse event chain
+tap browser type <selector> <text>              # Per-keystroke typing
+tap browser hover <selector>                    # mouseMoved to element center
+tap browser scroll <selector>                   # Scroll element into view
+tap browser scroll --x 0 --y 1000              # Scroll to pixel position
+tap browser select <selector> <value>           # Pick <select> option
+tap browser wait <selector> [--timeout 30s]     # Wait for element visible
+```
+
+| Command | vs JS eval | When to use |
+|---|---|---|
+| `click` | Real mousedown/mouseup chain | Sites listening on mousedown, hover menus |
+| `type` | Individual keyDown/keyUp events | Anti-bot detection, per-keystroke validation |
+| `hover` | Real mouseMoved to coordinates | CSS :hover states, mouseenter listeners |
+| `scroll` | Triggers IntersectionObserver | Lazy-loaded content, infinite scroll |
+| `select` | Fires focus/input/change events | Native `<select>` elements |
+| `wait` | CDP visibility polling | Wait for dynamic content before acting |
+
+### Forms
+
+```bash
 tap browser forms
 tap browser fill <sel> <val> [<sel> <val>...]
 tap browser fill <sel> <val> --submit <sel>

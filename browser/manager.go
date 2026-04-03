@@ -468,6 +468,114 @@ func (m *Manager) Fill(ctx context.Context, sessionName string, tabName string, 
 	return nil
 }
 
+// Click dispatches a real mouse click on the element matching sel in a tracked tab.
+func (m *Manager) Click(ctx context.Context, sessionName string, tabName string, sel string) error {
+	rt, err := m.resolveTarget(sessionName, tabName, "click")
+	if err != nil {
+		return err
+	}
+	if err := ClickTarget(ctx, rt.DebugURL, rt.TargetID, sel); err != nil {
+		return fmt.Errorf("click: %w", err)
+	}
+	return nil
+}
+
+// Type sends individual key events to the element matching sel in a tracked tab.
+func (m *Manager) Type(ctx context.Context, sessionName string, tabName string, sel string, text string) error {
+	rt, err := m.resolveTarget(sessionName, tabName, "type")
+	if err != nil {
+		return err
+	}
+	if err := TypeTarget(ctx, rt.DebugURL, rt.TargetID, sel, text); err != nil {
+		return fmt.Errorf("type: %w", err)
+	}
+	return nil
+}
+
+// Hover moves the mouse to the element matching sel in a tracked tab.
+func (m *Manager) Hover(ctx context.Context, sessionName string, tabName string, sel string) error {
+	rt, err := m.resolveTarget(sessionName, tabName, "hover")
+	if err != nil {
+		return err
+	}
+	if err := HoverTarget(ctx, rt.DebugURL, rt.TargetID, sel); err != nil {
+		return fmt.Errorf("hover: %w", err)
+	}
+	return nil
+}
+
+// Scroll scrolls to the element matching sel, or to absolute x,y if sel is empty.
+func (m *Manager) Scroll(ctx context.Context, sessionName string, tabName string, sel string, x, y float64) error {
+	rt, err := m.resolveTarget(sessionName, tabName, "scroll")
+	if err != nil {
+		return err
+	}
+	if err := ScrollTarget(ctx, rt.DebugURL, rt.TargetID, sel, x, y); err != nil {
+		return fmt.Errorf("scroll: %w", err)
+	}
+	return nil
+}
+
+// Select selects an option by value in a <select> element in a tracked tab.
+func (m *Manager) Select(ctx context.Context, sessionName string, tabName string, sel string, value string) error {
+	rt, err := m.resolveTarget(sessionName, tabName, "select")
+	if err != nil {
+		return err
+	}
+	if err := SelectTarget(ctx, rt.DebugURL, rt.TargetID, sel, value); err != nil {
+		return fmt.Errorf("select: %w", err)
+	}
+	return nil
+}
+
+// WaitFor waits until the element matching sel is visible in a tracked tab.
+func (m *Manager) WaitFor(ctx context.Context, sessionName string, tabName string, sel string, timeout time.Duration) error {
+	rt, err := m.resolveTarget(sessionName, tabName, "wait")
+	if err != nil {
+		return err
+	}
+	if err := WaitForTarget(ctx, rt.DebugURL, rt.TargetID, sel, timeout); err != nil {
+		return fmt.Errorf("wait: %w", err)
+	}
+	return nil
+}
+
+// Back navigates the tracked tab backwards in history.
+func (m *Manager) Back(ctx context.Context, sessionName string, tabName string) error {
+	rt, err := m.resolveTarget(sessionName, tabName, "back")
+	if err != nil {
+		return err
+	}
+	if err := BackTarget(ctx, rt.DebugURL, rt.TargetID); err != nil {
+		return fmt.Errorf("back: %w", err)
+	}
+	return nil
+}
+
+// Forward navigates the tracked tab forwards in history.
+func (m *Manager) Forward(ctx context.Context, sessionName string, tabName string) error {
+	rt, err := m.resolveTarget(sessionName, tabName, "forward")
+	if err != nil {
+		return err
+	}
+	if err := ForwardTarget(ctx, rt.DebugURL, rt.TargetID); err != nil {
+		return fmt.Errorf("forward: %w", err)
+	}
+	return nil
+}
+
+// Reload reloads the current page in a tracked tab.
+func (m *Manager) Reload(ctx context.Context, sessionName string, tabName string) error {
+	rt, err := m.resolveTarget(sessionName, tabName, "reload")
+	if err != nil {
+		return err
+	}
+	if err := ReloadTarget(ctx, rt.DebugURL, rt.TargetID); err != nil {
+		return fmt.Errorf("reload: %w", err)
+	}
+	return nil
+}
+
 // NetworkWait blocks until a network request matching the filter completes in a
 // tracked tab. If includeBody is true, the response body is fetched before
 // returning. The caller controls the timeout via ctx.
