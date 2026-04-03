@@ -15,6 +15,7 @@ import { Route as ApiUsageRouteImport } from './routes/api/usage'
 import { Route as ApiSyncRouteImport } from './routes/api/sync'
 import { Route as ApiSearchRouteImport } from './routes/api/search'
 import { Route as ApiScriptsRouteImport } from './routes/api/scripts'
+import { Route as ApiBatchRouteImport } from './routes/api/batch'
 import { Route as ScriptsSiteCommandRouteImport } from './routes/scripts/$site.$command'
 import { Route as ApiScriptsSplatRouteImport } from './routes/api/scripts/$'
 
@@ -48,6 +49,11 @@ const ApiScriptsRoute = ApiScriptsRouteImport.update({
   path: '/api/scripts',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiBatchRoute = ApiBatchRouteImport.update({
+  id: '/api/batch',
+  path: '/api/batch',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ScriptsSiteCommandRoute = ScriptsSiteCommandRouteImport.update({
   id: '/scripts/$site/$command',
   path: '/scripts/$site/$command',
@@ -61,6 +67,7 @@ const ApiScriptsSplatRoute = ApiScriptsSplatRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/api/batch': typeof ApiBatchRoute
   '/api/scripts': typeof ApiScriptsRouteWithChildren
   '/api/search': typeof ApiSearchRoute
   '/api/sync': typeof ApiSyncRoute
@@ -71,6 +78,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/api/batch': typeof ApiBatchRoute
   '/api/scripts': typeof ApiScriptsRouteWithChildren
   '/api/search': typeof ApiSearchRoute
   '/api/sync': typeof ApiSyncRoute
@@ -82,6 +90,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/api/batch': typeof ApiBatchRoute
   '/api/scripts': typeof ApiScriptsRouteWithChildren
   '/api/search': typeof ApiSearchRoute
   '/api/sync': typeof ApiSyncRoute
@@ -94,6 +103,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/api/batch'
     | '/api/scripts'
     | '/api/search'
     | '/api/sync'
@@ -104,6 +114,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/api/batch'
     | '/api/scripts'
     | '/api/search'
     | '/api/sync'
@@ -114,6 +125,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/api/batch'
     | '/api/scripts'
     | '/api/search'
     | '/api/sync'
@@ -125,6 +137,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApiBatchRoute: typeof ApiBatchRoute
   ApiScriptsRoute: typeof ApiScriptsRouteWithChildren
   ApiSearchRoute: typeof ApiSearchRoute
   ApiSyncRoute: typeof ApiSyncRoute
@@ -177,6 +190,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiScriptsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/batch': {
+      id: '/api/batch'
+      path: '/api/batch'
+      fullPath: '/api/batch'
+      preLoaderRoute: typeof ApiBatchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/scripts/$site/$command': {
       id: '/scripts/$site/$command'
       path: '/scripts/$site/$command'
@@ -208,6 +228,7 @@ const ApiScriptsRouteWithChildren = ApiScriptsRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApiBatchRoute: ApiBatchRoute,
   ApiScriptsRoute: ApiScriptsRouteWithChildren,
   ApiSearchRoute: ApiSearchRoute,
   ApiSyncRoute: ApiSyncRoute,
