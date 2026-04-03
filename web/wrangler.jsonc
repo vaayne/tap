@@ -24,7 +24,7 @@
 	"d1_databases": [
 		{
 			"binding": "DB",
-			"database_name": "tap-web-db",
+			"database_name": "tap-sites-db",
 			"database_id": "dd315d34-32e9-48af-9044-242295e06ab1",
 			"migrations_dir": "migrations"
 		}
