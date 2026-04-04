@@ -18,12 +18,14 @@ description: >
 
 # tap-web
 
-## Install / Upgrade
+## Install
 
 ```bash
-# Install
+# Install tap CLI
 curl -fsSL https://raw.githubusercontent.com/vaayne/tap/main/scripts/install.sh | sh
-# Upgrade
+# Install this skill
+npx skills add vaayne/tap
+# Upgrade tap
 tap upgrade
 ```
 

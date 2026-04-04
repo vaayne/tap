@@ -87,6 +87,16 @@ tap fetch https://example.com --wait-selector '.content'
 tap fetch https://example.com --wait-js 'document.body.innerText.includes("ready")'
 ```
 
+## Agent skill
+
+Tap ships with a built-in [agent skill](https://agentskills.io) that gives AI coding agents web access, site scripts, and browser automation. Works with Claude Code, Cursor, Copilot, and [45+ other agents](https://github.com/vercel-labs/skills).
+
+```bash
+npx skills add vaayne/tap
+```
+
+Once installed, your agent will automatically use `tap` when you ask it to search the web, read a URL, run site scripts, or automate a browser.
+
 ## Agent / LLM usage
 
 Tap is designed as a tool-use target for AI agents. Every `tap site` script returns deterministic structured JSON, and every command is a single CLI call with no interactive prompts — ideal for function calling and pipelines.
