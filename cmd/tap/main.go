@@ -49,6 +49,7 @@ Use 'tap <command> --help' for details on any command.`,
 			fetchCmd(),
 			loginCmd(),
 			upgradeCmd(),
+			doctorCmd(),
 		},
 	}
 

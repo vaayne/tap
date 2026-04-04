@@ -3,6 +3,7 @@ package browser
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -120,13 +121,66 @@ func (lp *Lightpanda) Stop() {
 	log.Println("lightpanda stopped")
 }
 
-// Cleanup removes the downloaded binary.
+// Cleanup removes the downloaded binary and its metadata.
 func (lp *Lightpanda) Cleanup() error {
 	bin := lp.binPath()
 	if err := os.Remove(bin); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("remove lightpanda binary: %w", err)
 	}
+	// Best-effort removal of metadata file.
+	_ = os.Remove(lp.metaPath())
 	return nil
+}
+
+// Meta holds metadata about the installed Lightpanda binary.
+type Meta struct {
+	DownloadedAt time.Time `json:"downloaded_at"`
+	URL          string    `json:"url"`
+}
+
+// Installed reports whether the Lightpanda binary exists and is non-empty.
+func (lp *Lightpanda) Installed() bool {
+	fi, err := os.Stat(lp.binPath())
+	return err == nil && fi.Size() > 0
+}
+
+// ReadMeta reads the metadata file for the installed binary.
+// Returns nil if no metadata file exists.
+func (lp *Lightpanda) ReadMeta() (*Meta, error) {
+	data, err := os.ReadFile(lp.metaPath())
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	var m Meta
+	if err := json.Unmarshal(data, &m); err != nil {
+		return nil, err
+	}
+	return &m, nil
+}
+
+// Update re-downloads the Lightpanda binary regardless of whether it exists.
+func (lp *Lightpanda) Update(ctx context.Context) error {
+	log.Println("updating lightpanda browser")
+	return lp.download(ctx)
+}
+
+func (lp *Lightpanda) writeMeta(url string) error {
+	m := Meta{
+		DownloadedAt: time.Now().UTC(),
+		URL:          url,
+	}
+	data, err := json.MarshalIndent(m, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(lp.metaPath(), data, 0o644)
+}
+
+func (lp *Lightpanda) metaPath() string {
+	return lp.binPath() + ".meta.json"
 }
 
 func (lp *Lightpanda) binPath() string {
@@ -184,6 +238,10 @@ func (lp *Lightpanda) download(ctx context.Context) error {
 
 	if err := os.Rename(tmp, bin); err != nil {
 		return fmt.Errorf("rename binary: %w", err)
+	}
+
+	if err := lp.writeMeta(url); err != nil {
+		log.Printf("warning: failed to write metadata: %v", err)
 	}
 
 	log.Printf("lightpanda browser downloaded: %s", bin)
