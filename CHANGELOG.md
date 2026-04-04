@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-04-04
+
+### Added
+
+- Install script for easy one-line installation
+- `tap upgrade` command for self-upgrading the CLI
+
+### Changed
+
+- README rewritten with use-case-driven structure
+- Agent skill section added to README
+- CLAUDE.md now requires lint and test pass before every commit
+
+### Fixed
+
+- Resolved errcheck lint errors in upgrade command
+
 ## [0.3.0] - 2026-04-04
 
 ### Added
@@ -157,7 +174,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - CI workflows for lint, test, and release
 - GoReleaser configuration for cross-platform builds
 
-[Unreleased]: https://github.com/vaayne/tap/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/vaayne/tap/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/vaayne/tap/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/vaayne/tap/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/vaayne/tap/compare/v0.1.8...v0.2.0
 [0.1.8]: https://github.com/vaayne/tap/compare/v0.1.7...v0.1.8
