@@ -192,40 +192,12 @@ tap browser session close forms-demo
 
 ## Browser Backends
 
-Tap supports two browser backends: **Chrome** (default) and **Lightpanda**.
-
-### Chrome
-
-The default backend. Requires Chrome or Chromium installed on the system. Supports all features including persistent sessions, network interception, and authenticated workflows.
-
-### Lightpanda
-
-A lightweight headless browser alternative. Activate with `--lightpanda` / `--lp` or `TAP_LIGHTPANDA=1`.
-
-```bash
-tap fetch --lp https://example.com       # Use Lightpanda for JS rendering
-tap doctor --install                      # Download Lightpanda
-tap doctor --update                       # Update to latest nightly
-```
-
-**Platform support:** macOS and Linux only. Windows is not supported.
-
-**Limitations:**
-
-- **Not all sites work.** Lightpanda is under active development. Pages relying on advanced Web APIs, complex CSS layouts, or heavy JS frameworks may fail or render incorrectly.
-- **No network interception.** The Network and Fetch CDP domains are not supported — `tap browser network` commands will not work with Lightpanda.
-- **No persistent sessions.** Lightpanda does not support Chrome profile directories, so cookies and auth state are not persisted.
-- **Nightly builds only.** Lightpanda ships nightly releases that may introduce breaking changes. Use `tap doctor --update` to stay current.
-
-**When to use Lightpanda:**
-
-- Fast headless JS rendering when auth is not needed
-- `tap fetch --lp` for JS-rendered pages without login requirements
-- CI/CD environments where installing Chrome is impractical
-
-**When to use Chrome instead:**
-
-- Sites that don't render correctly with Lightpanda
-- Authenticated workflows (login, cookies)
-- Network interception and monitoring
-- Persistent browser sessions
+| | Chrome | Lightpanda (`--lp`) |
+|---|---|---|
+| **Platforms** | macOS, Linux, Windows | macOS, Linux |
+| **Install** | Manual | `tap doctor --install` |
+| **Update** | — | `tap doctor --update` |
+| **Sessions & cookies** | Yes | No |
+| **Network interception** | Yes | No |
+| **Site compatibility** | All | Partial — nightly builds, not all sites render correctly |
+| **Best for** | Auth, full automation | Fast headless JS rendering without auth |
