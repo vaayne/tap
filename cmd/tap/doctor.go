@@ -17,11 +17,7 @@ func doctorCmd() *cli.Command {
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:  "install",
-				Usage: "Download missing browser dependencies",
-			},
-			&cli.BoolFlag{
-				Name:  "update",
-				Usage: "Update Lightpanda to the latest nightly build",
+				Usage: "Install or update Lightpanda to the latest nightly build",
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
@@ -36,7 +32,6 @@ func runDoctor(ctx context.Context, cmd *cli.Command) error {
 
 	color := useColor(cmd)
 	install := cmd.Bool("install")
-	update := cmd.Bool("update")
 
 	ok := checkMark(color)
 	fail := failMark(color)
@@ -61,8 +56,19 @@ func runDoctor(ctx context.Context, cmd *cli.Command) error {
 
 	// --- Lightpanda ---
 	lp := browser.NewLightpanda("", "")
-	if update {
-		return updateLightpanda(ctx, lp, color, ok)
+
+	if install {
+		action := "Installing"
+		if lp.Installed() {
+			action = "Updating"
+		}
+		fmt.Printf("  %s Lightpanda... ", action)
+		if err := lp.Update(ctx); err != nil {
+			return fmt.Errorf("install lightpanda: %w", err)
+		}
+		fmt.Println("done")
+		fmt.Printf("%s Lightpanda installed\n", ok)
+		return nil
 	}
 
 	if lp.Installed() {
@@ -73,39 +79,17 @@ func runDoctor(ctx context.Context, cmd *cli.Command) error {
 			fmt.Printf("%s Lightpanda installed (%s ago)\n", ok, ageStr)
 			fmt.Printf("  %s\n", dim(color, "Downloaded: "+meta.DownloadedAt.Format(time.RFC3339)))
 			if age > 7*24*time.Hour {
-				fmt.Printf("  %s Run %s to get the latest nightly\n", warn, bold(color, "tap doctor --update"))
+				fmt.Printf("  %s Run %s to get the latest nightly\n", warn, bold(color, "tap doctor --install"))
 			}
 		} else {
 			fmt.Printf("%s Lightpanda installed (unknown age)\n", warn)
-			fmt.Printf("  %s Run %s to get the latest nightly\n", warn, bold(color, "tap doctor --update"))
+			fmt.Printf("  %s Run %s to get the latest nightly\n", warn, bold(color, "tap doctor --install"))
 		}
-	} else if install {
-		return installLightpanda(ctx, lp, color, ok)
 	} else {
 		fmt.Printf("%s Lightpanda not installed\n", warn)
 		fmt.Printf("  %s Run %s to download it\n", dim(color, "→"), bold(color, "tap doctor --install"))
 	}
 
-	return nil
-}
-
-func installLightpanda(ctx context.Context, lp *browser.Lightpanda, color bool, ok string) error {
-	fmt.Print("  Downloading Lightpanda... ")
-	if err := lp.EnsureInstalled(ctx); err != nil {
-		return fmt.Errorf("install lightpanda: %w", err)
-	}
-	fmt.Println("done")
-	fmt.Printf("%s Lightpanda installed\n", ok)
-	return nil
-}
-
-func updateLightpanda(ctx context.Context, lp *browser.Lightpanda, color bool, ok string) error {
-	fmt.Print("  Updating Lightpanda to latest nightly... ")
-	if err := lp.Update(ctx); err != nil {
-		return fmt.Errorf("update lightpanda: %w", err)
-	}
-	fmt.Println("done")
-	fmt.Printf("%s Lightpanda updated\n", ok)
 	return nil
 }
 

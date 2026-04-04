@@ -123,11 +123,10 @@ tap browser network intercept --block --url-pattern "*.ads.*"
 
 ```bash
 tap doctor              # Check tap, Chrome, Lightpanda status
-tap doctor --install    # Download Lightpanda
-tap doctor --update     # Update Lightpanda to latest nightly
+tap doctor --install    # Install or update Lightpanda to latest nightly
 ```
 
-**Lightpanda limitations:** macOS/Linux only. Does not support all sites (advanced Web APIs, heavy JS frameworks may fail). No network interception (`tap browser network`), no persistent sessions/cookies. Use Chrome (`-b`) when `--lp` doesn't work.
+**Lightpanda limitations:** macOS/Linux only. Not all sites work (advanced Web APIs, heavy JS frameworks may fail). No network interception, no persistent sessions/cookies. Use Chrome (`-b`) when `--lp` doesn't work.
 
 ## References
 

@@ -35,7 +35,7 @@ Requires Google Chrome for browser features. Check dependencies with `tap doctor
 | **Chrome** | macOS, Linux, Windows | [Install manually](https://www.google.com/chrome/) | Full browser automation, auth, network interception |
 | **Lightpanda** | macOS, Linux | `tap doctor --install` | Fast headless JS rendering without auth |
 
-**Lightpanda limitations:** Lightpanda is a lightweight headless browser under active development. It does not support all sites — pages that rely on advanced Web APIs, complex CSS layouts, or heavy JS frameworks may fail or render incorrectly. Network/Fetch CDP domains are not supported (no `tap browser network` commands). Use Chrome when Lightpanda doesn't work.
+**Lightpanda limitations:** Lightpanda is a lightweight headless browser under active development. It does not support all sites — pages that rely on advanced Web APIs, complex CSS layouts, or heavy JS frameworks may fail or render incorrectly. Network/Fetch CDP domains are not supported (no `tap browser network` commands). Use Chrome when Lightpanda doesn't work. Run `tap doctor --install` to keep Lightpanda up to date.
 
 ## Site scripts — structured data from 100+ sites
 
@@ -155,8 +155,7 @@ Browser flags (imply `--browser`):
 
 ```bash
 tap doctor              # Check status of tap, Chrome, Lightpanda
-tap doctor --install    # Download Lightpanda if not installed
-tap doctor --update     # Update Lightpanda to the latest nightly
+tap doctor --install    # Install or update Lightpanda to the latest nightly
 ```
 
 ## Links

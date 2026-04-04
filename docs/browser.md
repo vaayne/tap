@@ -196,7 +196,7 @@ tap browser session close forms-demo
 |---|---|---|
 | **Platforms** | macOS, Linux, Windows | macOS, Linux |
 | **Install** | Manual | `tap doctor --install` |
-| **Update** | — | `tap doctor --update` |
+| **Update** | — | `tap doctor --install` |
 | **Sessions & cookies** | Yes | No |
 | **Network interception** | Yes | No |
 | **Site compatibility** | All | Partial — nightly builds, not all sites render correctly |
