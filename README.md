@@ -2,11 +2,31 @@
 
 Tap into any website from your terminal.
 
+## Install
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/vaayne/tap/main/scripts/install.sh | sh
+```
+
+Or with a custom directory:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/vaayne/tap/main/scripts/install.sh | sh -s -- --dir /usr/local/bin
+```
+
+Or install with Go:
+
 ```bash
 go install github.com/vaayne/tap/cmd/tap@latest
 ```
 
-Requires Go 1.22+ and Google Chrome (for browser features).
+To upgrade to the latest version:
+
+```bash
+tap upgrade
+```
+
+Requires Google Chrome for browser features.
 
 ## Site scripts — structured data from 100+ sites
 

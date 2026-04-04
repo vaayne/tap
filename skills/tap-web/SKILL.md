@@ -18,6 +18,15 @@ description: >
 
 # tap-web
 
+## Install / Upgrade
+
+```bash
+# Install
+curl -fsSL https://raw.githubusercontent.com/vaayne/tap/main/scripts/install.sh | sh
+# Upgrade
+tap upgrade
+```
+
 **Before accessing any site, check `$XDG_CONFIG_HOME/tap/site-notes/{domain}.md` for saved knowledge. Update after learning.** See [references/site-notes.md](references/site-notes.md).
 
 ## Pick the right tool
