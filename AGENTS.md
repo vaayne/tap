@@ -29,6 +29,8 @@ mise run tidy     # go mod tidy
 
 Emoji-prefixed Conventional Commits: `✨ feat:`, `🐛 fix:`, `♻️ refactor:`, `📝 docs:`, `🔥 chore:`.
 
+**Before every commit**, run `mise run lint && mise run test` and fix any failures. Do not commit code that fails lint or tests.
+
 ## Architecture
 
 ```
