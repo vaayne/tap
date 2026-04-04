@@ -116,7 +116,7 @@ tap browser navigate https://news-site.com/article
 
 ## Limitations
 
-- Chrome only (not Lightpanda)
+- Chrome only (not Lightpanda — Lightpanda does not support Network/Fetch CDP domains)
 - Ephemeral — logs not persisted
 - `body` fetch may fail for redirected/cached requests
 - `intercept` stops when the process exits

@@ -68,7 +68,7 @@ tap login <url>                          # Opens browser, press Enter when done
 
 | Flag | Use when |
 |---|---|
-| `--lp` | JS rendering without auth (implies `-b`, prefer over `-b` alone when no auth needed) |
+| `--lp` | JS rendering without auth (implies `-b`, macOS/Linux only, not all sites work — fall back to `-b` if rendering fails) |
 | `-b` | Auth needed — run `tap login <url>` first to save cookies |
 | `--pause` | One-off CAPTCHA (implies `-b --no-headless`). **Requires interactive terminal — agents use `--delay` or `--wait-selector` instead** |
 | `--delay <dur>` | Wait fixed duration after navigation (e.g., `--delay 3s`, implies `-b`) |
@@ -118,6 +118,15 @@ tap browser network intercept --block --url-pattern "*.ads.*"
 3. **Form fields?** → `forms` (~0.5-2k tokens)
 4. **Specific data?** → `evaluate` with targeted selector (~0.5-5k tokens)
 5. **Visual layout?** → `screenshot` (fixed cost)
+
+## Doctor — browser dependencies
+
+```bash
+tap doctor              # Check tap, Chrome, Lightpanda status
+tap doctor --install    # Install or update Lightpanda to latest nightly
+```
+
+**Lightpanda limitations:** macOS/Linux only. Not all sites work (advanced Web APIs, heavy JS frameworks may fail). No network interception, no persistent sessions/cookies. Use Chrome (`-b`) when `--lp` doesn't work.
 
 ## References
 

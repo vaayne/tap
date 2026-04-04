@@ -189,3 +189,15 @@ tap browser session close forms-demo
 `tap browser forms` reports all fillable elements (inputs, textareas, selects, buttons) with their best CSS selector, type, label, placeholder, current value, and role (`text`, `toggle`, `select`, `submit`). Use the selectors directly with `tap browser fill`.
 
 `tap browser fill` uses React-compatible native value setters with proper `input`/`change` event dispatch, so it works with React, Vue, Angular, and vanilla HTML forms.
+
+## Browser Backends
+
+| | Chrome | Lightpanda (`--lp`) |
+|---|---|---|
+| **Platforms** | macOS, Linux, Windows | macOS, Linux |
+| **Install** | Manual | `tap doctor --install` |
+| **Update** | — | `tap doctor --install` |
+| **Sessions & cookies** | Yes | No |
+| **Network interception** | Yes | No |
+| **Site compatibility** | All | Partial — nightly builds, not all sites render correctly |
+| **Best for** | Auth, full automation | Fast headless JS rendering without auth |
