@@ -55,7 +55,7 @@ func runUpgrade(ctx context.Context, force bool) error {
 	if err != nil {
 		return fmt.Errorf("fetch latest release: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("GitHub API returned %s", resp.Status)
@@ -103,7 +103,7 @@ func runUpgrade(ctx context.Context, force bool) error {
 	if err != nil {
 		return fmt.Errorf("download: %w", err)
 	}
-	defer dlResp.Body.Close()
+	defer func() { _ = dlResp.Body.Close() }()
 
 	if dlResp.StatusCode != http.StatusOK {
 		return fmt.Errorf("download returned %s", dlResp.Status)
@@ -132,7 +132,7 @@ func runUpgrade(ctx context.Context, force bool) error {
 	}
 
 	if err := os.Rename(tmpPath, exe); err != nil {
-		os.Remove(tmpPath)
+		_ = os.Remove(tmpPath)
 		return fmt.Errorf("replace binary: %w", err)
 	}
 
@@ -145,7 +145,7 @@ func extractTapBinary(r io.Reader) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("gzip: %w", err)
 	}
-	defer gz.Close()
+	defer func() { _ = gz.Close() }()
 
 	tr := tar.NewReader(gz)
 	binName := "tap"
