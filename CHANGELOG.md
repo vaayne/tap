@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `tap doctor` command — check, install, and update browser dependencies (Chrome detection, Lightpanda download/update)
+- Lightpanda download metadata tracking (`.meta.json`) to support update workflows
+- Chrome detection utility with path and version reporting
+
+### Changed
+
+- Documentation updated with Lightpanda platform support (macOS/Linux only), site compatibility limitations, and browser backend comparison
+
 ## [0.3.1] - 2026-04-04
 
 ### Added

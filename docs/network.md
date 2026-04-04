@@ -286,7 +286,7 @@ tap browser screenshot --output with-feature-flags.png
 
 ## Limitations
 
-- **Chrome only.** Network interception requires Chrome/Chromium. Lightpanda does not support the Network or Fetch CDP domains.
+- **Chrome only.** Network interception requires Chrome/Chromium. Lightpanda does not support the Network or Fetch CDP domains. Run `tap doctor` to verify Chrome is installed.
 - **Ephemeral.** Network logs are not persisted. They exist only for the lifetime of the `wait`/`log` process.
 - **`body` fetch may fail** for redirected or cached requests. This is a CDP limitation.
 - **`intercept` is process-bound.** The interception goroutine runs in the `tap browser network intercept` process. When the process exits, interception stops.
