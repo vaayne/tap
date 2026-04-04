@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"runtime"
 	"time"
 
 	"github.com/urfave/cli/v3"
@@ -54,7 +55,12 @@ func runDoctor(ctx context.Context, cmd *cli.Command) error {
 		fmt.Printf("  %s\n", dim(color, "Install Chrome or use --lightpanda as an alternative"))
 	}
 
-	// --- Lightpanda ---
+	// --- Lightpanda (macOS/Linux only) ---
+	if runtime.GOOS == "windows" {
+		fmt.Printf("%s Lightpanda not available on Windows\n", dim(color, "-"))
+		return nil
+	}
+
 	lp := browser.NewLightpanda("", "")
 
 	if install {
