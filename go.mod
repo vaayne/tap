@@ -25,6 +25,6 @@ require (
 	github.com/gobwas/ws v1.4.0 // indirect
 	github.com/klauspost/compress v1.17.4 // indirect
 	github.com/tetratelabs/wazero v1.9.0 // indirect
-	golang.org/x/crypto v0.44.0 // indirect
+	golang.org/x/crypto v0.45.0 // indirect
 	golang.org/x/text v0.31.0 // indirect
 )
