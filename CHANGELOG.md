@@ -7,15 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-04-06
+
 ### Added
 
+- uTLS fingerprinting to bypass bot detection — HTTP transport now mimics real browser TLS fingerprints
 - `tap doctor` command — check, install, and update browser dependencies (Chrome detection, Lightpanda download/update)
 - Lightpanda download metadata tracking (`.meta.json`) to support update workflows
 - Chrome detection utility with path and version reporting
 
 ### Changed
 
+- Browser session resolution simplified to always use "default" session
 - Documentation updated with Lightpanda platform support (macOS/Linux only), site compatibility limitations, and browser backend comparison
+
+### Fixed
+
+- Added h2 transport to fix uTLS ALPN negotiation on CI
 
 ## [0.3.1] - 2026-04-04
 
@@ -184,7 +192,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - CI workflows for lint, test, and release
 - GoReleaser configuration for cross-platform builds
 
-[Unreleased]: https://github.com/vaayne/tap/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/vaayne/tap/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/vaayne/tap/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/vaayne/tap/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/vaayne/tap/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/vaayne/tap/compare/v0.1.8...v0.2.0
