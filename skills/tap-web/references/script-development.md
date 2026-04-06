@@ -1,6 +1,8 @@
 # Script Development Guide
 
-Write and contribute new tap site scripts to extract structured data from websites.
+Write and contribute site scripts to extract structured data from websites.
+
+tap uses the same script format as [bb-sites](https://github.com/epiral/bb-sites) — scripts are fully compatible between tap and bb-browser.
 
 ## Development workflow
 
@@ -8,7 +10,7 @@ Write and contribute new tap site scripts to extract structured data from websit
 2. Test a fetch in QuickJS or browser eval
 3. Write the script file
 4. Save to `~/.config/tap/sites/{site}/{script}.js` and test locally
-5. Contribute to [tap-scripts](https://github.com/vaayne/tap-scripts)
+5. Contribute upstream to [bb-sites](https://github.com/epiral/bb-sites)
 
 ---
 
@@ -87,7 +89,8 @@ async function(args) {
 | `domain` | no | Target domain — used to navigate before browser execution |
 | `args` | yes | Map of argument definitions (`required` + `description`); use `{}` for no-argument scripts |
 | `readOnly` | no | `true` for read-only operations |
-| `example` | no | Example CLI invocation shown by `tap site info` |
+| `capabilities` | no | `["network"]` for scripts needing browser network interception (auth tokens, internal APIs) |
+| `example` | no | Example CLI invocation shown by `tap site info`. Use `bb-browser site ...` for upstream contributions |
 
 ### Execution model
 
@@ -283,14 +286,16 @@ try {
 
 ---
 
-## Step 5: Contribute to tap-scripts
+## Step 5: Contribute upstream to bb-sites
+
+Scripts are contributed to the upstream [bb-sites](https://github.com/epiral/bb-sites) repo. Make sure the `example` field uses `bb-browser site` (not `tap site`) for upstream compatibility.
 
 ```bash
-git clone https://github.com/vaayne/tap-scripts && cd tap-scripts
-git checkout -b feat/site-action
-# place your file at: sites/site/action.js
-git add sites/site/action.js
+gh repo fork epiral/bb-sites --clone && cd bb-sites
+git checkout -b feat-site-action
+# place your file at: site/action.js (flat layout: one dir per site)
+git add site/action.js
 git commit -m "✨ feat: add site/action script"
-git push -u origin feat/site-action
-gh pr create --repo vaayne/tap-scripts --title "feat(site): add action script"
+git push -u origin feat-site-action
+gh pr create --repo epiral/bb-sites --title "feat(site): add action adapter"
 ```

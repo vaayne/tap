@@ -50,7 +50,7 @@ tap site github/repo vaayne/tap
 
 Scripts auto-sync from [tap.vaayne.com](https://tap.vaayne.com) and cache locally. Run `tap site list` for the full catalog, or `tap site search <query>` to find scripts.
 
-Local overrides: drop a `.js` file at `~/.config/tap/sites/{site}/{script}.js`. Use `--local-only` to skip the remote cache entirely. Write your own — see the [script development guide](https://github.com/vaayne/tap-scripts).
+Local overrides: drop a `.js` file at `~/.config/tap/sites/{site}/{script}.js`. Use `--local-only` to skip the remote cache entirely. Write your own — see the [script development guide](https://github.com/epiral/bb-sites).
 
 ## Fetch — clean content from any URL
 
@@ -161,7 +161,7 @@ tap doctor --install    # Install or update Lightpanda to the latest nightly
 ## Links
 
 - [tap.vaayne.com](https://tap.vaayne.com) — browse scripts online
-- [tap-scripts](https://github.com/vaayne/tap-scripts) — script repository
+- [bb-sites](https://github.com/epiral/bb-sites) — script repository
 - [docs/browser.md](docs/browser.md) — browser sessions reference
 - [docs/network.md](docs/network.md) — network interception reference
 - [web/README.md](web/README.md) — web app docs

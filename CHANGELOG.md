@@ -47,8 +47,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 
 - **`web/`** — Web UI source moved into the tap monorepo (`tap/web/`); full TanStack Start + Cloudflare Workers + D1 app
-- **`POST /api/batch`** — new API endpoint that accepts a full script payload from tap-scripts, validates authentication via `X-Tap-Secret`, and atomically replaces all D1 scripts in a single batch
-- **`tap-scripts` repository** — standalone repo with 106 site scripts, `validate.ts`, `deploy.ts`, and a GitHub Action that auto-syncs to D1 on every push to main
+- **`POST /api/batch`** — new API endpoint that accepts a full script payload from bb-sites, validates authentication via `X-Tap-Secret`, and atomically replaces all D1 scripts in a single batch
+- **`bb-sites` repository** — standalone repo with 106 site scripts, `validate.ts`, `deploy.ts`, and a GitHub Action that auto-syncs to D1 on every push to main
 - **Local script overrides** — drop a `.js` file at `~/.config/tap/sites/{site}/{script}.js` to shadow the cached version; a warning is printed when the local copy is used
 - **`--local-only` flag** — skips the cache and auto-sync; only scripts in `~/.config/tap/sites/` are visible
 - `WithLocalOverrideDir` functional option on `tap.Client` for library users
@@ -149,7 +149,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
-- Replace sites submodule with remote sync from tap-sites
+- Replace sites submodule with remote sync from bb-sites
 - Use `XDG_CACHE_HOME` for scripts cache instead of `XDG_CONFIG_HOME`
 
 ### Fixed

@@ -45,7 +45,7 @@ web/                  → Web UI — TanStack Start + Cloudflare Workers + D1
 
 ## Scripts
 
-Site scripts live in [tap-scripts](https://github.com/vaayne/tap-scripts) (separate repo).
+Site scripts live in [bb-sites](https://github.com/epiral/bb-sites) (separate repo).
 They auto-sync to D1 on push via GitHub Actions → `POST /api/batch`.
 The CLI caches them locally in `~/.cache/tap/sites/` (refreshed every 24 h).
 

@@ -17,7 +17,7 @@ This app serves the public script catalog at `tap.vaayne.com`, exposes API route
 
 - Browse and search available site scripts
 - View script details and raw script content
-- Expose sync endpoints for the CLI and `tap-scripts` automation
+- Expose sync endpoints for the CLI and `bb-sites` automation
 - Record usage events for popularity ranking
 
 ## Structure
@@ -82,7 +82,7 @@ Apply local/remote D1 migrations with Wrangler as needed.
 - `POST /api/batch` — replace the script dataset in D1
   - Requires `X-Tap-Secret` header
   - Validates JSON payload and enforces a 500 KB limit
-  - Used by automation syncing from `tap-scripts`
+  - Used by automation syncing from `bb-sites`
 
 ## Configuration
 
@@ -101,7 +101,7 @@ For local development, provide any required Worker secrets with Wrangler.
 - Prefer server functions in `src/lib/server-fns.ts` for app-facing data loading.
 - Keep DB access in `src/lib/db.ts`.
 - API routes should stay thin and delegate validation/business logic to `lib/` helpers.
-- Preserve compatibility with the Go CLI sync flow and the separate `tap-scripts` repo.
+- Preserve compatibility with the Go CLI sync flow and the separate `bb-sites` repo.
 
 ## When updating this app
 

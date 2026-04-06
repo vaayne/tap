@@ -58,7 +58,7 @@ export type SyncManifestItem = {
   updatedAt: string
 }
 
-// Payload type for batch update from tap-scripts
+// Payload type for batch update from bb-sites
 export type BatchScript = {
   name: string
   site: string
