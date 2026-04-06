@@ -22,6 +22,7 @@ export type ScriptRow = {
   args: string // JSON string
   read_only: number // 0 or 1
   example: string
+  capabilities: string // JSON string, e.g. '["network"]'
   content: string
   hash: string
   created_at: string
@@ -36,6 +37,7 @@ export type ScriptListItem = {
   domain: string
   readOnly: boolean
   example: string
+  capabilities: string[]
   args: Record<string, ScriptArg>
   usageCount: number
   updatedAt: string
@@ -67,6 +69,7 @@ export type BatchScript = {
   description: string
   domain: string
   args: string // JSON string
+  capabilities: string[] // e.g. ["network"]
   example: string
   readOnly: boolean
 }

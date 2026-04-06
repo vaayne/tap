@@ -1,0 +1,29 @@
+name: Sync bb-sites
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # daily at 06:00 UTC
+  workflow_dispatch: # allow manual trigger
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    name: Sync scripts to D1
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: vaayne/bb-sites
+          path: bb-sites
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Build payload and sync
+        env:
+          TAP_SCRIPTS_SECRET: ${{ secrets.TAP_SCRIPTS_SECRET }}
+          TAP_API_URL: https://tap.vaayne.com/api/batch
+        run: node .github/scripts/sync-bb-sites.mjs bb-sites

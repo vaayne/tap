@@ -16,6 +16,15 @@ function parseArgs(argsJson: string): Record<string, ScriptArg> {
   }
 }
 
+function parseCapabilities(json: string): string[] {
+  try {
+    const parsed = JSON.parse(json)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
 function rowToListItem(
   row: ScriptRow,
   usageCount: number,
@@ -27,6 +36,7 @@ function rowToListItem(
     domain: row.domain,
     readOnly: row.read_only === 1,
     example: row.example,
+    capabilities: parseCapabilities(row.capabilities),
     args: parseArgs(row.args),
     usageCount,
     updatedAt: row.updated_at,
@@ -151,6 +161,7 @@ export async function getScript(
     domain: script.domain,
     readOnly: script.read_only === 1,
     example: script.example,
+    capabilities: parseCapabilities(script.capabilities),
     args: parseArgs(script.args),
     content: script.content,
     hash: script.hash,
@@ -226,6 +237,7 @@ export async function batchUpdate(
       name TEXT PRIMARY KEY, site TEXT NOT NULL, description TEXT NOT NULL DEFAULT '',
       domain TEXT NOT NULL DEFAULT '', args TEXT NOT NULL DEFAULT '{}',
       read_only INTEGER NOT NULL DEFAULT 1, example TEXT NOT NULL DEFAULT '',
+      capabilities TEXT NOT NULL DEFAULT '[]',
       content TEXT NOT NULL, hash TEXT NOT NULL,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -238,8 +250,8 @@ export async function batchUpdate(
 
   const insertStmts = scripts.map((s) =>
     DB.prepare(
-      `INSERT INTO _scripts_staging (name, site, description, domain, args, read_only, example, content, hash)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO _scripts_staging (name, site, description, domain, args, read_only, example, capabilities, content, hash)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).bind(
       s.name,
       s.site,
@@ -248,6 +260,7 @@ export async function batchUpdate(
       s.args,
       s.readOnly ? 1 : 0,
       s.example,
+      JSON.stringify(s.capabilities ?? []),
       s.content,
       s.hash,
     ),
@@ -262,8 +275,8 @@ export async function batchUpdate(
   await DB.batch([
     DB.prepare("DELETE FROM scripts"),
     DB.prepare(
-      `INSERT INTO scripts (name, site, description, domain, args, read_only, example, content, hash, created_at, updated_at)
-       SELECT name, site, description, domain, args, read_only, example, content, hash, created_at, updated_at
+      `INSERT INTO scripts (name, site, description, domain, args, read_only, example, capabilities, content, hash, created_at, updated_at)
+       SELECT name, site, description, domain, args, read_only, example, capabilities, content, hash, created_at, updated_at
        FROM _scripts_staging`,
     ),
     DB.prepare("DELETE FROM _scripts_staging"),
