@@ -56,7 +56,7 @@ type Transport struct {
 func New(ctx context.Context, config Config) (*Transport, error) {
 	t := &Transport{
 		config: config,
-		http:   &http.Client{},
+		http:   newHTTPClient(),
 	}
 
 	if config.Browser == BrowserLightpanda && config.WSURL == "" {
@@ -95,7 +95,7 @@ func (t *Transport) GetHTML(ctx context.Context, url string) (string, error) {
 		return "", fmt.Errorf("new request: %w", err)
 	}
 
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36")
+	req.Header.Set("User-Agent", UserAgent)
 	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
 
 	resp, err := t.http.Do(req)

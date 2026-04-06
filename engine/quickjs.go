@@ -125,7 +125,7 @@ func injectFetch(ctx *qjs.Context, tp *transport.Transport) {
 				return
 			}
 
-			req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36")
+			req.Header.Set("User-Agent", transport.UserAgent)
 			req.Header.Set("Accept", "application/json, text/plain, */*")
 			for k, v := range headers {
 				req.Header.Set(k, v)
