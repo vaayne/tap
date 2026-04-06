@@ -97,8 +97,8 @@ func (m *Manager) CreateSession(ctx context.Context, name string, mode Mode, opt
 
 // CloseSession terminates a browser session, kills the local process if
 // applicable, and removes all related metadata.
-func (m *Manager) CloseSession(_ context.Context, name string) error {
-	resolved, err := m.resolveSessionName(name)
+func (m *Manager) CloseSession(ctx context.Context, name string) error {
+	resolved, err := m.resolveSessionName(ctx, name, false)
 	if err != nil {
 		return fmt.Errorf("close session: %w", err)
 	}
@@ -148,10 +148,9 @@ func (m *Manager) CloseSession(_ context.Context, name string) error {
 	})
 }
 
-// SessionList holds the result of listing sessions including the current selection.
+// SessionList holds the result of listing sessions.
 type SessionList struct {
-	Sessions        []*SessionRecord
-	SelectedSession string
+	Sessions []*SessionRecord
 }
 
 // ListSessions returns all tracked sessions sorted by name.
@@ -168,7 +167,7 @@ func (m *Manager) ListSessions(_ context.Context) (*SessionList, error) {
 	sort.Slice(sessions, func(i, j int) bool {
 		return sessions[i].Name < sessions[j].Name
 	})
-	return &SessionList{Sessions: sessions, SelectedSession: state.SelectedSession}, nil
+	return &SessionList{Sessions: sessions}, nil
 }
 
 // GetSession resolves a session by name (or falls back to the selected/only session).
@@ -185,23 +184,13 @@ func (m *Manager) GetSession(_ context.Context, name string) (*SessionRecord, er
 	return session, nil
 }
 
-// SelectSession persists the default session used when --session is omitted.
-func (m *Manager) SelectSession(_ context.Context, name string) error {
-	if err := m.store.Update(func(state *State) error {
-		return state.SelectSession(name)
-	}); err != nil {
-		return fmt.Errorf("select session: %w", err)
-	}
-	return nil
-}
-
 // ---------------------------------------------------------------------------
 // Tab lifecycle
 // ---------------------------------------------------------------------------
 
 // CreateTab opens a new browser tab and tracks it in session metadata.
 func (m *Manager) CreateTab(ctx context.Context, sessionName string, tabName string, url string) error {
-	resolved, err := m.resolveSessionName(sessionName)
+	resolved, err := m.resolveSessionName(ctx, sessionName, true)
 	if err != nil {
 		return fmt.Errorf("create tab: %w", err)
 	}
@@ -258,7 +247,7 @@ func (m *Manager) CreateTab(ctx context.Context, sessionName string, tabName str
 
 // CloseTab closes a browser tab and removes it from session metadata.
 func (m *Manager) CloseTab(ctx context.Context, sessionName string, tabName string) error {
-	resolved, err := m.resolveSessionName(sessionName)
+	resolved, err := m.resolveSessionName(ctx, sessionName, true)
 	if err != nil {
 		return fmt.Errorf("close tab: %w", err)
 	}
@@ -336,8 +325,8 @@ func (m *Manager) ListTabs(_ context.Context, sessionName string) (*TabList, err
 }
 
 // SelectTab persists the default tab used when --tab is omitted.
-func (m *Manager) SelectTab(_ context.Context, sessionName string, tabName string) error {
-	resolved, err := m.resolveSessionName(sessionName)
+func (m *Manager) SelectTab(ctx context.Context, sessionName string, tabName string) error {
+	resolved, err := m.resolveSessionName(ctx, sessionName, true)
 	if err != nil {
 		return fmt.Errorf("select tab: %w", err)
 	}
@@ -356,7 +345,7 @@ func (m *Manager) SelectTab(_ context.Context, sessionName string, tabName strin
 
 // Navigate changes the URL of a tracked tab.
 func (m *Manager) Navigate(ctx context.Context, sessionName string, tabName string, url string) error {
-	resolved, err := m.resolveSessionName(sessionName)
+	resolved, err := m.resolveSessionName(ctx, sessionName, true)
 	if err != nil {
 		return fmt.Errorf("navigate: %w", err)
 	}
@@ -407,7 +396,7 @@ func (m *Manager) Navigate(ctx context.Context, sessionName string, tabName stri
 // Evaluate runs JavaScript in a tracked tab and returns the result.
 func (m *Manager) Evaluate(ctx context.Context, sessionName string, tabName string, js string) (any, error) {
 	// Resolve session/tab under lock, then release before CDP I/O.
-	rt, err := m.resolveTarget(sessionName, tabName, "evaluate")
+	rt, err := m.resolveTarget(ctx, sessionName, tabName, "evaluate")
 	if err != nil {
 		return nil, err
 	}
@@ -429,7 +418,7 @@ type ScreenshotResult struct {
 // Screenshot captures a full-page PNG of a tracked tab.
 func (m *Manager) Screenshot(ctx context.Context, sessionName string, tabName string) (*ScreenshotResult, error) {
 	// Resolve session/tab under lock, then release before CDP I/O.
-	rt, err := m.resolveTarget(sessionName, tabName, "screenshot")
+	rt, err := m.resolveTarget(ctx, sessionName, tabName, "screenshot")
 	if err != nil {
 		return nil, err
 	}
@@ -443,7 +432,7 @@ func (m *Manager) Screenshot(ctx context.Context, sessionName string, tabName st
 
 // Forms discovers fillable form elements in a tracked tab.
 func (m *Manager) Forms(ctx context.Context, sessionName string, tabName string) ([]FormField, error) {
-	rt, err := m.resolveTarget(sessionName, tabName, "forms")
+	rt, err := m.resolveTarget(ctx, sessionName, tabName, "forms")
 	if err != nil {
 		return nil, err
 	}
@@ -457,7 +446,7 @@ func (m *Manager) Forms(ctx context.Context, sessionName string, tabName string)
 
 // Fill sets values in form fields of a tracked tab.
 func (m *Manager) Fill(ctx context.Context, sessionName string, tabName string, fields []FillField, submitSelector string) error {
-	rt, err := m.resolveTarget(sessionName, tabName, "fill")
+	rt, err := m.resolveTarget(ctx, sessionName, tabName, "fill")
 	if err != nil {
 		return err
 	}
@@ -477,7 +466,7 @@ type PDFResult struct {
 
 // PDF saves the current page as PDF from a tracked tab.
 func (m *Manager) PDF(ctx context.Context, sessionName string, tabName string, landscape bool, printBackground bool, scale float64) (*PDFResult, error) {
-	rt, err := m.resolveTarget(sessionName, tabName, "pdf")
+	rt, err := m.resolveTarget(ctx, sessionName, tabName, "pdf")
 	if err != nil {
 		return nil, err
 	}
@@ -490,7 +479,7 @@ func (m *Manager) PDF(ctx context.Context, sessionName string, tabName string, l
 
 // Click dispatches a real mouse click on the element matching sel in a tracked tab.
 func (m *Manager) Click(ctx context.Context, sessionName string, tabName string, sel string) error {
-	rt, err := m.resolveTarget(sessionName, tabName, "click")
+	rt, err := m.resolveTarget(ctx, sessionName, tabName, "click")
 	if err != nil {
 		return err
 	}
@@ -502,7 +491,7 @@ func (m *Manager) Click(ctx context.Context, sessionName string, tabName string,
 
 // Type sends individual key events to the element matching sel in a tracked tab.
 func (m *Manager) Type(ctx context.Context, sessionName string, tabName string, sel string, text string) error {
-	rt, err := m.resolveTarget(sessionName, tabName, "type")
+	rt, err := m.resolveTarget(ctx, sessionName, tabName, "type")
 	if err != nil {
 		return err
 	}
@@ -514,7 +503,7 @@ func (m *Manager) Type(ctx context.Context, sessionName string, tabName string, 
 
 // Hover moves the mouse to the element matching sel in a tracked tab.
 func (m *Manager) Hover(ctx context.Context, sessionName string, tabName string, sel string) error {
-	rt, err := m.resolveTarget(sessionName, tabName, "hover")
+	rt, err := m.resolveTarget(ctx, sessionName, tabName, "hover")
 	if err != nil {
 		return err
 	}
@@ -526,7 +515,7 @@ func (m *Manager) Hover(ctx context.Context, sessionName string, tabName string,
 
 // Scroll scrolls to the element matching sel, or to absolute x,y if sel is empty.
 func (m *Manager) Scroll(ctx context.Context, sessionName string, tabName string, sel string, x, y float64) error {
-	rt, err := m.resolveTarget(sessionName, tabName, "scroll")
+	rt, err := m.resolveTarget(ctx, sessionName, tabName, "scroll")
 	if err != nil {
 		return err
 	}
@@ -538,7 +527,7 @@ func (m *Manager) Scroll(ctx context.Context, sessionName string, tabName string
 
 // Select selects an option by value in a <select> element in a tracked tab.
 func (m *Manager) Select(ctx context.Context, sessionName string, tabName string, sel string, value string) error {
-	rt, err := m.resolveTarget(sessionName, tabName, "select")
+	rt, err := m.resolveTarget(ctx, sessionName, tabName, "select")
 	if err != nil {
 		return err
 	}
@@ -550,7 +539,7 @@ func (m *Manager) Select(ctx context.Context, sessionName string, tabName string
 
 // WaitFor waits until the element matching sel is visible in a tracked tab.
 func (m *Manager) WaitFor(ctx context.Context, sessionName string, tabName string, sel string, timeout time.Duration) error {
-	rt, err := m.resolveTarget(sessionName, tabName, "wait")
+	rt, err := m.resolveTarget(ctx, sessionName, tabName, "wait")
 	if err != nil {
 		return err
 	}
@@ -562,7 +551,7 @@ func (m *Manager) WaitFor(ctx context.Context, sessionName string, tabName strin
 
 // Back navigates the tracked tab backwards in history.
 func (m *Manager) Back(ctx context.Context, sessionName string, tabName string) error {
-	rt, err := m.resolveTarget(sessionName, tabName, "back")
+	rt, err := m.resolveTarget(ctx, sessionName, tabName, "back")
 	if err != nil {
 		return err
 	}
@@ -574,7 +563,7 @@ func (m *Manager) Back(ctx context.Context, sessionName string, tabName string) 
 
 // Forward navigates the tracked tab forwards in history.
 func (m *Manager) Forward(ctx context.Context, sessionName string, tabName string) error {
-	rt, err := m.resolveTarget(sessionName, tabName, "forward")
+	rt, err := m.resolveTarget(ctx, sessionName, tabName, "forward")
 	if err != nil {
 		return err
 	}
@@ -586,7 +575,7 @@ func (m *Manager) Forward(ctx context.Context, sessionName string, tabName strin
 
 // Reload reloads the current page in a tracked tab.
 func (m *Manager) Reload(ctx context.Context, sessionName string, tabName string) error {
-	rt, err := m.resolveTarget(sessionName, tabName, "reload")
+	rt, err := m.resolveTarget(ctx, sessionName, tabName, "reload")
 	if err != nil {
 		return err
 	}
@@ -598,7 +587,7 @@ func (m *Manager) Reload(ctx context.Context, sessionName string, tabName string
 
 // Keypress sends key events to the page in a tracked tab.
 func (m *Manager) Keypress(ctx context.Context, sessionName string, tabName string, keys string) error {
-	rt, err := m.resolveTarget(sessionName, tabName, "keypress")
+	rt, err := m.resolveTarget(ctx, sessionName, tabName, "keypress")
 	if err != nil {
 		return err
 	}
@@ -610,7 +599,7 @@ func (m *Manager) Keypress(ctx context.Context, sessionName string, tabName stri
 
 // Dialog accepts or dismisses a pending JavaScript dialog in a tracked tab.
 func (m *Manager) Dialog(ctx context.Context, sessionName string, tabName string, accept bool, promptText string) error {
-	rt, err := m.resolveTarget(sessionName, tabName, "dialog")
+	rt, err := m.resolveTarget(ctx, sessionName, tabName, "dialog")
 	if err != nil {
 		return err
 	}
@@ -622,7 +611,7 @@ func (m *Manager) Dialog(ctx context.Context, sessionName string, tabName string
 
 // GetCookies returns all cookies for the current page in a tracked tab.
 func (m *Manager) GetCookies(ctx context.Context, sessionName string, tabName string) ([]CookieEntry, error) {
-	rt, err := m.resolveTarget(sessionName, tabName, "cookies get")
+	rt, err := m.resolveTarget(ctx, sessionName, tabName, "cookies get")
 	if err != nil {
 		return nil, err
 	}
@@ -635,7 +624,7 @@ func (m *Manager) GetCookies(ctx context.Context, sessionName string, tabName st
 
 // SetCookie sets a cookie in a tracked tab.
 func (m *Manager) SetCookie(ctx context.Context, sessionName string, tabName string, name, value, domain, path string) error {
-	rt, err := m.resolveTarget(sessionName, tabName, "cookies set")
+	rt, err := m.resolveTarget(ctx, sessionName, tabName, "cookies set")
 	if err != nil {
 		return err
 	}
@@ -647,7 +636,7 @@ func (m *Manager) SetCookie(ctx context.Context, sessionName string, tabName str
 
 // ClearCookies deletes all cookies for the current page in a tracked tab.
 func (m *Manager) ClearCookies(ctx context.Context, sessionName string, tabName string) error {
-	rt, err := m.resolveTarget(sessionName, tabName, "cookies clear")
+	rt, err := m.resolveTarget(ctx, sessionName, tabName, "cookies clear")
 	if err != nil {
 		return err
 	}
@@ -661,7 +650,7 @@ func (m *Manager) ClearCookies(ctx context.Context, sessionName string, tabName 
 // tracked tab. If includeBody is true, the response body is fetched before
 // returning. The caller controls the timeout via ctx.
 func (m *Manager) NetworkWait(ctx context.Context, sessionName string, tabName string, filter NetworkFilter, includeBody bool) (*NetworkEntry, error) {
-	rt, err := m.resolveTarget(sessionName, tabName, "network wait")
+	rt, err := m.resolveTarget(ctx, sessionName, tabName, "network wait")
 	if err != nil {
 		return nil, err
 	}
@@ -676,7 +665,7 @@ func (m *Manager) NetworkWait(ctx context.Context, sessionName string, tabName s
 // NetworkGetBody fetches the response body for a completed request by its
 // request ID from a tracked tab.
 func (m *Manager) NetworkGetBody(ctx context.Context, sessionName string, tabName string, requestID string) ([]byte, error) {
-	rt, err := m.resolveTarget(sessionName, tabName, "network body")
+	rt, err := m.resolveTarget(ctx, sessionName, tabName, "network body")
 	if err != nil {
 		return nil, err
 	}
@@ -691,7 +680,7 @@ func (m *Manager) NetworkGetBody(ctx context.Context, sessionName string, tabNam
 // NetworkLog starts capturing network requests for a tracked tab and streams
 // completed entries to the returned channel. Call cancel to stop capturing.
 func (m *Manager) NetworkLog(ctx context.Context, sessionName string, tabName string, filter NetworkFilter) (<-chan NetworkEntry, func(), error) {
-	rt, err := m.resolveTarget(sessionName, tabName, "network log")
+	rt, err := m.resolveTarget(ctx, sessionName, tabName, "network log")
 	if err != nil {
 		return nil, nil, err
 	}
@@ -721,7 +710,7 @@ func (m *Manager) cancelIntercept(key string) {
 // NetworkIntercept sets Fetch domain interception rules on a tracked tab.
 // Replaces any previously set rules (cancels the old interception goroutine).
 func (m *Manager) NetworkIntercept(ctx context.Context, sessionName string, tabName string, rules []InterceptRule) error {
-	rt, err := m.resolveTarget(sessionName, tabName, "network intercept")
+	rt, err := m.resolveTarget(ctx, sessionName, tabName, "network intercept")
 	if err != nil {
 		return err
 	}
@@ -742,7 +731,7 @@ func (m *Manager) NetworkIntercept(ctx context.Context, sessionName string, tabN
 // NetworkClearIntercept removes all Fetch domain interception rules from a
 // tracked tab.
 func (m *Manager) NetworkClearIntercept(ctx context.Context, sessionName string, tabName string) error {
-	rt, err := m.resolveTarget(sessionName, tabName, "network clear")
+	rt, err := m.resolveTarget(ctx, sessionName, tabName, "network clear")
 	if err != nil {
 		return err
 	}
@@ -761,7 +750,7 @@ func (m *Manager) NetworkClearIntercept(ctx context.Context, sessionName string,
 
 // Reconcile refreshes tab liveness by comparing metadata against live CDP targets.
 func (m *Manager) Reconcile(ctx context.Context, sessionName string) error {
-	resolved, err := m.resolveSessionName(sessionName)
+	resolved, err := m.resolveSessionName(ctx, sessionName, true)
 	if err != nil {
 		return fmt.Errorf("reconcile: %w", err)
 	}
@@ -808,8 +797,8 @@ func (m *Manager) Reconcile(ctx context.Context, sessionName string) error {
 
 // ResolveTarget resolves a session and tab to their CDP connection details.
 // Exported for commands that need direct CDP access (e.g., text extraction).
-func (m *Manager) ResolveTarget(sessionName string, tabName string) (ResolvedTarget, error) {
-	return m.resolveTarget(sessionName, tabName, "resolve")
+func (m *Manager) ResolveTarget(ctx context.Context, sessionName string, tabName string) (ResolvedTarget, error) {
+	return m.resolveTarget(ctx, sessionName, tabName, "resolve")
 }
 
 // ResolvedTarget holds the result of resolving a session and tab for CDP I/O.
@@ -825,8 +814,8 @@ type resolvedTarget struct {
 
 // resolveTarget resolves a session and tab under lock and returns the debug URL,
 // target ID, and resolved names for use outside the lock during CDP I/O.
-func (m *Manager) resolveTarget(sessionName string, tabName string, op string) (resolvedTarget, error) {
-	resolved, err := m.resolveSessionName(sessionName)
+func (m *Manager) resolveTarget(ctx context.Context, sessionName string, tabName string, op string) (resolvedTarget, error) {
+	resolved, err := m.resolveSessionName(ctx, sessionName, true)
 	if err != nil {
 		return resolvedTarget{}, fmt.Errorf("%s: %w", op, err)
 	}
@@ -864,21 +853,40 @@ func (m *Manager) resolveTarget(sessionName string, tabName string, op string) (
 	return rt, nil
 }
 
-// resolveSessionName resolves an optional session name to a concrete name
-// before it reaches WithSessionLock or UpdateSession (which reject empty names).
-func (m *Manager) resolveSessionName(name string) (string, error) {
-	if name != "" {
-		return name, nil
-	}
+// resolveSessionName resolves an optional session name to a concrete name.
+// When name is empty it defaults to "default", auto-creating a headless
+// session if one does not yet exist. Set autoCreate to false (e.g. for
+// CloseSession) to skip the auto-creation step.
+func (m *Manager) resolveSessionName(ctx context.Context, name string, autoCreate bool) (string, error) {
 	state, err := m.store.Load()
 	if err != nil {
 		return "", err
 	}
-	session, err := state.ResolveSession("")
-	if err != nil {
-		return "", err
+	session, err := state.ResolveSession(name)
+	if err == nil {
+		return session.Name, nil
 	}
-	return session.Name, nil
+
+	// Resolve the effective name for the error/auto-create path.
+	if name == "" {
+		name = DefaultSessionName
+	}
+	if !autoCreate || name != DefaultSessionName {
+		return "", fmt.Errorf("%w: %s", ErrSessionNotFound, name)
+	}
+
+	// Auto-create the default session. Handle the race where a concurrent
+	// caller already created it between our Load and now.
+	if err := m.CreateSession(ctx, DefaultSessionName, ModeLocal, SessionOptions{Headless: true}); err != nil {
+		// Re-check: another goroutine may have won the race.
+		if s, loadErr := m.store.Load(); loadErr == nil {
+			if _, ok := s.Sessions[DefaultSessionName]; ok {
+				return DefaultSessionName, nil
+			}
+		}
+		return "", fmt.Errorf("auto-create default session: %w", err)
+	}
+	return DefaultSessionName, nil
 }
 
 // resolveDebugURL extracts the CDP debug endpoint from session metadata.

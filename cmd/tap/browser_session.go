@@ -13,18 +13,20 @@ import (
 func browserSessionCmd() *cli.Command {
 	return &cli.Command{
 		Name:  "session",
-		Usage: "Create, inspect, select, list, and close persistent browser sessions",
+		Usage: "Create, inspect, list, and close persistent browser sessions",
 		Description: `A session is one persistent browser instance managed by tap.
 
 Local sessions own a dedicated Chrome profile directory and reconnect through
 stored launch metadata. Remote sessions are bound to the explicit --ws-url used
 when they are created; later global --ws-url overrides are ignored so reconnects
-stay deterministic.`,
+stay deterministic.
+
+When --session is omitted, commands use the "default" session (auto-created if needed).
+Use --session to target a different named session.`,
 		Commands: []*cli.Command{
 			browserSessionNewCmd(),
 			browserSessionListCmd(),
 			browserSessionInfoCmd(),
-			browserSessionSelectCmd(),
 			browserSessionCloseCmd(),
 		},
 	}
@@ -102,13 +104,9 @@ func browserSessionListCmd() *cli.Command {
 
 			c := useColor(cmd)
 			w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
-			_, _ = fmt.Fprintln(w, bold(c, "NAME\tMODE\tTABS\tSELECTED"))
+			_, _ = fmt.Fprintln(w, bold(c, "NAME\tMODE\tTABS"))
 			for _, s := range list.Sessions {
-				sel := ""
-				if s.Name == list.SelectedSession {
-					sel = green(c, "*")
-				}
-				_, _ = fmt.Fprintf(w, "%s\t%s\t%d\t%s\n", s.Name, s.Mode, len(s.Tabs), sel)
+				_, _ = fmt.Fprintf(w, "%s\t%s\t%d\n", s.Name, s.Mode, len(s.Tabs))
 			}
 			return w.Flush()
 		},
@@ -173,34 +171,6 @@ are not auto-adopted in v1.`,
 				_, _ = fmt.Fprintf(w, "  %s%s\t%s\t%s\n", tab.Name, sel, status, tab.URL)
 			}
 			return w.Flush()
-		},
-	}
-}
-
-func browserSessionSelectCmd() *cli.Command {
-	return &cli.Command{
-		Name:      "select",
-		Usage:     "Set the default browser session",
-		ArgsUsage: "<name>",
-		Description: `Persist the default session used by browser commands when --session is omitted.
-
-If no session is selected and more than one session exists, browser actions fail
-with guidance instead of guessing.`,
-		Action: func(ctx context.Context, cmd *cli.Command) error {
-			configureLogging(cmd)
-			name := cmd.Args().First()
-			if name == "" {
-				return fmt.Errorf("session name required")
-			}
-			mgr, err := newBrowserManager(cmd)
-			if err != nil {
-				return err
-			}
-			if err := mgr.SelectSession(ctx, name); err != nil {
-				return err
-			}
-			fmt.Fprintf(os.Stderr, "Session %q selected\n", name)
-			return nil
 		},
 	}
 }

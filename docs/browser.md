@@ -31,7 +31,6 @@ tap browser session new <name> --no-headless  # Visible browser
 tap browser session new <name> --ws-url <url> # Remote CDP session
 tap browser session list                    # List all sessions
 tap browser session info [name]             # Show session details
-tap browser session select <name>           # Set the default session
 tap browser session close [name]            # Close and remove a session
 ```
 
@@ -60,17 +59,14 @@ All action commands accept `--session <name>` and `--tab <name>` to override the
 
 When `--session` or `--tab` is omitted, tap resolves them automatically:
 
-**Session resolution order:**
-1. `--session` flag
-2. The selected session from `tap browser session select`
-3. The only available session, when exactly one exists
+**Session resolution:** When `--session` is omitted, tap uses the `default` session. If no `default` session exists, one is auto-created (headless). Use `--session <name>` to target a different named session.
 
 **Tab resolution order:**
 1. `--tab` flag
 2. The selected tab within the resolved session
 3. The only live tracked tab, when exactly one exists
 
-If the resolution is ambiguous, tap fails with guidance instead of guessing.
+If the tab resolution is ambiguous, tap fails with guidance instead of guessing.
 
 ## Local vs Remote Sessions
 

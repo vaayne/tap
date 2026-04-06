@@ -198,7 +198,7 @@ Examples:
 			if err != nil {
 				return err
 			}
-			rt, err := mgr.ResolveTarget(cmd.String("session"), cmd.String("tab"))
+			rt, err := mgr.ResolveTarget(ctx, cmd.String("session"), cmd.String("tab"))
 			if err != nil {
 				return err
 			}

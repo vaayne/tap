@@ -13,6 +13,9 @@ const (
 	// StateVersion is the current on-disk schema version for browser metadata.
 	StateVersion = 1
 
+	// DefaultSessionName is the session used when --session is omitted.
+	DefaultSessionName = "default"
+
 	// EnvStateRoot overrides the default durable state directory.
 	EnvStateRoot = "TAP_BROWSER_STATE_DIR"
 )
@@ -20,8 +23,6 @@ const (
 var namePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$`)
 
 var (
-	ErrNoSessions        = errors.New("no browser sessions found")
-	ErrAmbiguousSession  = errors.New("browser session selection is ambiguous")
 	ErrSessionNotFound   = errors.New("browser session not found")
 	ErrNoTabs            = errors.New("no tracked tabs found")
 	ErrAmbiguousTab      = errors.New("browser tab selection is ambiguous")
@@ -113,9 +114,8 @@ type SessionRecord struct {
 
 // State is the durable browser session metadata written to disk.
 type State struct {
-	Version         int                       `json:"version"`
-	SelectedSession string                    `json:"selected_session,omitempty"`
-	Sessions        map[string]*SessionRecord `json:"sessions"`
+	Version  int                       `json:"version"`
+	Sessions map[string]*SessionRecord `json:"sessions"`
 }
 
 // NewState returns an empty metadata state with initialized maps.
@@ -317,11 +317,6 @@ func (s *State) Validate() error {
 	if s.Version != StateVersion {
 		return fmt.Errorf("unsupported browser state version %d", s.Version)
 	}
-	if s.SelectedSession != "" {
-		if _, ok := s.Sessions[s.SelectedSession]; !ok {
-			return fmt.Errorf("selected session %q is missing", s.SelectedSession)
-		}
-	}
 	for name, session := range s.Sessions {
 		if err := ValidateSessionName(name); err != nil {
 			return err
@@ -405,7 +400,7 @@ func (t *TabRecord) validate() error {
 	}
 }
 
-// CreateSession adds a new named session and selects it if it is the first one.
+// CreateSession adds a new named session.
 func (s *State) CreateSession(session *SessionRecord) error {
 	if session == nil {
 		return errors.New("session is required")
@@ -417,55 +412,30 @@ func (s *State) CreateSession(session *SessionRecord) error {
 		return fmt.Errorf("session %q already exists", session.Name)
 	}
 	s.Sessions[session.Name] = session
-	if s.SelectedSession == "" {
-		s.SelectedSession = session.Name
-	}
 	return nil
 }
 
-// DeleteSession removes a session and clears the selected session when needed.
+// DeleteSession removes a session.
 func (s *State) DeleteSession(name string) error {
 	if _, ok := s.Sessions[name]; !ok {
 		return fmt.Errorf("%w: %s", ErrSessionNotFound, name)
 	}
 	delete(s.Sessions, name)
-	if s.SelectedSession == name {
-		s.SelectedSession = ""
-	}
 	return nil
 }
 
-// SelectSession persists the default session used when --session is omitted.
-func (s *State) SelectSession(name string) error {
-	if _, ok := s.Sessions[name]; !ok {
-		return fmt.Errorf("%w: %s", ErrSessionNotFound, name)
-	}
-	s.SelectedSession = name
-	return nil
-}
-
-// ResolveSession returns the explicit session, the selected session, or the only
-// available session when there is exactly one.
+// ResolveSession returns the session matching name, or the "default" session
+// when name is empty. Callers that need auto-creation of the default session
+// should use Manager.resolveSessionName instead.
 func (s *State) ResolveSession(name string) (*SessionRecord, error) {
-	if name != "" {
-		session, ok := s.Sessions[name]
-		if !ok {
-			return nil, fmt.Errorf("%w: %s", ErrSessionNotFound, name)
-		}
-		return session, nil
+	if name == "" {
+		name = DefaultSessionName
 	}
-	if s.SelectedSession != "" {
-		return s.Sessions[s.SelectedSession], nil
+	session, ok := s.Sessions[name]
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", ErrSessionNotFound, name)
 	}
-	switch len(s.Sessions) {
-	case 0:
-		return nil, ErrNoSessions
-	case 1:
-		for _, session := range s.Sessions {
-			return session, nil
-		}
-	}
-	return nil, fmt.Errorf("%w: use --session or 'tap browser session select <name>'", ErrAmbiguousSession)
+	return session, nil
 }
 
 // UpsertTab creates or updates a tracked tab. The first live tab becomes selected.

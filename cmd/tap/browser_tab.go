@@ -36,7 +36,7 @@ func browserTabNewCmd() *cli.Command {
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "session",
-				Usage: "Browser session name; defaults to the selected session when omitted",
+				Usage: "Browser session name; defaults to 'default' when omitted",
 			},
 			&cli.StringFlag{
 				Name:  "url",
@@ -72,7 +72,7 @@ func browserTabListCmd() *cli.Command {
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "session",
-				Usage: "Browser session name; defaults to the selected session when omitted",
+				Usage: "Browser session name; defaults to 'default' when omitted",
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
@@ -121,7 +121,7 @@ func browserTabSelectCmd() *cli.Command {
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "session",
-				Usage: "Browser session name; defaults to the selected session when omitted",
+				Usage: "Browser session name; defaults to 'default' when omitted",
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
@@ -152,7 +152,7 @@ func browserTabCloseCmd() *cli.Command {
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "session",
-				Usage: "Browser session name; defaults to the selected session when omitted",
+				Usage: "Browser session name; defaults to 'default' when omitted",
 			},
 		},
 		Description: `Close the resolved tracked tab and remove its metadata.

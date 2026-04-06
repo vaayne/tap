@@ -28,7 +28,7 @@ Commands are grouped by function:
   State:          forms, cookies
   Network:        network (wait, log, body, intercept, clear)
 
-Session resolution: --session flag → selected session → the only session.
+Session resolution: --session flag → "default" session (auto-created if needed).
 Tab resolution: --tab flag → selected tab → the only live tracked tab.`,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
@@ -77,7 +77,7 @@ func browserActionFlags(includeOutput bool) []cli.Flag {
 	flags := []cli.Flag{
 		&cli.StringFlag{
 			Name:  "session",
-			Usage: "Browser session name; defaults to the selected session when omitted",
+			Usage: "Browser session name; defaults to 'default' when omitted",
 		},
 		&cli.StringFlag{
 			Name:  "tab",

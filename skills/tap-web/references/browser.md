@@ -10,7 +10,6 @@ tap browser session new <name> --no-headless  # Visible browser
 tap browser session new <name> --ws-url <url> # Remote CDP endpoint
 tap browser session list
 tap browser session info [name]
-tap browser session select <name>             # Set default
 tap browser session close [name]
 ```
 
@@ -106,19 +105,17 @@ tap browser fill <sel> <val> --submit <sel>
 
 When `--session`/`--tab` omitted, tap resolves automatically:
 
-- **Session**: flag → selected → the only session
+- **Session**: flag → `default` (auto-created if missing)
 - **Tab**: flag → selected tab → the only live tab
 
 ## Session Strategy
 
-**Always reuse the `default` session.** The profile directory is derived from the session name, so same name = same profile = same cookies. Only create named sessions for isolation (parallel subagents, different accounts).
+**The `default` session is always used when `--session` is omitted.** If it doesn't exist, tap auto-creates a headless `default` session. The profile directory is derived from the session name, so same name = same profile = same cookies. Only use `--session <name>` for isolation (parallel subagents, different accounts).
 
-### Bootstrap the default session
+### Quick start
 
 ```bash
-tap browser session list                    # Check if default exists
-tap browser session new default             # Create if missing
-tap browser tab new main --url <start-url>  # Open a tab
+tap browser tab new main --url <start-url>  # Auto-creates default session, opens a tab
 ```
 
 ### Recover a stale session

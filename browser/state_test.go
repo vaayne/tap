@@ -11,46 +11,68 @@ func TestStateSessionResolution(t *testing.T) {
 	state := NewState()
 	now := time.Date(2026, 4, 1, 8, 0, 0, 0, time.UTC)
 
-	alpha, err := NewLocalSession("alpha", filepath.Join(t.TempDir(), "alpha"), true, now)
+	// Create a session named "default".
+	def, err := NewLocalSession(DefaultSessionName, filepath.Join(t.TempDir(), "default"), true, now)
 	if err != nil {
 		t.Fatalf("NewLocalSession failed: %v", err)
 	}
-	beta, err := NewRemoteSession("beta", "wss://example.com/devtools/browser/1", now.Add(time.Minute))
+	if err := state.CreateSession(def); err != nil {
+		t.Fatalf("CreateSession(default) failed: %v", err)
+	}
+
+	// Empty name resolves to the "default" session.
+	if session, err := state.ResolveSession(""); err != nil {
+		t.Fatalf("ResolveSession('') failed: %v", err)
+	} else if session.Name != DefaultSessionName {
+		t.Fatalf("ResolveSession('') = %q, want %q", session.Name, DefaultSessionName)
+	}
+
+	// Explicit name resolves correctly.
+	other, err := NewRemoteSession("other", "wss://example.com/devtools/browser/1", now.Add(time.Minute))
 	if err != nil {
 		t.Fatalf("NewRemoteSession failed: %v", err)
 	}
-
-	if err := state.CreateSession(alpha); err != nil {
-		t.Fatalf("CreateSession(alpha) failed: %v", err)
+	if err := state.CreateSession(other); err != nil {
+		t.Fatalf("CreateSession(other) failed: %v", err)
 	}
-	if err := state.CreateSession(beta); err != nil {
-		t.Fatalf("CreateSession(beta) failed: %v", err)
+	if session, err := state.ResolveSession("other"); err != nil {
+		t.Fatalf("ResolveSession(other) failed: %v", err)
+	} else if session.Name != "other" {
+		t.Fatalf("ResolveSession(other) = %q, want other", session.Name)
 	}
 
+	// Empty name still resolves to "default" even with multiple sessions.
 	if session, err := state.ResolveSession(""); err != nil {
-		t.Fatalf("ResolveSession(selected) failed: %v", err)
-	} else if session.Name != "alpha" {
-		t.Fatalf("ResolveSession(selected) = %q, want alpha", session.Name)
+		t.Fatalf("ResolveSession('') with multiple sessions failed: %v", err)
+	} else if session.Name != DefaultSessionName {
+		t.Fatalf("ResolveSession('') = %q, want %q", session.Name, DefaultSessionName)
 	}
 
-	if err := state.SelectSession("beta"); err != nil {
-		t.Fatalf("SelectSession(beta) failed: %v", err)
+	// Non-existent session returns error.
+	if _, err := state.ResolveSession("nonexistent"); !errors.Is(err, ErrSessionNotFound) {
+		t.Fatalf("ResolveSession(nonexistent) error = %v, want ErrSessionNotFound", err)
 	}
-	if session, err := state.ResolveSession(""); err != nil {
-		t.Fatalf("ResolveSession(selected after select) failed: %v", err)
-	} else if session.Name != "beta" {
-		t.Fatalf("ResolveSession(selected after select) = %q, want beta", session.Name)
+}
+
+func TestResolveSessionWithoutDefault(t *testing.T) {
+	state := NewState()
+	now := time.Date(2026, 4, 1, 8, 0, 0, 0, time.UTC)
+
+	// No sessions: empty name fails with ErrSessionNotFound for "default".
+	if _, err := state.ResolveSession(""); !errors.Is(err, ErrSessionNotFound) {
+		t.Fatalf("ResolveSession('') with no sessions: error = %v, want ErrSessionNotFound", err)
 	}
 
-	state.SelectedSession = ""
-	if _, err := state.ResolveSession(""); !errors.Is(err, ErrAmbiguousSession) {
-		t.Fatalf("ResolveSession(ambiguous) error = %v, want ErrAmbiguousSession", err)
+	// Only non-default session: empty name still fails (looks for "default").
+	other, err := NewRemoteSession("other", "wss://example.com/devtools/browser/1", now)
+	if err != nil {
+		t.Fatalf("NewRemoteSession failed: %v", err)
 	}
-
-	if session, err := state.ResolveSession("alpha"); err != nil {
-		t.Fatalf("ResolveSession(alpha) failed: %v", err)
-	} else if session.Name != "alpha" {
-		t.Fatalf("ResolveSession(alpha) = %q, want alpha", session.Name)
+	if err := state.CreateSession(other); err != nil {
+		t.Fatalf("CreateSession(other) failed: %v", err)
+	}
+	if _, err := state.ResolveSession(""); !errors.Is(err, ErrSessionNotFound) {
+		t.Fatalf("ResolveSession('') without default: error = %v, want ErrSessionNotFound", err)
 	}
 }
 

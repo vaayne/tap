@@ -1,7 +1,6 @@
 package browser
 
 import (
-	"context"
 	"testing"
 	"time"
 )
@@ -20,13 +19,13 @@ func TestManagerCreateSessionLocalValidation(t *testing.T) {
 	mgr := NewManager(store)
 
 	// Empty name should fail validation.
-	err := mgr.CreateSession(context.Background(), "", ModeLocal, SessionOptions{})
+	err := mgr.CreateSession(t.Context(), "", ModeLocal, SessionOptions{})
 	if err == nil {
 		t.Fatal("CreateSession with empty name should return error")
 	}
 
 	// Invalid name (spaces) should fail.
-	err = mgr.CreateSession(context.Background(), "bad name", ModeLocal, SessionOptions{})
+	err = mgr.CreateSession(t.Context(), "bad name", ModeLocal, SessionOptions{})
 	if err == nil {
 		t.Fatal("CreateSession with invalid name should return error")
 	}
@@ -37,7 +36,7 @@ func TestManagerCreateSessionRemoteInvalidEndpoint(t *testing.T) {
 	mgr := NewManager(store)
 
 	// Unreachable endpoint should fail.
-	err := mgr.CreateSession(context.Background(), "remote1", ModeRemote, SessionOptions{
+	err := mgr.CreateSession(t.Context(), "remote1", ModeRemote, SessionOptions{
 		WSURL: "ws://127.0.0.1:1/devtools/browser/unreachable",
 	})
 	if err == nil {
@@ -49,7 +48,7 @@ func TestManagerListSessionsEmpty(t *testing.T) {
 	store := testStore(t)
 	mgr := NewManager(store)
 
-	list, err := mgr.ListSessions(context.Background())
+	list, err := mgr.ListSessions(t.Context())
 	if err != nil {
 		t.Fatalf("ListSessions error: %v", err)
 	}
@@ -58,57 +57,14 @@ func TestManagerListSessionsEmpty(t *testing.T) {
 	}
 }
 
-func TestManagerSelectSession(t *testing.T) {
-	store := testStore(t)
-	mgr := NewManager(store)
-	now := time.Date(2026, 4, 1, 10, 0, 0, 0, time.UTC)
-
-	// Manually insert a session into the store.
-	err := store.Update(func(state *State) error {
-		session, err := NewLocalSession("alpha", store.Root()+"/profiles/alpha", true, now)
-		if err != nil {
-			return err
-		}
-		session.Process = &ProcessRecord{DebugURL: "ws://127.0.0.1:9222/devtools/browser/abc"}
-		return state.CreateSession(session)
-	})
-	if err != nil {
-		t.Fatalf("seed session: %v", err)
-	}
-
-	// SelectSession should succeed.
-	if err := mgr.SelectSession(context.Background(), "alpha"); err != nil {
-		t.Fatalf("SelectSession error: %v", err)
-	}
-
-	// Verify selected session is correct.
-	session, err := mgr.GetSession(context.Background(), "")
-	if err != nil {
-		t.Fatalf("GetSession error: %v", err)
-	}
-	if session.Name != "alpha" {
-		t.Fatalf("selected session = %q, want alpha", session.Name)
-	}
-}
-
-func TestManagerSelectSessionNotFound(t *testing.T) {
-	store := testStore(t)
-	mgr := NewManager(store)
-
-	err := mgr.SelectSession(context.Background(), "nonexistent")
-	if err == nil {
-		t.Fatal("SelectSession with nonexistent name should return error")
-	}
-}
-
 func TestManagerGetSessionResolution(t *testing.T) {
 	store := testStore(t)
 	mgr := NewManager(store)
 	now := time.Date(2026, 4, 1, 10, 0, 0, 0, time.UTC)
 
-	// Insert two sessions and select one.
+	// Insert a "default" session and another session.
 	err := store.Update(func(state *State) error {
-		s1, err := NewLocalSession("first", store.Root()+"/profiles/first", true, now)
+		s1, err := NewLocalSession(DefaultSessionName, store.Root()+"/profiles/default", true, now)
 		if err != nil {
 			return err
 		}
@@ -116,28 +72,32 @@ func TestManagerGetSessionResolution(t *testing.T) {
 			return err
 		}
 
-		s2, err := NewRemoteSession("second", "wss://remote:9222/devtools/browser/1", now)
+		s2, err := NewRemoteSession("other", "wss://remote:9222/devtools/browser/1", now)
 		if err != nil {
 			return err
 		}
-		if err := state.CreateSession(s2); err != nil {
-			return err
-		}
-
-		// First session is auto-selected; switch to second.
-		return state.SelectSession("second")
+		return state.CreateSession(s2)
 	})
 	if err != nil {
 		t.Fatalf("seed sessions: %v", err)
 	}
 
-	// GetSession with empty name should resolve to the selected session.
-	session, err := mgr.GetSession(context.Background(), "")
+	// GetSession with empty name should resolve to "default".
+	session, err := mgr.GetSession(t.Context(), "")
 	if err != nil {
 		t.Fatalf("GetSession error: %v", err)
 	}
-	if session.Name != "second" {
-		t.Fatalf("GetSession(\"\") = %q, want second", session.Name)
+	if session.Name != DefaultSessionName {
+		t.Fatalf("GetSession(\"\") = %q, want %q", session.Name, DefaultSessionName)
+	}
+
+	// GetSession with explicit name should resolve correctly.
+	session, err = mgr.GetSession(t.Context(), "other")
+	if err != nil {
+		t.Fatalf("GetSession(other) error: %v", err)
+	}
+	if session.Name != "other" {
+		t.Fatalf("GetSession(other) = %q, want other", session.Name)
 	}
 }
 
