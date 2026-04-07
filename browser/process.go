@@ -14,6 +14,8 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/gorilla/websocket"
 )
 
 // findChrome discovers the first available Chrome or Chromium binary.
@@ -191,11 +193,22 @@ func checkDebugEndpoint(ctx context.Context, debugURL string) error {
 	_, _ = io.Copy(io.Discard, resp.Body)
 	_ = resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("debug endpoint returned status %d", resp.StatusCode)
+	if resp.StatusCode == http.StatusOK {
+		return nil
 	}
 
-	return nil
+	// Some CDP endpoints expose a valid browser WebSocket but do not serve
+	// /json/version from the derived HTTP base. Fall back to a WebSocket
+	// handshake before rejecting the endpoint.
+	dialCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	conn, _, dialErr := websocket.DefaultDialer.DialContext(dialCtx, resolvedURL, nil)
+	if dialErr == nil {
+		_ = conn.Close()
+		return nil
+	}
+
+	return fmt.Errorf("debug endpoint returned status %d", resp.StatusCode)
 }
 
 // KillProcess terminates the Chrome process described by record. It sends
