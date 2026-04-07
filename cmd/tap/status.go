@@ -41,12 +41,14 @@ func runStatus(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 
+	defaultContext, _ := mgr.DefaultContext(ctx)
+
 	// Get default session info
 	session, err := mgr.GetSession(ctx, "")
 	if err != nil {
 		// No default session - show empty state
 		if cmd.Bool("json") {
-			return printStatusJSON(nil, nil, "no_default_session")
+			return printStatusJSON(defaultContext, nil, nil, "no_default_session")
 		}
 		return printStatusEmpty()
 	}
@@ -60,10 +62,10 @@ func runStatus(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	if cmd.Bool("json") {
-		return printStatusJSON(session, currentTab, "")
+		return printStatusJSON(defaultContext, session, currentTab, "")
 	}
 
-	return printStatusHuman(session, currentTab)
+	return printStatusHuman(defaultContext, session, currentTab)
 }
 
 func printStatusEmpty() error {
@@ -76,11 +78,20 @@ func printStatusEmpty() error {
 	return nil
 }
 
-func printStatusHuman(session *browser.SessionRecord, currentTab *browser.TabRecord) error {
+func printStatusHuman(defaultContext *browser.DefaultContextRecord, session *browser.SessionRecord, currentTab *browser.TabRecord) error {
 	c := true
 
 	// Context type
 	contextType := "Managed local browser"
+	if defaultContext != nil {
+		fmt.Printf("%s %s (%s)\n", bold(c, "Default context:"), defaultContext.SessionName, defaultContext.Kind)
+		if defaultContext.Stale {
+			fmt.Printf("%s %s\n", bold(c, "Context state:"), yellow(c, "stale"))
+			if defaultContext.Reason != "" {
+				fmt.Printf("%s %s\n", bold(c, "Reason:"), defaultContext.Reason)
+			}
+		}
+	}
 	if session.Remote != nil {
 		contextType = "Attached remote browser"
 	}
@@ -122,9 +133,19 @@ func printStatusHuman(session *browser.SessionRecord, currentTab *browser.TabRec
 	return nil
 }
 
-func printStatusJSON(session *browser.SessionRecord, currentTab *browser.TabRecord, errorState string) error {
+func printStatusJSON(defaultContext *browser.DefaultContextRecord, session *browser.SessionRecord, currentTab *browser.TabRecord, errorState string) error {
 	result := map[string]any{
 		"error": errorState,
+	}
+
+	if defaultContext != nil {
+		result["defaultContext"] = map[string]any{
+			"sessionName": defaultContext.SessionName,
+			"kind":        defaultContext.Kind,
+			"stale":       defaultContext.Stale,
+			"reason":      defaultContext.Reason,
+			"updatedAt":   defaultContext.UpdatedAt,
+		}
 	}
 
 	if session != nil {

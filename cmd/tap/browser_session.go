@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"text/tabwriter"
@@ -87,6 +88,9 @@ func browserSessionListCmd() *cli.Command {
 	return &cli.Command{
 		Name:  "list",
 		Usage: "List tracked browser sessions",
+		Flags: []cli.Flag{
+			&cli.BoolFlag{Name: "json", Usage: "Output as JSON"},
+		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			configureLogging(cmd)
 			mgr, err := newBrowserManager(cmd)
@@ -96,6 +100,9 @@ func browserSessionListCmd() *cli.Command {
 			list, err := mgr.ListSessions(ctx)
 			if err != nil {
 				return err
+			}
+			if cmd.Bool("json") {
+				return printSessionListJSON(list)
 			}
 			if len(list.Sessions) == 0 {
 				fmt.Fprintln(os.Stderr, "No browser sessions found.")
@@ -118,6 +125,9 @@ func browserSessionInfoCmd() *cli.Command {
 		Name:      "info",
 		Usage:     "Show session metadata and tracked-tab status",
 		ArgsUsage: "[name]",
+		Flags: []cli.Flag{
+			&cli.BoolFlag{Name: "json", Usage: "Output as JSON"},
+		},
 		Description: `Show the persisted session configuration, selected-tab state, and tracked tabs.
 
 Tracked tabs are reported as live, stale, or closed. Untracked live browser tabs
@@ -132,6 +142,10 @@ are not auto-adopted in v1.`,
 			session, err := mgr.GetSession(ctx, name)
 			if err != nil {
 				return err
+			}
+			defaultContext, _ := mgr.DefaultContext(ctx)
+			if cmd.Bool("json") {
+				return printSessionInfoJSON(defaultContext, session)
 			}
 
 			c := useColor(cmd)
@@ -173,6 +187,54 @@ are not auto-adopted in v1.`,
 			return w.Flush()
 		},
 	}
+}
+
+func printSessionListJSON(list *browser.SessionList) error {
+	out := make([]map[string]any, 0, len(list.Sessions))
+	for _, s := range list.Sessions {
+		out = append(out, map[string]any{
+			"name":        s.Name,
+			"mode":        s.Mode,
+			"selectedTab": s.SelectedTab,
+			"tabCount":    len(s.Tabs),
+			"createdAt":   s.CreatedAt,
+			"updatedAt":   s.UpdatedAt,
+		})
+	}
+	return json.NewEncoder(os.Stdout).Encode(map[string]any{"sessions": out})
+}
+
+func printSessionInfoJSON(defaultContext *browser.DefaultContextRecord, session *browser.SessionRecord) error {
+	result := map[string]any{
+		"session": map[string]any{
+			"name":             session.Name,
+			"mode":             session.Mode,
+			"selectedTab":      session.SelectedTab,
+			"createdAt":        session.CreatedAt,
+			"updatedAt":        session.UpdatedAt,
+			"lastReconciledAt": session.LastReconciledAt,
+		},
+	}
+	if defaultContext != nil {
+		result["defaultContext"] = map[string]any{
+			"sessionName": defaultContext.SessionName,
+			"kind":        defaultContext.Kind,
+			"stale":       defaultContext.Stale,
+			"reason":      defaultContext.Reason,
+		}
+	}
+	if session.Process != nil {
+		result["process"] = session.Process
+	}
+	if session.Remote != nil {
+		result["remote"] = session.Remote
+	}
+	tabs := make([]*browser.TabRecord, 0, len(session.Tabs))
+	for _, tab := range session.Tabs {
+		tabs = append(tabs, tab)
+	}
+	result["tabs"] = tabs
+	return json.NewEncoder(os.Stdout).Encode(result)
 }
 
 func browserSessionCloseCmd() *cli.Command {

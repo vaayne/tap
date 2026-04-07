@@ -158,6 +158,9 @@ Original error: %w`, err)
 	if err := mgr.CreateSession(ctx, sessionName, browser.ModeRemote, opts); err != nil {
 		return fmt.Errorf("create attached session: %w", err)
 	}
+	if err := mgr.SetDefaultContext(ctx, sessionName, browser.DefaultContextAttached); err != nil {
+		return fmt.Errorf("set default context: %w", err)
+	}
 
 	c := true
 	fmt.Fprintf(os.Stderr, "%s Attached to Chrome\n", green(c, "✓"))
@@ -284,10 +287,13 @@ func runAttachElectron(ctx context.Context, cmd *cli.Command) error {
 	if err := mgr.CreateSession(ctx, sessionName, browser.ModeRemote, opts); err != nil {
 		return fmt.Errorf("create session: %w", err)
 	}
+	if err := mgr.SetDefaultContext(ctx, sessionName, browser.DefaultContextAttached); err != nil {
+		return fmt.Errorf("set default context: %w", err)
+	}
 
 	// Auto-adopt tabs
 	if err := autoAdoptTabs(ctx, mgr, sessionName, wsURL); err != nil {
-		// Non-fatal
+		fmt.Fprintf(os.Stderr, "  Warning: could not auto-adopt tabs: %v\n", err)
 	}
 
 	c := true
@@ -320,10 +326,11 @@ func runAttachStatus(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	session, err := mgr.GetSession(ctx, browser.DefaultSessionName)
+	defaultContext, _ := mgr.DefaultContext(ctx)
+	session, err := mgr.GetSession(ctx, "")
 	if err != nil {
 		if cmd.Bool("json") {
-			return printAttachStatusJSON(nil, "no_session")
+			return printAttachStatusJSON(defaultContext, nil, "no_session")
 		}
 		fmt.Println("No attachment active.")
 		fmt.Println()
@@ -334,16 +341,22 @@ func runAttachStatus(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	if cmd.Bool("json") {
-		return printAttachStatusJSON(session, "")
+		return printAttachStatusJSON(defaultContext, session, "")
 	}
 
-	return printAttachStatusHuman(session)
+	return printAttachStatusHuman(defaultContext, session)
 }
 
-func printAttachStatusHuman(session *browser.SessionRecord) error {
+func printAttachStatusHuman(defaultContext *browser.DefaultContextRecord, session *browser.SessionRecord) error {
 	c := true
 
 	contextType := "Managed local browser"
+	if defaultContext != nil {
+		fmt.Printf("%s %s (%s)\n", bold(c, "Default context:"), defaultContext.SessionName, defaultContext.Kind)
+		if defaultContext.Stale {
+			fmt.Printf("%s %s\n", bold(c, "State:"), yellow(c, "stale"))
+		}
+	}
 	if session.Remote != nil {
 		contextType = "Attached remote browser"
 	}
@@ -374,9 +387,18 @@ func printAttachStatusHuman(session *browser.SessionRecord) error {
 	return nil
 }
 
-func printAttachStatusJSON(session *browser.SessionRecord, errorState string) error {
+func printAttachStatusJSON(defaultContext *browser.DefaultContextRecord, session *browser.SessionRecord, errorState string) error {
 	result := map[string]any{
 		"error": errorState,
+	}
+
+	if defaultContext != nil {
+		result["defaultContext"] = map[string]any{
+			"sessionName": defaultContext.SessionName,
+			"kind":        defaultContext.Kind,
+			"stale":       defaultContext.Stale,
+			"reason":      defaultContext.Reason,
+		}
 	}
 
 	if session != nil {
@@ -421,17 +443,25 @@ func runAttachClear(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	session, err := mgr.GetSession(ctx, browser.DefaultSessionName)
-	if err != nil {
+	defaultContext, err := mgr.DefaultContext(ctx)
+	if err != nil || defaultContext == nil {
 		fmt.Println("No attachment to clear.")
+		return nil
+	}
+
+	session, err := mgr.GetSession(ctx, defaultContext.SessionName)
+	if err != nil {
+		_ = mgr.ClearDefaultContext(ctx)
+		fmt.Println("Cleared stale attachment metadata.")
 		return nil
 	}
 
 	// Only clear if it's a remote session (attached, not managed)
 	if session.Remote != nil {
-		if err := mgr.CloseSession(ctx, browser.DefaultSessionName); err != nil {
+		if err := mgr.CloseSession(ctx, defaultContext.SessionName); err != nil {
 			return fmt.Errorf("close session: %w", err)
 		}
+		_ = mgr.ClearDefaultContext(ctx)
 		c := true
 		fmt.Fprintf(os.Stderr, "%s Detached from external browser\n", green(c, "✓"))
 	} else {

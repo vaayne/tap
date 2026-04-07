@@ -74,23 +74,27 @@ func runBrowserOpen(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	sessionName := cmd.String("session")
-	if sessionName == "" {
-		sessionName = browser.DefaultSessionName
-	}
 
-	// Get or create session
+	// Resolve the active context first. Only auto-create a managed local default
+	// when no persisted context exists at all.
 	session, err := mgr.GetSession(ctx, sessionName)
 	if err != nil {
-		// Session doesn't exist - create managed local session
+		if sessionName != "" {
+			return err
+		}
 		opts := browser.SessionOptions{Headless: !cmd.Bool("show")}
-		if err := mgr.CreateSession(ctx, sessionName, browser.ModeLocal, opts); err != nil {
+		if err := mgr.CreateSession(ctx, browser.DefaultSessionName, browser.ModeLocal, opts); err != nil {
 			return fmt.Errorf("create session: %w", err)
 		}
-		session, err = mgr.GetSession(ctx, sessionName)
+		if err := mgr.SetDefaultContext(ctx, browser.DefaultSessionName, browser.DefaultContextManaged); err != nil {
+			return fmt.Errorf("set default context: %w", err)
+		}
+		session, err = mgr.GetSession(ctx, browser.DefaultSessionName)
 		if err != nil {
 			return err
 		}
 	}
+	sessionName = session.Name
 
 	// Determine if we need a new tab
 	createNewTab := cmd.Bool("new-tab")
@@ -409,11 +413,11 @@ func runBrowserStatus(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	sessionName := cmd.String("session")
+	defaultContext, _ := mgr.DefaultContext(ctx)
 	session, err := mgr.GetSession(ctx, sessionName)
 	if err != nil {
 		if cmd.Bool("json") {
-			fmt.Println(`{"error": "no_session"}`)
-			return nil
+			return printStatusJSON(defaultContext, nil, nil, "no_session")
 		}
 		fmt.Println("No browser session active.")
 		fmt.Println("Run: tap browser open <url>")
@@ -421,8 +425,8 @@ func runBrowserStatus(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	if cmd.Bool("json") {
-		return printStatusJSON(session, nil, "")
+		return printStatusJSON(defaultContext, session, nil, "")
 	}
 
-	return printStatusHuman(session, nil)
+	return printStatusHuman(defaultContext, session, nil)
 }

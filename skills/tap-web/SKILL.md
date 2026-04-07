@@ -81,14 +81,28 @@ tap login <url>                          # Opens browser, press Enter when done
 
 ## Browser sessions
 
-**Always reuse the `default` session.** Only create named sessions for isolation (parallel subagents, different accounts). Stale recovery: close + recreate with same name. Note: closing a session deletes its profile directory (including cookies) — use `tap login` for persistent auth that survives session close.
+**Always reuse the persisted default browser context.** Resolution order is:
+1. explicit `--session`
+2. persisted default context (`tap attach ...` or a previously-created `default` session)
+3. managed local `default` session auto-created only when no persisted context exists
 
-See [references/browser.md](references/browser.md) for full commands, session strategy, and recovery.
+This means `tap attach chrome` becomes sticky across later `tap browser ...` commands. If the attached context becomes unreachable, tap marks it stale and fails explicitly — it does **not** silently fall back to a managed local browser.
+
+Only create named sessions for isolation (parallel subagents, different accounts). Stale recovery: re-attach or close + recreate the same session. Note: closing a managed local session deletes its profile directory (including cookies) — use `tap login` for persistent auth that survives session close.
+
+See [references/browser.md](references/browser.md) for full commands, session strategy, status output, and recovery.
 
 ```bash
-tap browser session list | new <name> | info [name] | close [name]
+tap status [--json]                     # Show resolved default context + current tab
+tap attach status [--json]              # Show attachment/default-context state
+tap browser status [--json]             # Show current browser context + tab state
+tap browser session list [--json]
+tap browser session new <name>
+tap browser session info [name] [--json]
+tap browser session close [name]
 tap browser tab new <name> --url <url>
 # Page
+tap browser open <url>                  # Resolve current context, create/navigate tab
 tap browser navigate <url>              # Go to URL
 tap browser back | forward | reload     # History navigation
 tap browser text [selector]             # Clean text via defuddle (token-efficient)

@@ -8,9 +8,17 @@ Manage long-lived browser instances that survive across CLI invocations.
 tap browser session new <name>                # Launch headless Chrome
 tap browser session new <name> --no-headless  # Visible browser
 tap browser session new <name> --ws-url <url> # Remote CDP endpoint
-tap browser session list
-tap browser session info [name]
+tap browser session list [--json]
+tap browser session info [name] [--json]
 tap browser session close [name]
+```
+
+## Status
+
+```bash
+tap status [--json]            # Resolved default context + current tab
+tap attach status [--json]     # Attachment/default-context state
+tap browser status [--json]    # Current browser context + tab state
 ```
 
 ## Tabs
@@ -120,14 +128,21 @@ After `discover`, all `tap browser` commands work against the session. macOS `.a
 
 ## Resolution
 
-When `--session`/`--tab` omitted, tap resolves automatically:
+When `--session`/`--tab` are omitted, tap resolves automatically:
 
-- **Session**: flag → `default` (auto-created if missing)
-- **Tab**: flag → selected tab → the only live tab
+- **Session**: explicit `--session` → persisted default context → managed local `default`
+- **Tab**: explicit `--tab` → selected tab → the only live tab
+
+The managed local `default` session is auto-created **only when no persisted default context exists**.
+If a persisted attached context exists but is unreachable, tap marks it stale and fails explicitly — it does not silently switch to a different browser context.
 
 ## Session Strategy
 
-**The `default` session is always used when `--session` is omitted.** If it doesn't exist, tap auto-creates a headless `default` session. The profile directory is derived from the session name, so same name = same profile = same cookies. Only use `--session <name>` for isolation (parallel subagents, different accounts).
+**The persisted default context is used when `--session` is omitted.** That default may point at:
+- a managed local `default` session, or
+- an attached remote session created by `tap attach ...`
+
+If no persisted default context exists, tap auto-creates a headless managed local `default` session. The profile directory is derived from the session name, so same name = same profile = same cookies. Only use `--session <name>` for isolation (parallel subagents, different accounts).
 
 ### Quick start
 
@@ -137,9 +152,19 @@ tap browser tab new main --url <start-url>  # Auto-creates default session, open
 
 ### Recover a stale session
 
-If `default` is unresponsive (Chrome crashed, PID gone), close and recreate. **Note: closing deletes the profile directory (including cookies).** Use `tap login` for persistent auth that survives session close.
+If the persisted default context is stale:
+- for an attached browser: re-run `tap attach chrome` or `tap attach electron ...`
+- for a managed local browser: close and recreate the same session
+
+`tap status --json` / `tap attach status --json` report the stale marker and reason.
+
+**Note:** closing a managed local session deletes its profile directory (including cookies). Use `tap login` for persistent auth that survives session close.
 
 ```bash
+# Re-attach a remote default context
+tap attach chrome
+
+# Or recreate a managed local default session
 tap browser session close default
 tap browser session new default
 # Re-login if needed: tap login <url>
@@ -166,8 +191,16 @@ tap browser session new research-b
 ## Examples
 
 ```bash
-# Reuse default session for a workflow
-tap browser session new default
+# Reuse resolved default context for a workflow
+tap browser open https://go.dev/doc
+tap browser status --json
+tap browser evaluate 'document.title'
+
+# Persist an attached default context
+# (subsequent tap browser commands will reuse it)
+tap attach chrome
+tap status --json
+
 tap browser tab new docs --url https://go.dev/doc
 tap browser evaluate 'document.title'
 

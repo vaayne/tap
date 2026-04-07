@@ -23,12 +23,14 @@ const (
 var namePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$`)
 
 var (
-	ErrSessionNotFound   = errors.New("browser session not found")
-	ErrNoTabs            = errors.New("no tracked tabs found")
-	ErrAmbiguousTab      = errors.New("browser tab selection is ambiguous")
-	ErrTabNotFound       = errors.New("browser tab not found")
-	ErrClosedTabSelected = errors.New("browser tab is closed")
-	ErrStaleTabSelected  = errors.New("browser tab is stale")
+	ErrSessionNotFound       = errors.New("browser session not found")
+	ErrNoTabs                = errors.New("no tracked tabs found")
+	ErrAmbiguousTab          = errors.New("browser tab selection is ambiguous")
+	ErrTabNotFound           = errors.New("browser tab not found")
+	ErrClosedTabSelected     = errors.New("browser tab is closed")
+	ErrStaleTabSelected      = errors.New("browser tab is stale")
+	ErrDefaultContextNotSet  = errors.New("default browser context is not set")
+	ErrDefaultContextInvalid = errors.New("default browser context is invalid")
 )
 
 // Mode identifies how a session connects to Chrome.
@@ -37,6 +39,13 @@ type Mode string
 const (
 	ModeLocal  Mode = "local"
 	ModeRemote Mode = "remote"
+)
+
+type DefaultContextKind string
+
+const (
+	DefaultContextManaged  DefaultContextKind = "managed"
+	DefaultContextAttached DefaultContextKind = "attached"
 )
 
 // Operation is a user-facing browser action supported by the session manager.
@@ -112,10 +121,20 @@ type SessionRecord struct {
 	LastReconciledAt time.Time                `json:"last_reconciled_at,omitempty"`
 }
 
+// DefaultContextRecord stores the persisted default browser context resolution.
+type DefaultContextRecord struct {
+	SessionName string             `json:"session_name"`
+	Kind        DefaultContextKind `json:"kind"`
+	Stale       bool               `json:"stale,omitempty"`
+	Reason      string             `json:"reason,omitempty"`
+	UpdatedAt   time.Time          `json:"updated_at,omitempty"`
+}
+
 // State is the durable browser session metadata written to disk.
 type State struct {
-	Version  int                       `json:"version"`
-	Sessions map[string]*SessionRecord `json:"sessions"`
+	Version        int                       `json:"version"`
+	DefaultContext *DefaultContextRecord     `json:"default_context,omitempty"`
+	Sessions       map[string]*SessionRecord `json:"sessions"`
 }
 
 // NewState returns an empty metadata state with initialized maps.
@@ -286,6 +305,12 @@ func (s *State) Normalize() {
 	if s.Sessions == nil {
 		s.Sessions = make(map[string]*SessionRecord)
 	}
+	if s.DefaultContext != nil {
+		s.DefaultContext.SessionName = strings.TrimSpace(s.DefaultContext.SessionName)
+		if s.DefaultContext.SessionName == "" {
+			s.DefaultContext = nil
+		}
+	}
 	for name, session := range s.Sessions {
 		if session == nil {
 			delete(s.Sessions, name)
@@ -326,6 +351,11 @@ func (s *State) Validate() error {
 		}
 		if err := session.validate(); err != nil {
 			return fmt.Errorf("session %q: %w", name, err)
+		}
+	}
+	if s.DefaultContext != nil {
+		if err := s.DefaultContext.validate(s); err != nil {
+			return fmt.Errorf("default context: %w", err)
 		}
 	}
 	return nil
@@ -388,6 +418,24 @@ func (s *SessionRecord) validate() error {
 	return nil
 }
 
+func (dc *DefaultContextRecord) validate(state *State) error {
+	if dc == nil {
+		return nil
+	}
+	if strings.TrimSpace(dc.SessionName) == "" {
+		return ErrDefaultContextNotSet
+	}
+	switch dc.Kind {
+	case DefaultContextManaged, DefaultContextAttached:
+	default:
+		return fmt.Errorf("unsupported default context kind %q", dc.Kind)
+	}
+	if _, ok := state.Sessions[dc.SessionName]; !ok {
+		return fmt.Errorf("%w: %s", ErrDefaultContextInvalid, dc.SessionName)
+	}
+	return nil
+}
+
 func (t *TabRecord) validate() error {
 	if err := ValidateTabName(t.Name); err != nil {
 		return err
@@ -421,12 +469,15 @@ func (s *State) DeleteSession(name string) error {
 		return fmt.Errorf("%w: %s", ErrSessionNotFound, name)
 	}
 	delete(s.Sessions, name)
+	if s.DefaultContext != nil && s.DefaultContext.SessionName == name {
+		s.DefaultContext = nil
+	}
 	return nil
 }
 
 // ResolveSession returns the session matching name, or the "default" session
-// when name is empty. Callers that need auto-creation of the default session
-// should use Manager.resolveSessionName instead.
+// when name is empty. Callers that need persisted-context resolution should use
+// ResolveSessionByPreference or Manager.resolveSessionName instead.
 func (s *State) ResolveSession(name string) (*SessionRecord, error) {
 	if name == "" {
 		name = DefaultSessionName
@@ -436,6 +487,54 @@ func (s *State) ResolveSession(name string) (*SessionRecord, error) {
 		return nil, fmt.Errorf("%w: %s", ErrSessionNotFound, name)
 	}
 	return session, nil
+}
+
+func (s *State) SetDefaultContext(sessionName string, kind DefaultContextKind, now time.Time) error {
+	if _, ok := s.Sessions[sessionName]; !ok {
+		return fmt.Errorf("%w: %s", ErrSessionNotFound, sessionName)
+	}
+	s.DefaultContext = &DefaultContextRecord{
+		SessionName: sessionName,
+		Kind:        kind,
+		UpdatedAt:   now.UTC(),
+	}
+	return nil
+}
+
+func (s *State) ClearDefaultContext() {
+	s.DefaultContext = nil
+}
+
+func (s *State) MarkDefaultContextStale(sessionName string, reason string, now time.Time) {
+	if s.DefaultContext == nil || s.DefaultContext.SessionName != sessionName {
+		return
+	}
+	s.DefaultContext.Stale = true
+	s.DefaultContext.Reason = strings.TrimSpace(reason)
+	s.DefaultContext.UpdatedAt = now.UTC()
+}
+
+func (s *State) MarkDefaultContextHealthy(sessionName string, now time.Time) {
+	if s.DefaultContext == nil || s.DefaultContext.SessionName != sessionName {
+		return
+	}
+	s.DefaultContext.Stale = false
+	s.DefaultContext.Reason = ""
+	s.DefaultContext.UpdatedAt = now.UTC()
+}
+
+func (s *State) ResolveSessionByPreference(name string) (*SessionRecord, error) {
+	if name != "" {
+		return s.ResolveSession(name)
+	}
+	if s.DefaultContext != nil {
+		session, ok := s.Sessions[s.DefaultContext.SessionName]
+		if !ok {
+			return nil, fmt.Errorf("%w: %s", ErrDefaultContextInvalid, s.DefaultContext.SessionName)
+		}
+		return session, nil
+	}
+	return s.ResolveSession(DefaultSessionName)
 }
 
 // UpsertTab creates or updates a tracked tab. The first live tab becomes selected.

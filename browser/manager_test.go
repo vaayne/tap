@@ -57,6 +57,41 @@ func TestManagerListSessionsEmpty(t *testing.T) {
 	}
 }
 
+func TestManagerGetSessionUsesPersistedDefaultContext(t *testing.T) {
+	store := testStore(t)
+	mgr := NewManager(store)
+	now := time.Date(2026, 4, 1, 10, 0, 0, 0, time.UTC)
+
+	err := store.Update(func(state *State) error {
+		def, err := NewLocalSession(DefaultSessionName, store.Root()+"/profiles/default", true, now)
+		if err != nil {
+			return err
+		}
+		other, err := NewRemoteSession("other", "wss://remote:9222/devtools/browser/1", now)
+		if err != nil {
+			return err
+		}
+		if err := state.CreateSession(def); err != nil {
+			return err
+		}
+		if err := state.CreateSession(other); err != nil {
+			return err
+		}
+		return state.SetDefaultContext("other", DefaultContextAttached, now)
+	})
+	if err != nil {
+		t.Fatalf("seed sessions: %v", err)
+	}
+
+	session, err := mgr.GetSession(t.Context(), "")
+	if err != nil {
+		t.Fatalf("GetSession error: %v", err)
+	}
+	if session.Name != "other" {
+		t.Fatalf("GetSession(\"\") = %q, want other", session.Name)
+	}
+}
+
 func TestManagerGetSessionResolution(t *testing.T) {
 	store := testStore(t)
 	mgr := NewManager(store)
@@ -144,6 +179,49 @@ func TestResolveDebugURL(t *testing.T) {
 			t.Fatal("resolveDebugURL should return error when no debug endpoint")
 		}
 	})
+}
+
+func TestResolveTargetMarksUnreachableRemoteSessionStale(t *testing.T) {
+	store := testStore(t)
+	mgr := NewManager(store)
+	now := time.Date(2026, 4, 1, 10, 0, 0, 0, time.UTC)
+
+	err := store.Update(func(state *State) error {
+		session, err := NewRemoteSession("attached", "ws://127.0.0.1:1/devtools/browser/unreachable", now)
+		if err != nil {
+			return err
+		}
+		tab, err := NewTab("main", "target-1", "https://example.com", now)
+		if err != nil {
+			return err
+		}
+		session.Tabs[tab.Name] = tab
+		session.SelectedTab = tab.Name
+		session.Process = &ProcessRecord{DebugURL: session.Remote.WSURL}
+		if err := state.CreateSession(session); err != nil {
+			return err
+		}
+		return state.SetDefaultContext("attached", DefaultContextAttached, now)
+	})
+	if err != nil {
+		t.Fatalf("seed remote session: %v", err)
+	}
+
+	if _, err := mgr.ResolveTarget(t.Context(), "", ""); err == nil {
+		t.Fatal("ResolveTarget should fail for unreachable remote session")
+	}
+
+	state, err := store.Load()
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+	session := state.Sessions["attached"]
+	if session.Tabs["main"].Status != TabStatusStale {
+		t.Fatalf("tab status = %q, want stale", session.Tabs["main"].Status)
+	}
+	if state.DefaultContext == nil || !state.DefaultContext.Stale {
+		t.Fatal("default context should be marked stale")
+	}
 }
 
 func TestRequireLiveTab(t *testing.T) {
