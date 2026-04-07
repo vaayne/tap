@@ -81,6 +81,16 @@ tap login <url>                          # Opens browser, press Enter when done
 
 ## Browser sessions
 
+**User's existing Chrome is a first-class workflow.** If the user already has Chrome/Chromium open with remote debugging enabled, attach it with:
+
+```bash
+tap attach chrome
+tap attach chrome --browser-url http://localhost:9222
+tap attach chrome --port-file ~/Library/Application\ Support/Google/Chrome/DevToolsActivePort
+```
+
+That attached browser becomes the persisted default context for later plain `tap browser ...` commands.
+
 **Always reuse the persisted default browser context.** Resolution order is:
 1. explicit `--session`
 2. persisted default context (`tap attach ...` or a previously-created `default` session)
@@ -95,6 +105,8 @@ See [references/browser.md](references/browser.md) for full commands, session st
 ```bash
 # Top-level status / default-context commands
 tap status [--json]                     # Show resolved default context + current tab
+tap attach chrome                       # Attach the user's existing Chrome/Chromium
+tap attach chrome --browser-url http://localhost:9222
 tap attach status [--json]              # Show attachment/default-context state
 tap attach clear                        # Clear attached default context metadata
 

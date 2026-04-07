@@ -17,10 +17,23 @@ tap browser session close [name]
 
 ```bash
 tap status [--json]            # Resolved default context + current tab
+tap attach chrome              # Attach the user's existing Chrome/Chromium
 tap attach status [--json]     # Attachment/default-context state
 tap attach clear               # Clear attached default-context metadata
 tap browser status [--json]    # Current browser context + tab state
 ```
+
+## Attach the user's existing Chrome
+
+If the user already has Chrome/Chromium open and wants tap to reuse that browser, prefer:
+
+```bash
+tap attach chrome
+tap attach chrome --browser-url http://localhost:9222
+tap attach chrome --port-file ~/Library/Application\ Support/Google/Chrome/DevToolsActivePort
+```
+
+That attached Chrome becomes the persisted default context for later plain `tap browser ...` commands. This is the preferred path for authenticated/manual browsing workflows where the user is already logged in.
 
 ## Tabs
 
