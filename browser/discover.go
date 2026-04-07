@@ -36,19 +36,21 @@ func ResolveDebugURLFromDevToolsFile(path string) (string, error) {
 }
 
 func parseDevToolsActivePort(content string) (string, error) {
-	content = strings.TrimSpace(content)
-	lines := strings.Split(content, "\n")
+	lines := strings.Split(strings.TrimSpace(content), "\n")
 	if len(lines) < 2 {
 		return "", fmt.Errorf("invalid DevToolsActivePort content")
 	}
+
 	port, err := strconv.Atoi(strings.TrimSpace(lines[0]))
 	if err != nil || port <= 0 {
 		return "", fmt.Errorf("invalid DevToolsActivePort port")
 	}
+
 	wsPath := strings.TrimSpace(lines[1])
-	if wsPath == "" || !strings.HasPrefix(wsPath, "/") {
+	if !strings.HasPrefix(wsPath, "/") {
 		return "", fmt.Errorf("invalid DevToolsActivePort websocket path")
 	}
+
 	return fmt.Sprintf("ws://127.0.0.1:%d%s", port, wsPath), nil
 }
 
@@ -86,11 +88,5 @@ func existingCandidates(root string, paths ...string) []string {
 	if strings.TrimSpace(root) == "" {
 		return nil
 	}
-	out := make([]string, 0, len(paths))
-	for _, path := range paths {
-		if strings.TrimSpace(path) != "" {
-			out = append(out, path)
-		}
-	}
-	return out
+	return paths
 }

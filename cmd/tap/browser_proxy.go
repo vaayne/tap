@@ -30,7 +30,7 @@ Then point tap at the proxy:
 			&cli.StringFlag{
 				Name:  "listen",
 				Usage: "Local listen address for the proxy",
-				Value: "127.0.0.1:9401",
+				Value: browser.DefaultProxyListenAddr,
 			},
 			&cli.StringFlag{
 				Name:  "upstream",
@@ -49,21 +49,9 @@ Then point tap at the proxy:
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			configureLogging(cmd)
 
-			upstream := cmd.String("upstream")
-			if path := cmd.String("devtools-port-file"); path != "" {
-				url, err := browser.ResolveDebugURLFromDevToolsFile(path)
-				if err != nil {
-					return fmt.Errorf("resolve devtools port file: %w", err)
-				}
-				upstream = url
-				fmt.Fprintf(os.Stderr, "Resolved upstream from %s\n", path)
-			} else if cmd.Bool("user-chrome") {
-				url, path, err := browser.DiscoverUserChromeDebugURL()
-				if err != nil {
-					return err
-				}
-				upstream = url
-				fmt.Fprintf(os.Stderr, "Discovered user Chrome via %s\n", path)
+			upstream, err := resolveProxyUpstream(cmd)
+			if err != nil {
+				return err
 			}
 
 			proxy := browser.NewProxy(browser.ProxyConfig{
@@ -79,4 +67,28 @@ Then point tap at the proxy:
 			return proxy.Serve(runCtx)
 		},
 	}
+}
+
+func resolveProxyUpstream(cmd *cli.Command) (string, error) {
+	upstream := cmd.String("upstream")
+
+	if path := cmd.String("devtools-port-file"); path != "" {
+		url, err := browser.ResolveDebugURLFromDevToolsFile(path)
+		if err != nil {
+			return "", fmt.Errorf("resolve devtools port file: %w", err)
+		}
+		fmt.Fprintf(os.Stderr, "Resolved upstream from %s\n", path)
+		return url, nil
+	}
+
+	if cmd.Bool("user-chrome") {
+		url, path, err := browser.DiscoverUserChromeDebugURL()
+		if err != nil {
+			return "", err
+		}
+		fmt.Fprintf(os.Stderr, "Discovered user Chrome via %s\n", path)
+		return url, nil
+	}
+
+	return upstream, nil
 }

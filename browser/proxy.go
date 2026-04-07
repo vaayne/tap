@@ -13,6 +13,19 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+const (
+	DefaultProxyListenAddr = "127.0.0.1:9401"
+	pendingRequestTTL      = 60 * time.Second
+	pendingCleanupInterval = 30 * time.Second
+	reconnectInterval      = 2 * time.Second
+	cdpRequestTimeout      = 10 * time.Second
+)
+
+var blockedClientMethods = map[string]struct{}{
+	"Target.activateTarget": {},
+	"Page.bringToFront":     {},
+}
+
 // ProxyConfig configures the local CDP proxy.
 type ProxyConfig struct {
 	ListenAddr string
@@ -60,7 +73,7 @@ type proxyClient struct {
 
 func NewProxy(cfg ProxyConfig) *Proxy {
 	if strings.TrimSpace(cfg.ListenAddr) == "" {
-		cfg.ListenAddr = "127.0.0.1:9401"
+		cfg.ListenAddr = DefaultProxyListenAddr
 	}
 	return &Proxy{
 		cfg: cfg,
@@ -141,16 +154,7 @@ func (p *Proxy) scheduleReconnect(ctx context.Context) {
 	p.reconnecting = true
 	p.upstreamReady = false
 	p.upstreamConn = nil
-	for sid := range p.sessionOwners {
-		delete(p.sessionOwners, sid)
-	}
-	for tid := range p.targetOwners {
-		delete(p.targetOwners, tid)
-	}
-	for _, state := range p.clientState {
-		state.tabs = map[string]struct{}{}
-		state.sessions = map[string]struct{}{}
-	}
+	p.resetOwnershipStateLocked()
 	p.mu.Unlock()
 
 	go func() {
@@ -163,7 +167,7 @@ func (p *Proxy) scheduleReconnect(ctx context.Context) {
 			select {
 			case <-ctx.Done():
 				return
-			case <-time.After(2 * time.Second):
+			case <-time.After(reconnectInterval):
 			}
 			if err := p.connectUpstream(ctx); err == nil {
 				return
@@ -183,7 +187,7 @@ func (p *Proxy) closeUpstream() {
 }
 
 func (p *Proxy) cleanupPendingLoop(ctx context.Context) {
-	ticker := time.NewTicker(30 * time.Second)
+	ticker := time.NewTicker(pendingCleanupInterval)
 	defer ticker.Stop()
 
 	for {
@@ -192,25 +196,15 @@ func (p *Proxy) cleanupPendingLoop(ctx context.Context) {
 			return
 		case <-ticker.C:
 			now := time.Now()
-			var expired []int64
 
 			p.mu.Lock()
 			for id, req := range p.pending {
-				if now.Sub(req.createdAt) > 60*time.Second {
-					expired = append(expired, id)
-					if req.client != nil {
-						if state := p.clientState[req.client]; state != nil {
-							delete(state.proxyIDs, id)
-						}
-					}
-					delete(p.pending, id)
+				if now.Sub(req.createdAt) <= pendingRequestTTL {
+					continue
 				}
+				p.removePendingRequestLocked(id, req)
 			}
 			p.mu.Unlock()
-
-			for _, id := range expired {
-				_ = id
-			}
 		}
 	}
 }
@@ -244,31 +238,7 @@ func (p *Proxy) handleUpstreamMessage(msg map[string]any) {
 			return
 		}
 
-		if req.method == "Target.createTarget" {
-			if result, _ := msg["result"].(map[string]any); result != nil {
-				if targetID, _ := result["targetId"].(string); targetID != "" && req.client != nil {
-					p.mu.Lock()
-					p.targetOwners[targetID] = req.client
-					if state := p.clientState[req.client]; state != nil {
-						state.tabs[targetID] = struct{}{}
-					}
-					p.mu.Unlock()
-				}
-			}
-		}
-
-		if req.method == "Target.attachToTarget" {
-			if result, _ := msg["result"].(map[string]any); result != nil {
-				if sessionID, _ := result["sessionId"].(string); sessionID != "" && req.client != nil {
-					p.mu.Lock()
-					p.sessionOwners[sessionID] = req.client
-					if state := p.clientState[req.client]; state != nil {
-						state.sessions[sessionID] = struct{}{}
-					}
-					p.mu.Unlock()
-				}
-			}
-		}
+		p.recordOwnership(msg, req)
 
 		msg["id"] = req.originalID
 		if req.internal != nil {
@@ -336,11 +306,7 @@ func (p *Proxy) handleBrowserWS(w http.ResponseWriter, r *http.Request) {
 	client := &proxyClient{conn: conn}
 
 	p.mu.Lock()
-	p.clientState[client] = &proxyState{
-		tabs:     make(map[string]struct{}),
-		sessions: make(map[string]struct{}),
-		proxyIDs: make(map[int64]struct{}),
-	}
+	p.clientState[client] = newProxyState()
 	p.mu.Unlock()
 
 	defer p.removeClient(client)
@@ -361,7 +327,7 @@ func (p *Proxy) handleBrowserWS(w http.ResponseWriter, r *http.Request) {
 
 func (p *Proxy) handleClientMessage(client *proxyClient, msg map[string]any) error {
 	method, _ := msg["method"].(string)
-	if method == "Target.activateTarget" || method == "Page.bringToFront" {
+	if _, blocked := blockedClientMethods[method]; blocked {
 		resp := map[string]any{"id": msg["id"], "result": map[string]any{}}
 		if sessionID, _ := msg["sessionId"].(string); sessionID != "" {
 			resp["sessionId"] = sessionID
@@ -443,7 +409,7 @@ func (p *Proxy) cdpRequest(method string, params map[string]any) (map[string]any
 			return nil, fmt.Errorf("cdp error: %v", errField)
 		}
 		return resp, nil
-	case <-time.After(10 * time.Second):
+	case <-time.After(cdpRequestTimeout):
 		p.mu.Lock()
 		delete(p.pending, proxyID)
 		p.mu.Unlock()
@@ -516,6 +482,7 @@ func (p *Proxy) handleStatus(w http.ResponseWriter, _ *http.Request) {
 func (p *Proxy) removeClient(client *proxyClient) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+
 	state := p.clientState[client]
 	for sessionID, owner := range p.sessionOwners {
 		if owner == client {
@@ -534,6 +501,72 @@ func (p *Proxy) removeClient(client *proxyClient) {
 	}
 	delete(p.clientState, client)
 	_ = client.conn.Close()
+}
+
+func (p *Proxy) resetOwnershipStateLocked() {
+	for sessionID := range p.sessionOwners {
+		delete(p.sessionOwners, sessionID)
+	}
+	for targetID := range p.targetOwners {
+		delete(p.targetOwners, targetID)
+	}
+	for _, state := range p.clientState {
+		state.tabs = make(map[string]struct{})
+		state.sessions = make(map[string]struct{})
+	}
+}
+
+func (p *Proxy) removePendingRequestLocked(id int64, req *pendingRequest) {
+	if req.client != nil {
+		if state := p.clientState[req.client]; state != nil {
+			delete(state.proxyIDs, id)
+		}
+	}
+	delete(p.pending, id)
+}
+
+func (p *Proxy) recordOwnership(msg map[string]any, req *pendingRequest) {
+	if req == nil || req.client == nil {
+		return
+	}
+
+	result, _ := msg["result"].(map[string]any)
+	if result == nil {
+		return
+	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	state := p.clientState[req.client]
+	switch req.method {
+	case "Target.createTarget":
+		targetID, _ := result["targetId"].(string)
+		if targetID == "" {
+			return
+		}
+		p.targetOwners[targetID] = req.client
+		if state != nil {
+			state.tabs[targetID] = struct{}{}
+		}
+	case "Target.attachToTarget":
+		sessionID, _ := result["sessionId"].(string)
+		if sessionID == "" {
+			return
+		}
+		p.sessionOwners[sessionID] = req.client
+		if state != nil {
+			state.sessions[sessionID] = struct{}{}
+		}
+	}
+}
+
+func newProxyState() *proxyState {
+	return &proxyState{
+		tabs:     make(map[string]struct{}),
+		sessions: make(map[string]struct{}),
+		proxyIDs: make(map[int64]struct{}),
+	}
 }
 
 func (c *proxyClient) writeJSON(msg map[string]any) error {
