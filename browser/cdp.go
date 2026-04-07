@@ -113,7 +113,7 @@ func CreateTarget(ctx context.Context, debugURL string, url string) (string, err
 	var id target.ID
 	err := chromedp.Run(bctx, chromedp.ActionFunc(func(ctx context.Context) error {
 		var err error
-		id, err = target.CreateTarget(url).Do(ctx)
+		id, err = target.CreateTarget(url).WithBackground(true).Do(ctx)
 		return err
 	}))
 	if err != nil {

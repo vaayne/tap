@@ -168,7 +168,12 @@ func CheckProcessContext(ctx context.Context, record *ProcessRecord) error {
 // checkDebugEndpoint verifies that a CDP debug endpoint is reachable by
 // hitting its /json/version path.
 func checkDebugEndpoint(ctx context.Context, debugURL string) error {
-	httpURL, err := debugURLToHTTP(debugURL)
+	resolvedURL, err := ResolveDebugURL(ctx, debugURL)
+	if err != nil {
+		return fmt.Errorf("parse debug URL: %w", err)
+	}
+
+	httpURL, err := debugURLToHTTP(resolvedURL)
 	if err != nil {
 		return fmt.Errorf("parse debug URL: %w", err)
 	}

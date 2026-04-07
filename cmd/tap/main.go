@@ -80,7 +80,7 @@ func globalFlags() []cli.Flag {
 		},
 		&cli.StringFlag{
 			Name:    "ws-url",
-			Usage:   "Remote Chrome DevTools Protocol WebSocket URL (e.g. ws://localhost:9222)",
+			Usage:   "Remote Chrome DevTools endpoint: WebSocket URL or HTTP base URL (e.g. ws://localhost:9222/devtools/browser/... or http://localhost:9222)",
 			Sources: cli.EnvVars("TAP_WS_URL"),
 		},
 		&cli.StringFlag{

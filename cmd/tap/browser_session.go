@@ -51,7 +51,7 @@ Examples:
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "ws-url",
-				Usage: "Remote CDP WebSocket URL; omit for a managed local browser",
+				Usage: "Remote CDP endpoint: WebSocket URL or HTTP base URL; omit for a managed local browser",
 			},
 			&cli.BoolFlag{
 				Name:  "no-headless",

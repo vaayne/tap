@@ -54,6 +54,14 @@ type Transport struct {
 // If the Lightpanda browser backend is selected, it downloads (if needed)
 // and starts the Lightpanda server eagerly so errors surface immediately.
 func New(ctx context.Context, config Config) (*Transport, error) {
+	if config.WSURL != "" {
+		resolvedURL, err := browser.ResolveDebugURL(ctx, config.WSURL)
+		if err != nil {
+			return nil, fmt.Errorf("resolve debug endpoint: %w", err)
+		}
+		config.WSURL = resolvedURL
+	}
+
 	t := &Transport{
 		config: config,
 		http:   newHTTPClient(),
@@ -235,7 +243,7 @@ func (t *Transport) BrowseInteractive(ctx context.Context, url string, pauseFn P
 }
 
 func (t *Transport) newBrowserContext(parent context.Context) (context.Context, context.CancelFunc) {
-	// Remote CDP endpoint (explicit --ws-url).
+	// Remote CDP endpoint (explicit --ws-url or resolved from an HTTP DevTools base URL).
 	if t.config.WSURL != "" {
 		ctx, cancel1 := chromedp.NewRemoteAllocator(parent, t.config.WSURL, chromedp.NoModifyURL)
 		ctx, cancel2 := chromedp.NewContext(ctx)
