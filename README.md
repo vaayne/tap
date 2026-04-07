@@ -8,139 +8,165 @@ Tap into any website from your terminal.
 curl -fsSL https://raw.githubusercontent.com/vaayne/tap/main/scripts/install.sh | sh
 ```
 
-Or with a custom directory:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/vaayne/tap/main/scripts/install.sh | sh -s -- --dir /usr/local/bin
-```
-
-Or install with Go:
+Or with Go:
 
 ```bash
 go install github.com/vaayne/tap/cmd/tap@latest
 ```
 
-To upgrade to the latest version:
+Upgrade later with:
 
 ```bash
 tap upgrade
 ```
 
-Requires Google Chrome for browser features. Check dependencies with `tap doctor`.
+Browser features use Chrome by default. Check dependencies with `tap doctor`.
 
-### Browser backends
+## Quick start
 
-| Backend | Platforms | Install | Best for |
-|---|---|---|---|
-| **Chrome** | macOS, Linux, Windows | [Install manually](https://www.google.com/chrome/) | Full browser automation, auth, network interception |
-| **Lightpanda** | macOS, Linux | `tap doctor --install` | Fast headless JS rendering without auth |
-
-**Lightpanda limitations:** Lightpanda is a lightweight headless browser under active development. It does not support all sites — pages that rely on advanced Web APIs, complex CSS layouts, or heavy JS frameworks may fail or render incorrectly. Network/Fetch CDP domains are not supported (no `tap browser network` commands). Use Chrome when Lightpanda doesn't work. Run `tap doctor --install` to keep Lightpanda up to date.
-
-## Site scripts — structured data from 100+ sites
-
-Run community scripts to get structured JSON from popular websites.
+### Structured data from site scripts
 
 ```bash
-tap site hackernews/top | jq '.stories[:3]'
-tap site twitter/search query=claude
-tap site bilibili/search keyword=编程 order=click
-tap site github/repo vaayne/tap
+tap site list
+tap site hackernews/top
+tap site run github/repo repo=vaayne/tap
+tap site search weather
 ```
 
-Scripts auto-sync from [tap.vaayne.com](https://tap.vaayne.com) and cache locally. Run `tap site list` for the full catalog, or `tap site search <query>` to find scripts.
+Scripts auto-sync from [tap.vaayne.com](https://tap.vaayne.com) into the local cache. Local overrides at `~/.config/tap/sites/{site}/{script}.js` take precedence.
 
-Local overrides: drop a `.js` file at `~/.config/tap/sites/{site}/{script}.js`. Use `--local-only` to skip the remote cache entirely. Write your own — see the [script development guide](https://github.com/epiral/bb-sites).
-
-## Fetch — clean content from any URL
-
-Extract readable content as markdown or JSON, powered by [go-defuddle](https://github.com/vaayne/go-defuddle).
+### Readable content from any URL
 
 ```bash
 tap fetch https://example.com/article
 tap fetch --json https://example.com/article
+tap fetch -b https://example.com/app --wait-selector '.content'
 ```
 
-Falls back to a real browser for JS-rendered pages automatically.
-
-## Browser — persistent sessions and automation
-
-Manage long-lived Chrome sessions, automate interactions, and intercept network requests.
+### Use a visible browser for auth when needed
 
 ```bash
-# Attach tap's built-in proxy to your visible Chrome
-# (Chrome must already have remote debugging enabled)
-tap browser proxy --user-chrome
+tap attach chrome
+tap browser open https://github.com/login --show
+tap site -b github/notifications
+tap fetch -b https://github.com/notifications
+```
 
-# Reuse that browser for authenticated fetches and scripts
-TAP_WS_URL=http://127.0.0.1:9401 tap fetch -b https://example.com
-TAP_WS_URL=http://127.0.0.1:9401 tap site -b github/notifications
+### Reuse your existing Chrome
 
-# Or create a persistent remote default session through the proxy
-# so all `tap browser ...` commands control the same browser
-tap browser session new default --ws-url http://127.0.0.1:9401
-tap browser tab new main --url https://example.com
-tap browser navigate https://httpbin.org/html
+Chrome must already expose DevTools.
+
+```bash
+tap attach chrome
+tap attach status
+tap browser open https://example.com
 tap browser click '#submit'
 tap browser text
+```
+
+You can also attach explicitly:
+
+```bash
+tap attach chrome --browser-url http://127.0.0.1:9222
+tap attach chrome --port-file ~/Library/Application\ Support/Google/Chrome/DevToolsActivePort
+```
+
+### Browser workflow
+
+```bash
+tap browser open https://news.ycombinator.com
+tap browser open https://github.com --new-tab
+tap browser tabs
+tap browser switch tab-2
+tap browser screenshot --output github.png
+tap browser status
+```
+
+### Electron workflow
+
+```bash
+tap attach electron --port 9333
+tap browser evaluate 'document.title'
 tap browser screenshot
-tap browser network wait --url '*/api/data'
 ```
 
-Save a PDF, handle dialogs, fill forms, press keys, and more. See [docs/browser.md](docs/browser.md) and [docs/network.md](docs/network.md) for the full reference.
-
-### Login and interactive mode
-
-Log in once and reuse saved cookies:
+Or launch and attach:
 
 ```bash
-tap login https://github.com/login
-tap site -b github/notifications
+tap attach electron --launch /Applications/MyApp.app/Contents/MacOS/MyApp
 ```
 
-Wait for dynamic content:
+## Command map
+
+```text
+tap
+├── site        structured extraction from known sites
+├── fetch       clean readable content from arbitrary URLs
+├── browser     open pages and automate the current browser context
+├── attach      connect tap to existing Chrome/Electron/browser targets
+├── status      show the active browser context and current tab
+├── doctor      dependency and environment checks
+└── upgrade     update tap
+```
+
+## Common browser-backed flags
+
+These show up on the relevant commands instead of only in global help:
+
+| Flag | Description |
+| --- | --- |
+| `--browser`, `-b` | Force browser execution and reuse the resolved browser context |
+| `--show` | Run the browser visibly |
+| `--wait` | Wait a fixed duration after navigation |
+| `--wait-selector` | Wait for a CSS selector |
+| `--wait-js` | Wait for a JS expression |
+| `--timeout` | Set execution timeout |
+| `--browser-url` | One-shot DevTools override |
+| `--profile-dir` | One-shot profile override |
+| `--lightpanda`, `--lp` | Use Lightpanda instead of Chrome |
+
+Compatibility aliases still work:
+- `--ws-url` -> `--browser-url`
+- `--delay` -> `--wait`
+- `--no-headless` -> `--show`
+
+## Advanced browser commands
+
+The browser command still includes lower-level tools when needed:
 
 ```bash
-tap fetch https://example.com --wait-selector '.content'
-tap fetch https://example.com --wait-js 'document.body.innerText.includes("ready")'
+tap browser evaluate ...
+tap browser forms
+tap browser cookies ...
+tap browser network ...
 ```
 
-## Electron — debug and automate Electron apps
+## Lightpanda
 
-Tap connects to any Electron app via Chrome DevTools Protocol. Electron exposes the same CDP as Chrome — no plugins or patches required, just launch with `--remote-debugging-port`.
+| Backend | Platforms | Best for |
+| --- | --- | --- |
+| Chrome | macOS, Linux, Windows | Full browser automation, auth, network interception |
+| Lightpanda | macOS, Linux | Fast headless rendering without auth-heavy flows |
+
+Install or update Lightpanda with:
 
 ```bash
-# Launch an Electron app with debugging and create a session
-tap electron launch "/Applications/MyApp.app/Contents/MacOS/MyApp"
-
-# Attach to an already-running app (started with --remote-debugging-port=PORT)
-tap electron attach --port 9229
-
-# Discover open windows as tracked tabs
-tap electron discover --session electron
-
-# Then use all tap browser commands as normal
-tap browser screenshot --session electron
-tap browser evaluate "document.title" --session electron
-tap browser click "button.submit" --session electron
-
-# Find running Electron/CEF processes with debug ports
-tap electron ps
+tap doctor --install
 ```
+
+## Docs
+
+- [docs/browser.md](docs/browser.md) — browser UX and reference
+- [docs/network.md](docs/network.md) — network interception reference
+- [web/README.md](web/README.md) — web app docs
 
 ## Agent skill
 
-Tap ships with a built-in [agent skill](https://agentskills.io) that gives AI coding agents web access, site scripts, and browser automation. Works with Claude Code, Cursor, Copilot, and [45+ other agents](https://github.com/vercel-labs/skills).
+Tap ships with a built-in agent skill that gives coding agents web access, site scripts, and browser automation.
 
 ```bash
 npx skills add vaayne/tap
 ```
-
-Once installed, your agent will automatically use `tap` when you ask it to search the web, read a URL, run site scripts, or automate a browser.
-
-## Agent / LLM usage
-
-Tap is designed as a tool-use target for AI agents. Every `tap site` script returns deterministic structured JSON, and every command is a single CLI call with no interactive prompts — ideal for function calling and pipelines.
 
 ## Go library
 
@@ -152,51 +178,10 @@ go get github.com/vaayne/tap
 client, _ := tap.New()
 defer client.Close()
 
-// Run a site script
 result, _ := client.RunScript(ctx, "hackernews/top", nil)
-
-// Extract clean content
 content, _ := client.Fetch(ctx, "https://example.com", &fetch.Options{Markdown: true})
 fmt.Println(content.Markdown)
 ```
-
-## Configuration
-
-Essential flags and environment variables:
-
-| Flag | Env | Description |
-|---|---|---|
-| `--browser`, `-b` | `TAP_BROWSER` | Force browser execution |
-| `--sites-dir` | `TAP_SITES_DIR` | Script directory (default `~/.config/tap/sites`) |
-| `--ws-url` | `TAP_WS_URL` | Remote CDP endpoint (browser WebSocket URL or HTTP DevTools base URL) |
-| `--local-only` | | Skip remote cache, use local scripts only |
-
-Browser flags (imply `--browser`):
-
-| Flag | Description |
-|---|---|
-| `--pause` | Pause after navigation for manual interaction |
-| `--delay` | Wait a fixed duration after navigation |
-| `--wait-selector` | Wait until a CSS selector is visible |
-| `--wait-js` | Wait until a JS expression is truthy |
-| `--no-headless` | Run browser in visible mode |
-| `--lightpanda`, `--lp` | Use Lightpanda instead of Chrome (fast, but limited site support) |
-| `--profile-dir` | Chrome profile directory |
-
-## Doctor — manage browser dependencies
-
-```bash
-tap doctor              # Check status of tap, Chrome, Lightpanda
-tap doctor --install    # Install or update Lightpanda to the latest nightly
-```
-
-## Links
-
-- [tap.vaayne.com](https://tap.vaayne.com) — browse scripts online
-- [bb-sites](https://github.com/epiral/bb-sites) — script repository
-- [docs/browser.md](docs/browser.md) — browser sessions reference
-- [docs/network.md](docs/network.md) — network interception reference
-- [web/README.md](web/README.md) — web app docs
 
 ## License
 

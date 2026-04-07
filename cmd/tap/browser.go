@@ -13,7 +13,7 @@ func browserCmd() *cli.Command {
 		Usage: "Browser automation and page interaction",
 		Description: `Open pages, interact with elements, and extract content from websites.
 
-Quick start (simple workflow):
+Quick start:
   tap browser open <url>                 Open or navigate to a URL
   tap browser tabs                       List open tabs
   tap browser switch <tab-id>            Switch to a different tab
@@ -21,23 +21,14 @@ Quick start (simple workflow):
   tap browser text                       Extract readable page content
   tap browser screenshot                 Capture the current page
 
-For authenticated access, first run:
+For authenticated access:
   tap attach chrome                      Attach your existing Chrome
-  tap login <url>                        Log in and save cookies
-
-Advanced commands (for power users):
-  tap browser session ...                Manage named sessions
-  tap browser tab ...                    Manage tracked tabs explicitly
-  tap browser proxy ...                  Run CDP proxy
-  tap browser network ...                Network capture and interception
+  tap browser open https://example.com/login --show
 
 Default behavior:
 - Uses the default browser context (managed or attached)
 - Operates on the current tab (created automatically if needed)
-- Use --new-tab to open in a new tab instead of navigating current
-
-Session resolution: defaults to active context, or 'default' if none.
-Tab resolution: defaults to current tab, or creates one if needed.`,
+- Use --new-tab to open in a new tab instead of navigating current`,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:    "state-root",
@@ -46,16 +37,11 @@ Tab resolution: defaults to current tab, or creates one if needed.`,
 			},
 		},
 		Commands: []*cli.Command{
-			// Simple workflow commands (preferred for most users)
 			withCategory("Common", browserOpenCmd()),
 			withCategory("Common", browserTabsCmd()),
 			withCategory("Common", browserSwitchCmd()),
 			withCategory("Common", browserCloseTabCmd()),
 			withCategory("Common", browserStatusCmd()),
-			// Advanced commands
-			withCategory("Proxy", browserProxyCmd()),
-			withCategory("Session & Tab", browserSessionCmd()),
-			withCategory("Session & Tab", browserTabCmd()),
 			withCategory("Navigation", browserNavigateCmd()),
 			withCategory("Navigation", browserBackCmd()),
 			withCategory("Navigation", browserForwardCmd()),
@@ -92,12 +78,14 @@ func newBrowserManager(cmd *cli.Command) (*browser.Manager, error) {
 func browserActionFlags(includeOutput bool) []cli.Flag {
 	flags := []cli.Flag{
 		&cli.StringFlag{
-			Name:  "session",
-			Usage: "Browser session name; defaults to 'default' when omitted",
+			Name:   "session",
+			Usage:  "Advanced session override",
+			Hidden: true,
 		},
 		&cli.StringFlag{
-			Name:  "tab",
-			Usage: "Tracked tab name; defaults to the selected tab in the resolved session when omitted",
+			Name:   "tab",
+			Usage:  "Advanced tab override",
+			Hidden: true,
 		},
 	}
 	if includeOutput {

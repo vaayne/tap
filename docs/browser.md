@@ -1,287 +1,146 @@
-# Persistent Browser Sessions
+# Browser Automation
 
-Tap provides persistent browser automation via `tap browser`. Sessions and tabs survive across CLI invocations, letting you navigate pages, evaluate JavaScript, and capture screenshots against long-lived browser state.
+Tap now exposes a task-first browser UX for common workflows while keeping the older session/tab/proxy commands for advanced use.
 
-## Quick Start
+## Common workflows
+
+### Reuse your existing Chrome
+
+Chrome must already expose a DevTools endpoint.
 
 ```bash
-# Start tap's built-in proxy against your existing visible Chrome.
-# Your browser must already expose DevTools.
-tap browser proxy --user-chrome
-
-# Reuse the attached browser for authenticated fetches/scripts.
-TAP_WS_URL=http://127.0.0.1:9401 tap fetch -b https://example.com
-
-# Or create a persistent remote default session through the proxy.
-tap browser session new default --ws-url http://127.0.0.1:9401
-
-# Open a tab and navigate
-tap browser tab new main --url https://example.com
-tap browser navigate https://httpbin.org/html
-
-# Interact with the page
-tap browser evaluate 'document.querySelector("h1").textContent'
-tap browser screenshot --output page.png
+tap attach chrome
+tap attach status
+tap fetch -b https://example.com/private
+tap site -b github/notifications
+tap browser open https://example.com
+tap browser click '#submit'
 ```
 
-## Proxy workflow
-
-Use the proxy when you want tap to control your already-running Chrome profile instead of launching a separate tap-managed browser profile.
+Supported attach inputs:
 
 ```bash
-# Auto-discover Chrome via DevToolsActivePort
-tap browser proxy --user-chrome
-
-# Or attach to an explicit endpoint / port file
-tap browser proxy --upstream http://127.0.0.1:9222
-tap browser proxy --devtools-port-file ~/Library/Application\ Support/Google/Chrome/DevToolsActivePort
-
-# Then point browser-backed commands at the proxy
-TAP_WS_URL=http://127.0.0.1:9401 tap fetch -b https://example.com
-TAP_WS_URL=http://127.0.0.1:9401 tap site -b github/notifications
-
-# For persistent browser automation, create a remote default session once
-tap browser session new default --ws-url http://127.0.0.1:9401
+tap attach chrome
+tap attach chrome --browser-url http://127.0.0.1:9222
+tap attach chrome --port-file ~/Library/Application\ Support/Google/Chrome/DevToolsActivePort
 ```
 
-Notes:
-- `tap browser proxy` runs in the foreground; keep it running while using tap.
-- `--user-chrome` requires an existing Chrome/Chromium instance with DevTools enabled.
-- If a local `default` session already exists, close it before creating the remote `default` session.
+If the attached browser becomes unreachable, tap marks the default context as **stale** and fails explicitly. It does **not** silently switch to another browser context.
 
-## Commands
-
-### Sessions
+### Use a visible browser for auth when needed
 
 ```bash
-tap browser proxy [--listen 127.0.0.1:9401] [--upstream http://127.0.0.1:9222]
-tap browser proxy --user-chrome
-tap browser session new <name>              # Create a local session
-tap browser session new <name> --no-headless  # Visible browser
-tap browser session new <name> --ws-url <url> # Remote CDP session (WebSocket or HTTP DevTools URL)
-tap browser session list                    # List all sessions
-tap browser session info [name]             # Show session details
-tap browser session close [name]            # Close and remove a session
+tap attach chrome
+tap browser open https://github.com/login --show
+tap site -b github/notifications
+tap fetch -b https://github.com/notifications
+tap browser open https://github.com
 ```
 
-### Tabs
+Auth state lives in the resolved browser context:
+- attached Chrome/Electron context, if one is active
+- otherwise tap's managed default browser profile
+
+### Browser open / tabs / switch
 
 ```bash
-tap browser tab new <name> [--url <url>]    # Create a tracked tab
-tap browser tab list                        # List tracked tabs
-tap browser tab select <name>               # Set the default tab
-tap browser tab close [name]                # Close and remove a tab
+tap browser open https://news.ycombinator.com
+tap browser open https://github.com --new-tab
+tap browser tabs
+tap browser switch tab-2
+tap browser screenshot --output github.png
+tap browser status
 ```
 
-### Actions
+Default behavior:
+- `tap browser open <url>` navigates the current tab
+- `--new-tab` creates another tracked tab
+- `tap browser tabs` shows stable tab IDs like `tab-1`, `tab-2`
+- `tap browser switch <tab-id>` switches by exact ID
+- `tap browser close-tab` closes the current tab
+
+### Attach to Electron
 
 ```bash
-tap browser navigate <url>                  # Navigate the selected tab
-tap browser evaluate <javascript>           # Run JS and print the result
-tap browser screenshot [--output <path>]    # Capture a full-page PNG
-tap browser forms                           # Discover fillable form elements
-tap browser fill <sel> <val> [<sel> <val>]  # Fill form fields
-```
-
-All action commands accept `--session <name>` and `--tab <name>` to override the defaults.
-
-## Resolution Rules
-
-When `--session` or `--tab` is omitted, tap resolves them automatically:
-
-**Session resolution:** When `--session` is omitted, tap uses the `default` session. If no `default` session exists, one is auto-created (headless). Use `--session <name>` to target a different named session.
-
-**Tab resolution order:**
-1. `--tab` flag
-2. The selected tab within the resolved session
-3. The only live tracked tab, when exactly one exists
-
-If the tab resolution is ambiguous, tap fails with guidance instead of guessing.
-
-## Local vs Remote Sessions
-
-| Operation | Local managed browser | Remote CDP session |
-|---|---|---|
-| `session new` | Launches Chrome with a dedicated profile and debug endpoint | Persists the `--ws-url` and validates the connection at creation time |
-| `session close` | Verifies ownership, stops Chrome, removes metadata and profile | Removes tap metadata only; never kills the remote browser |
-| `tab new/close` | Supported | Supported when the remote endpoint allows target management |
-| `navigate/evaluate/screenshot` | Operate on the resolved tracked tab | Operate through the saved endpoint, ignoring later global `--ws-url` overrides |
-
-### Remote sessions
-
-```bash
-# Connect to a remote browser
-# Either a browser WebSocket URL...
-tap browser session new remote-box --ws-url wss://remote:9222/devtools/browser/abc
-# ...or an HTTP DevTools base URL (tap resolves /json/version automatically)
-tap browser session new remote-box --ws-url http://127.0.0.1:9222
-
-# Use it like a local session
-tap browser tab new t1 --url https://example.com
+tap attach electron --port 9333
+tap browser tabs --json
 tap browser evaluate 'document.title'
+tap browser screenshot
 ```
 
-Remote sessions freeze the `--ws-url` from creation time. Later global `--ws-url` flags or `TAP_WS_URL` environment changes are ignored for reconnects.
-
-## Lifecycle Rules
-
-- A **session** is one persistent browser instance (local or remote).
-- A **tab** is a named tracked CDP target within a session.
-- Only tracked tabs are part of tap metadata. Untracked live browser tabs are ignored.
-- If a tracked target disappears, tap marks the tab **stale** and clears invalid selected-tab state.
-- `tab close` promotes the next remaining live tracked tab by creation order, or leaves no selected tab if none remain.
-- `session close` for local sessions verifies browser-process ownership before terminating Chrome and deleting its profile directory.
-
-## Configuration
-
-| Variable | Flag | Description | Default |
-|---|---|---|---|
-| `TAP_BROWSER_STATE_DIR` | `--state-root` | Browser metadata directory | `$XDG_CACHE_HOME/tap/browser` or `~/.cache/tap/browser` |
-
-## Output Formatting
-
-`tap browser evaluate` supports the same output formats as `tap site`:
+Or launch and attach in one step:
 
 ```bash
-tap browser evaluate 'document.title'                    # Pretty (default)
-tap browser evaluate --format json 'document.title'      # JSON
-tap browser evaluate --format raw 'document.title'       # Raw value
+tap attach electron --launch /Applications/MyApp.app/Contents/MacOS/MyApp
 ```
 
-## Examples
+`--port` must be a **browser CDP port**, not a generic Node inspector port.
 
-### Multi-tab workflow
+## Status commands
+
+These commands provide machine-readable output for automation:
 
 ```bash
-tap browser session new research
-
-tap browser tab new docs --url https://go.dev/doc
-tap browser tab new api --url https://pkg.go.dev
-
-# Switch between tabs
-tap browser tab select docs
-tap browser evaluate 'document.title'
-
-tap browser tab select api
-tap browser evaluate 'document.title'
-
-tap browser session close research
+tap status --json
+tap attach status --json
+tap browser status --json
+tap browser tabs --json
 ```
 
-### Screenshot automation
+## Command map
+
+### Task-first commands
 
 ```bash
-tap browser session new screenshots
-tap browser tab new page --url https://example.com
+tap site list
+tap site search <query>
+tap site info <script>
+tap site sync
+tap site run <script> [key=value ...]
+tap site <script> [key=value ...]     # compatibility shorthand
 
-# Navigate and capture
-tap browser navigate https://example.com/page1
-tap browser screenshot --output page1.png
+tap fetch <url>
 
-tap browser navigate https://example.com/page2
-tap browser screenshot --output page2.png
+tap attach chrome
+tap attach electron --port <port>
+tap attach status
+tap attach clear
 
-tap browser session close screenshots
+tap browser open <url>
+tap browser tabs
+tap browser switch <tab-id>
+tap browser close-tab [tab-id]
+tap browser status
 ```
 
-### Non-headless debugging
+### Additional browser tools
 
 ```bash
-# Launch a visible browser for debugging
-tap browser session new debug --no-headless
-tap browser tab new test --url https://example.com
-
-# Interact manually in the visible browser, then:
-tap browser evaluate 'document.querySelector(".result").textContent'
-tap browser session close debug
-```
-
-### Form discovery and filling
-
-```bash
-tap browser session new forms-demo --no-headless
-tap browser tab new page --url https://example.com/login
-
-# Discover fillable elements on the page
+tap browser evaluate ...
 tap browser forms
-# Returns JSON with selector, type, name, placeholder, label, role for each element
-
-# Fill fields using the reported selectors
-tap browser fill "#username" "myuser" "#password" "secret"
-
-# Fill and submit in one command
-tap browser fill "#username" "myuser" "#password" "secret" --submit "button[type=submit]"
-
-tap browser session close forms-demo
+tap browser cookies ...
+tap browser network ...
 ```
 
-`tap browser forms` reports all fillable elements (inputs, textareas, selects, buttons) with their best CSS selector, type, label, placeholder, current value, and role (`text`, `toggle`, `select`, `submit`). Use the selectors directly with `tap browser fill`.
+Use these when you need lower-level page inspection, cookie management, or network tooling.
 
-`tap browser fill` uses React-compatible native value setters with proper `input`/`change` event dispatch, so it works with React, Vue, Angular, and vanilla HTML forms.
+## Browser-backed flags
 
-## Electron Apps
-
-Tap connects to any Electron app using the same CDP protocol as Chrome. No plugins or patches required.
-
-### Quickstart
+Common commands expose browser-related flags directly:
 
 ```bash
-# Launch an Electron app with debugging enabled; creates session "electron"
-tap electron launch "/Applications/MyApp.app/Contents/MacOS/MyApp"
-
-# Discover open windows as tracked tabs
-tap electron discover --session electron
-
-# Use any tap browser command against the session
-tap browser screenshot --session electron
-tap browser text --session electron
-tap browser evaluate "document.title" --session electron
-tap browser click "i.icon-ic_send" --session electron
+--browser, -b          Use browser execution and reuse the resolved context
+--show                 Run visibly
+--wait <duration>      Wait after navigation
+--wait-selector <css>  Wait for an element
+--wait-js <expr>       Wait for a JS expression
+--timeout <duration>   Set execution timeout
+--browser-url <url>    One-shot DevTools override
+--profile-dir <path>   One-shot profile override
 ```
 
-### Commands
+Compatibility aliases remain accepted:
+- `--ws-url` -> `--browser-url`
+- `--delay` -> `--wait`
+- `--no-headless` -> `--show`
 
-```bash
-tap electron ps                              # List running processes with --remote-debugging-port
-tap electron attach --port <port>            # Attach to app already running with debug port
-tap electron attach --port <port> --session <name>
-tap electron launch <binary> [app-args...]   # Launch binary with --remote-debugging-port=0
-tap electron launch <binary> --session <name>
-tap electron discover [--session <name>]     # Adopt live windows as tracked tabs
-```
-
-### Workflow: attach to an existing app
-
-Start the app with `--remote-debugging-port`:
-
-```bash
-/path/to/MyApp --remote-debugging-port=9229
-```
-
-Then connect:
-
-```bash
-tap electron ps                              # Confirm port
-tap electron attach --port 9229 --session myapp
-tap electron discover --session myapp
-tap browser tab list --session myapp
-```
-
-### Notes
-
-- `tap electron launch` uses the same debug URL detection as `LaunchBrowser` — the binary must emit `"DevTools listening on ws://..."` to stderr (all Electron apps do this automatically).
-- `tap electron discover` uses the HTTP `/json/list` endpoint rather than the WebSocket CDP command, which is more compatible with Electron apps that do not support `Target.getTargets` over the browser WebSocket.
-- After `discover`, all `tap browser` commands work — screenshot, evaluate, click, type, network intercept, etc.
-- macOS `.app` bundles: pass the inner binary, not the `.app` directory (`/Applications/MyApp.app/Contents/MacOS/MyApp`).
-
-## Browser Backends
-
-| | Chrome | Lightpanda (`--lp`) |
-|---|---|---|
-| **Platforms** | macOS, Linux, Windows | macOS, Linux |
-| **Install** | Manual | `tap doctor --install` |
-| **Update** | — | `tap doctor --install` |
-| **Sessions & cookies** | Yes | No |
-| **Network interception** | Yes | No |
-| **Site compatibility** | All | Partial — nightly builds, not all sites render correctly |
-| **Best for** | Auth, full automation | Fast headless JS rendering without auth |

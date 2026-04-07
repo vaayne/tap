@@ -226,13 +226,13 @@ func printTabsHuman(list *browser.TabList) error {
 	c := true
 	fmt.Printf("%s %d tabs\n\n", bold(c, "Tabs:"), len(list.Tabs))
 
-	fmt.Printf("%-10s %-20s %-40s %s\n", "ID", "STATUS", "URL", "CURRENT")
-	fmt.Println(string(make([]byte, 80))) // separator line
+	fmt.Printf("%-10s %-20s %-40s %-8s %s\n", "ID", "TITLE", "URL", "CURRENT", "STATUS")
+	fmt.Println("------------------------------------------------------------------------------------------")
 
 	for _, tab := range list.Tabs {
 		current := ""
 		if tab.Name == list.SelectedTab {
-			current = green(c, "*")
+			current = green(c, "yes")
 		}
 
 		status := string(tab.Status)
@@ -243,12 +243,18 @@ func printTabsHuman(list *browser.TabList) error {
 			status = yellow(c, status)
 		}
 
+		title := "-"
 		url := tab.URL
 		if len(url) > 38 {
 			url = url[:35] + "..."
 		}
 
-		fmt.Printf("%-10s %-20s %-40s %s\n", tab.Name, status, url, current)
+		fmt.Printf("%-10s %-20s %-40s %-8s %s\n", tab.Name, title, url, current, status)
+	}
+
+	if list.SelectedTab == "" {
+		fmt.Println()
+		fmt.Println("No current tab selected. Run: tap browser open <url>")
 	}
 
 	return nil
@@ -263,7 +269,8 @@ func printTabsJSON(list *browser.TabList) error {
 	tabs := make([]map[string]any, 0, len(list.Tabs))
 	for _, tab := range list.Tabs {
 		tabs = append(tabs, map[string]any{
-			"name":   tab.Name,
+			"id":     tab.Name,
+			"title":  "",
 			"status": tab.Status,
 			"url":    tab.URL,
 			"target": tab.TargetID,
@@ -424,9 +431,14 @@ func runBrowserStatus(ctx context.Context, cmd *cli.Command) error {
 		return nil
 	}
 
-	if cmd.Bool("json") {
-		return printStatusJSON(defaultContext, session, nil, "")
+	var currentTab *browser.TabRecord
+	if session.SelectedTab != "" {
+		currentTab = session.Tabs[session.SelectedTab]
 	}
 
-	return printStatusHuman(defaultContext, session, nil)
+	if cmd.Bool("json") {
+		return printStatusJSON(defaultContext, session, currentTab, "")
+	}
+
+	return printStatusHuman(defaultContext, session, currentTab)
 }

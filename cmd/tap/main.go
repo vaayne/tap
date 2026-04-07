@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 
 	"github.com/joho/godotenv"
 	"github.com/urfave/cli/v3"
 	"github.com/vaayne/tap"
+	"github.com/vaayne/tap/browser"
 	"github.com/vaayne/tap/transport"
 )
 
@@ -26,33 +28,24 @@ from URLs. Scripts execute in QuickJS (fast, no browser) with automatic fallback
 to a real Chrome browser when auth or JS rendering is needed.
 
 Quick start:
-  tap fetch https://example.com          Extract article as clean Markdown
-  tap fetch --json https://example.com   Full metadata as JSON
   tap site list                          List available site scripts
-  tap site hackernews/top                Run a script
-  tap site -b twitter/search query=go    Run with browser cookies (auth)
-  tap login https://github.com/login     Log in via visible browser, save cookies
-
-Browser automation:
-  tap browser session new default        Start a persistent browser
-  tap browser tab new main --url https://example.com
-  tap browser text                       Extract clean page text (token-efficient)
-  tap browser screenshot                 Capture the current page
-  tap browser click "button.submit"      Interact with elements
-  tap browser network wait --url-pattern "*/api/*" --body
+  tap site hackernews/top                Run a site script
+  tap fetch https://example.com          Extract clean readable content
+  tap attach chrome                      Reuse your existing Chrome
+  tap browser open https://example.com   Open a page in the default browser context
+  tap browser open https://github.com/login --show
+  tap status                             Show the active browser context + current tab
 
 Use 'tap <command> --help' for details on any command.`,
 		Flags: globalFlags(),
 		Commands: []*cli.Command{
-			browserCmd(),
-			electronCmd(),
-			attachCmd(),
-			statusCmd(),
 			siteCmd(),
 			fetchCmd(),
-			loginCmd(),
-			upgradeCmd(),
+			browserCmd(),
+			attachCmd(),
+			statusCmd(),
 			doctorCmd(),
+			upgradeCmd(),
 		},
 	}
 
@@ -83,54 +76,64 @@ func globalFlags() []cli.Flag {
 		&cli.StringFlag{
 			Name:    "ws-url",
 			Aliases: []string{"browser-url", "devtools-url"},
-			Usage:   "Remote Chrome DevTools endpoint: WebSocket URL or HTTP base URL (e.g. ws://localhost:9222/devtools/browser/... or http://localhost:9222). Aliases: --browser-url, --devtools-url",
+			Usage:   "Remote Chrome DevTools endpoint override (advanced)",
 			Sources: cli.EnvVars("TAP_WS_URL"),
+			Hidden:  true,
 		},
 		&cli.StringFlag{
 			Name:    "profile-dir",
-			Usage:   "Chrome profile directory for persistent cookies",
+			Usage:   "Chrome profile directory override (advanced)",
 			Sources: cli.EnvVars("TAP_PROFILE_DIR"),
+			Hidden:  true,
 		},
 		&cli.BoolFlag{
 			Name:    "browser",
 			Aliases: []string{"b"},
 			Usage:   "Force browser execution, skip QuickJS",
 			Sources: cli.EnvVars("TAP_BROWSER"),
+			Hidden:  true,
 		},
 		&cli.BoolFlag{
 			Name:    "no-headless",
 			Aliases: []string{"show"},
-			Usage:   "Run browser in visible mode (useful for debugging auth). Alias: --show",
+			Usage:   "Run browser in visible mode (advanced)",
+			Hidden:  true,
 		},
 		&cli.BoolFlag{
 			Name:    "lightpanda",
 			Aliases: []string{"lp"},
-			Usage:   "Use Lightpanda (lightweight headless browser) instead of Chrome (implies --browser)",
+			Usage:   "Use Lightpanda instead of Chrome (advanced)",
 			Sources: cli.EnvVars("TAP_LIGHTPANDA"),
+			Hidden:  true,
 		},
 		&cli.BoolFlag{
-			Name:  "pause",
-			Usage: "Pause after navigation for manual interaction (requires interactive terminal)",
+			Name:   "pause",
+			Usage:  "Pause after navigation for manual interaction (advanced)",
+			Hidden: true,
 		},
 		&cli.DurationFlag{
 			Name:    "delay",
 			Aliases: []string{"wait"},
-			Usage:   "Wait a fixed duration after navigation before continuing (implies --browser). Alias: --wait",
+			Usage:   "Wait after navigation (advanced)",
+			Hidden:  true,
 		},
 		&cli.StringFlag{
-			Name:  "wait-selector",
-			Usage: "Wait until a CSS selector becomes visible before continuing (implies --browser)",
+			Name:   "wait-selector",
+			Usage:  "Wait until a CSS selector becomes visible (advanced)",
+			Hidden: true,
 		},
 		&cli.StringFlag{
-			Name:  "wait-js",
-			Usage: "Wait until a JavaScript expression becomes truthy before continuing (implies --browser)",
+			Name:   "wait-js",
+			Usage:  "Wait until a JavaScript expression becomes truthy (advanced)",
+			Hidden: true,
 		},
 		&cli.DurationFlag{
 			Name:    "timeout",
 			Aliases: []string{"t"},
-			Usage:   "Execution timeout; 0 means no timeout (e.g. 30s, 2m)",
+			Usage:   "Execution timeout (advanced)",
 			Value:   0,
 			Sources: cli.EnvVars("TAP_TIMEOUT"),
+			Hidden:  true,
 		},
 		&cli.BoolFlag{
 			Name:  "verbose",
@@ -182,12 +185,13 @@ func newClient(ctx context.Context, cmd *cli.Command) (*tap.Client, error) {
 		opts = append(opts, tap.WithSitesDir(dir))
 		opts = append(opts, tap.WithLocalOverrideDir(localOverrideDir))
 	}
-	if url := cmd.String("ws-url"); url != "" {
-		opts = append(opts, tap.WithWSURL(url))
+
+	resolvedOpts, err := resolveBrowserClientOptions(ctx, cmd, false)
+	if err != nil {
+		return nil, err
 	}
-	if dir := cmd.String("profile-dir"); dir != "" {
-		opts = append(opts, tap.WithProfileDir(dir))
-	}
+	opts = append(opts, resolvedOpts...)
+
 	pauseFn, err := resolvePauseFunc(cmd)
 	if err != nil {
 		return nil, err
@@ -200,7 +204,7 @@ func newClient(ctx context.Context, cmd *cli.Command) (*tap.Client, error) {
 	if cmd.Bool("browser") || hasPauseMode(cmd) {
 		opts = append(opts, tap.WithForceBrowser(true))
 	}
-	if cmd.Bool("no-headless") || cmd.Bool("pause") {
+	if cmd.Bool("no-headless") || cmd.Bool("show") || cmd.Bool("pause") {
 		opts = append(opts, tap.WithHeadless(false))
 	}
 	if pauseFn != nil {
@@ -213,33 +217,107 @@ func newClient(ctx context.Context, cmd *cli.Command) (*tap.Client, error) {
 	return tap.New(ctx, opts...)
 }
 
-// newClientWithOverrides creates a client with forced overrides (e.g. for login).
-func newClientWithOverrides(ctx context.Context, cmd *cli.Command, forceVisible bool) (*tap.Client, error) {
+func resolveBrowserClientOptions(ctx context.Context, cmd *cli.Command, forceManagedDefault bool) ([]tap.Option, error) {
 	var opts []tap.Option
 
-	dir := cmd.String("sites-dir")
-	if dir == "" {
-		dir = defaultSitesDir()
+	if url := firstString(cmd, "browser-url", "ws-url", "devtools-url"); url != "" {
+		return append(opts, tap.WithWSURL(url)), nil
 	}
-	opts = append(opts, tap.WithSitesDir(dir))
-
-	if url := cmd.String("ws-url"); url != "" {
-		opts = append(opts, tap.WithWSURL(url))
-	}
-	if dir := cmd.String("profile-dir"); dir != "" {
-		opts = append(opts, tap.WithProfileDir(dir))
-	}
-	if cmd.Bool("lightpanda") {
-		opts = append(opts, tap.WithBrowserType(transport.BrowserLightpanda))
-	}
-	if forceVisible {
-		opts = append(opts, tap.WithHeadless(false))
-	}
-	if d := cmd.Duration("timeout"); d > 0 {
-		opts = append(opts, tap.WithTimeout(d))
+	if dir := firstString(cmd, "profile-dir"); dir != "" {
+		return append(opts, tap.WithProfileDir(dir)), nil
 	}
 
-	return tap.New(ctx, opts...)
+	mgr, err := newBrowserManager(cmd)
+	if err != nil {
+		return nil, err
+	}
+	defaultContext, err := mgr.DefaultContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if defaultContext != nil && defaultContext.Stale {
+		return nil, fmt.Errorf("default browser context %q is stale: %s (run 'tap attach clear' or re-attach explicitly)", defaultContext.SessionName, defaultContext.Reason)
+	}
+
+	session, err := mgr.GetSession(ctx, "")
+	if err == nil {
+		switch {
+		case session.Remote != nil && session.Remote.WSURL != "":
+			return append(opts, tap.WithWSURL(session.Remote.WSURL)), nil
+		case session.Local != nil && session.Local.ProfileDir != "":
+			return append(opts, tap.WithProfileDir(session.Local.ProfileDir)), nil
+		}
+	}
+	if defaultContext != nil {
+		return nil, fmt.Errorf("resolve default browser context %q: %w", defaultContext.SessionName, err)
+	}
+	if forceManagedDefault {
+		return append(opts, tap.WithProfileDir(defaultManagedProfileDir(cmd))), nil
+	}
+	return opts, nil
+}
+
+func defaultManagedProfileDir(cmd *cli.Command) string {
+	return filepath.Join(browserStateRoot(cmd), "profiles", browser.DefaultSessionName)
+}
+
+func firstString(cmd *cli.Command, names ...string) string {
+	for _, name := range names {
+		if value := cmd.String(name); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func browserClientFlags(includeLightpanda bool) []cli.Flag {
+	flags := []cli.Flag{
+		&cli.BoolFlag{
+			Name:    "browser",
+			Aliases: []string{"b"},
+			Usage:   "Use the browser path and reuse the resolved browser context",
+		},
+		&cli.BoolFlag{
+			Name:    "show",
+			Aliases: []string{"no-headless"},
+			Usage:   "Run the browser visibly",
+		},
+		&cli.DurationFlag{
+			Name:    "wait",
+			Aliases: []string{"delay"},
+			Usage:   "Wait a fixed duration after navigation before continuing",
+		},
+		&cli.StringFlag{
+			Name:  "wait-selector",
+			Usage: "Wait until a CSS selector becomes visible before continuing",
+		},
+		&cli.StringFlag{
+			Name:  "wait-js",
+			Usage: "Wait until a JavaScript expression becomes truthy before continuing",
+		},
+		&cli.DurationFlag{
+			Name:    "timeout",
+			Aliases: []string{"t"},
+			Usage:   "Execution timeout; 0 means no timeout",
+		},
+		&cli.StringFlag{
+			Name:    "browser-url",
+			Aliases: []string{"ws-url", "devtools-url"},
+			Usage:   "One-shot DevTools endpoint override",
+		},
+		&cli.StringFlag{
+			Name:  "profile-dir",
+			Usage: "One-shot browser profile override",
+		},
+	}
+	if includeLightpanda {
+		flags = append(flags, &cli.BoolFlag{
+			Name:    "lightpanda",
+			Aliases: []string{"lp"},
+			Usage:   "Use Lightpanda instead of Chrome (implies --browser)",
+		})
+	}
+	return flags
 }
 
 // configureLogging sets up log output based on --verbose/--quiet flags.

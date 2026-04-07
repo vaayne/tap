@@ -63,9 +63,10 @@ Examples:
 				Usage: "Path to DevToolsActivePort file",
 			},
 			&cli.StringFlag{
-				Name:  "listen",
-				Usage: "Internal proxy listen address (advanced)",
-				Value: browser.DefaultProxyListenAddr,
+				Name:   "listen",
+				Usage:  "Internal proxy listen address (advanced)",
+				Value:  browser.DefaultProxyListenAddr,
+				Hidden: true,
 			},
 			// Compatibility aliases
 			&cli.StringFlag{
@@ -230,6 +231,7 @@ Examples:
 				Aliases: []string{"session", "s"},
 				Usage:   "Session name for this attachment",
 				Value:   "electron",
+				Hidden:  true,
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
@@ -465,8 +467,8 @@ func runAttachClear(ctx context.Context, cmd *cli.Command) error {
 		c := true
 		fmt.Fprintf(os.Stderr, "%s Detached from external browser\n", green(c, "✓"))
 	} else {
-		fmt.Println("Default session is managed locally, not attached.")
-		fmt.Println("To close: tap browser session close default")
+		fmt.Println("Default context is managed locally, not attached.")
+		fmt.Println("Nothing to detach.")
 	}
 
 	return nil
