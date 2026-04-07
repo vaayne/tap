@@ -38,6 +38,7 @@ Tab resolution: --tab flag → selected tab → the only live tracked tab.`,
 			},
 		},
 		Commands: []*cli.Command{
+			withCategory("Proxy", browserProxyCmd()),
 			withCategory("Session & Tab", browserSessionCmd()),
 			withCategory("Session & Tab", browserTabCmd()),
 			withCategory("Navigation", browserNavigateCmd()),

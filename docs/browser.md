@@ -5,8 +5,15 @@ Tap provides persistent browser automation via `tap browser`. Sessions and tabs 
 ## Quick Start
 
 ```bash
-# Create a session (launches a managed headless Chrome)
-tap browser session new work
+# Start tap's built-in proxy against your existing visible Chrome.
+# Your browser must already expose DevTools.
+tap browser proxy --user-chrome
+
+# Reuse the attached browser for authenticated fetches/scripts.
+TAP_WS_URL=http://127.0.0.1:9401 tap fetch -b https://example.com
+
+# Or create a persistent remote default session through the proxy.
+tap browser session new default --ws-url http://127.0.0.1:9401
 
 # Open a tab and navigate
 tap browser tab new main --url https://example.com
@@ -15,20 +22,43 @@ tap browser navigate https://httpbin.org/html
 # Interact with the page
 tap browser evaluate 'document.querySelector("h1").textContent'
 tap browser screenshot --output page.png
-
-# Clean up
-tap browser tab close main
-tap browser session close work
 ```
+
+## Proxy workflow
+
+Use the proxy when you want tap to control your already-running Chrome profile instead of launching a separate tap-managed browser profile.
+
+```bash
+# Auto-discover Chrome via DevToolsActivePort
+tap browser proxy --user-chrome
+
+# Or attach to an explicit endpoint / port file
+tap browser proxy --upstream http://127.0.0.1:9222
+tap browser proxy --devtools-port-file ~/Library/Application\ Support/Google/Chrome/DevToolsActivePort
+
+# Then point browser-backed commands at the proxy
+TAP_WS_URL=http://127.0.0.1:9401 tap fetch -b https://example.com
+TAP_WS_URL=http://127.0.0.1:9401 tap site -b github/notifications
+
+# For persistent browser automation, create a remote default session once
+tap browser session new default --ws-url http://127.0.0.1:9401
+```
+
+Notes:
+- `tap browser proxy` runs in the foreground; keep it running while using tap.
+- `--user-chrome` requires an existing Chrome/Chromium instance with DevTools enabled.
+- If a local `default` session already exists, close it before creating the remote `default` session.
 
 ## Commands
 
 ### Sessions
 
 ```bash
+tap browser proxy [--listen 127.0.0.1:9401] [--upstream http://127.0.0.1:9222]
+tap browser proxy --user-chrome
 tap browser session new <name>              # Create a local session
 tap browser session new <name> --no-headless  # Visible browser
-tap browser session new <name> --ws-url <url> # Remote CDP session
+tap browser session new <name> --ws-url <url> # Remote CDP session (WebSocket or HTTP DevTools URL)
 tap browser session list                    # List all sessions
 tap browser session info [name]             # Show session details
 tap browser session close [name]            # Close and remove a session
@@ -81,7 +111,10 @@ If the tab resolution is ambiguous, tap fails with guidance instead of guessing.
 
 ```bash
 # Connect to a remote browser
+# Either a browser WebSocket URL...
 tap browser session new remote-box --ws-url wss://remote:9222/devtools/browser/abc
+# ...or an HTTP DevTools base URL (tap resolves /json/version automatically)
+tap browser session new remote-box --ws-url http://127.0.0.1:9222
 
 # Use it like a local session
 tap browser tab new t1 --url https://example.com

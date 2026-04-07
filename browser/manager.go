@@ -72,15 +72,19 @@ func (m *Manager) CreateSession(ctx context.Context, name string, mode Mode, opt
 		}
 
 	case ModeRemote:
-		if err := checkDebugEndpoint(ctx, opts.WSURL); err != nil {
-			return fmt.Errorf("create session: %w", err)
-		}
-
-		session, err := NewRemoteSession(name, opts.WSURL, now)
+		resolvedURL, err := ResolveDebugURL(ctx, opts.WSURL)
 		if err != nil {
 			return fmt.Errorf("create session: %w", err)
 		}
-		session.Process = &ProcessRecord{DebugURL: opts.WSURL}
+		if err := checkDebugEndpoint(ctx, resolvedURL); err != nil {
+			return fmt.Errorf("create session: %w", err)
+		}
+
+		session, err := NewRemoteSession(name, resolvedURL, now)
+		if err != nil {
+			return fmt.Errorf("create session: %w", err)
+		}
+		session.Process = &ProcessRecord{DebugURL: resolvedURL}
 
 		if err := m.store.Update(func(state *State) error {
 			return state.CreateSession(session)

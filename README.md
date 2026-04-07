@@ -68,14 +68,23 @@ Falls back to a real browser for JS-rendered pages automatically.
 Manage long-lived Chrome sessions, automate interactions, and intercept network requests.
 
 ```bash
-tap browser session new work
+# Attach tap's built-in proxy to your visible Chrome
+# (Chrome must already have remote debugging enabled)
+tap browser proxy --user-chrome
+
+# Reuse that browser for authenticated fetches and scripts
+TAP_WS_URL=http://127.0.0.1:9401 tap fetch -b https://example.com
+TAP_WS_URL=http://127.0.0.1:9401 tap site -b github/notifications
+
+# Or create a persistent remote default session through the proxy
+# so all `tap browser ...` commands control the same browser
+tap browser session new default --ws-url http://127.0.0.1:9401
 tap browser tab new main --url https://example.com
 tap browser navigate https://httpbin.org/html
 tap browser click '#submit'
 tap browser text
 tap browser screenshot
 tap browser network wait --url '*/api/data'
-tap browser session close work
 ```
 
 Save a PDF, handle dialogs, fill forms, press keys, and more. See [docs/browser.md](docs/browser.md) and [docs/network.md](docs/network.md) for the full reference.
@@ -159,7 +168,7 @@ Essential flags and environment variables:
 |---|---|---|
 | `--browser`, `-b` | `TAP_BROWSER` | Force browser execution |
 | `--sites-dir` | `TAP_SITES_DIR` | Script directory (default `~/.config/tap/sites`) |
-| `--ws-url` | `TAP_WS_URL` | Remote CDP WebSocket URL |
+| `--ws-url` | `TAP_WS_URL` | Remote CDP endpoint (browser WebSocket URL or HTTP DevTools base URL) |
 | `--local-only` | | Skip remote cache, use local scripts only |
 
 Browser flags (imply `--browser`):
