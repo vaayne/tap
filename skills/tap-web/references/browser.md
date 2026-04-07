@@ -18,10 +18,21 @@ tap browser session close [name]
 ```bash
 tap status [--json]            # Resolved default context + current tab
 tap attach status [--json]     # Attachment/default-context state
+tap attach clear               # Clear attached default-context metadata
 tap browser status [--json]    # Current browser context + tab state
 ```
 
 ## Tabs
+
+Simple tab workflow:
+
+```bash
+tap browser tabs [--json]
+tap browser switch <tab-id>
+tap browser close-tab [tab-id]
+```
+
+Advanced tracked-tab workflow:
 
 ```bash
 tap browser tab new <name> [--url <url>]
@@ -37,6 +48,9 @@ All accept `--session` and `--tab` to override defaults.
 ### Page actions
 
 ```bash
+tap browser open <url>                         # Open/navigate in resolved current context
+tap browser open <url> --new-tab               # Force a new tab
+tap browser open <url> --show                  # Visible managed browser
 tap browser navigate <url>
 tap browser back
 tap browser forward
@@ -113,6 +127,8 @@ tap browser fill <sel> <val> --submit <sel>
 
 Connect tap to any Electron (or CEF-based) desktop app via CDP.
 
+### Session-oriented Electron commands
+
 ```bash
 tap electron ps                              # List running processes with --remote-debugging-port
 tap electron launch <binary> [app-args...]   # Launch with --remote-debugging-port=0
@@ -121,6 +137,15 @@ tap electron attach --port <port>            # Attach to running app
 tap electron attach --port <port> --session <name>
 tap electron discover [--session <name>]     # Adopt live windows as tracked tabs
 ```
+
+### Default-context attachment commands
+
+```bash
+tap attach electron --port <port>
+tap attach electron --launch <binary>
+```
+
+Use `tap electron ...` when you want an explicit named session and `tap attach electron ...` when you want the Electron app to become the persisted default context for later plain `tap browser ...` commands.
 
 After `discover`, all `tap browser` commands work against the session. macOS `.app` bundles: pass the inner binary (`/Applications/MyApp.app/Contents/MacOS/MyApp`).
 
@@ -153,7 +178,8 @@ tap browser tab new main --url <start-url>  # Auto-creates default session, open
 ### Recover a stale session
 
 If the persisted default context is stale:
-- for an attached browser: re-run `tap attach chrome` or `tap attach electron ...`
+- for an attached Chrome/browser: re-run `tap attach chrome`
+- for an attached Electron app: re-run `tap attach electron ...`
 - for a managed local browser: close and recreate the same session
 
 `tap status --json` / `tap attach status --json` report the stale marker and reason.

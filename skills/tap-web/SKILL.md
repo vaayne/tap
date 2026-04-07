@@ -93,21 +93,35 @@ Only create named sessions for isolation (parallel subagents, different accounts
 See [references/browser.md](references/browser.md) for full commands, session strategy, status output, and recovery.
 
 ```bash
+# Top-level status / default-context commands
 tap status [--json]                     # Show resolved default context + current tab
 tap attach status [--json]              # Show attachment/default-context state
+tap attach clear                        # Clear attached default context metadata
+
+# Simple browser workflow (preferred)
+tap browser open <url>                  # Resolve current context, create/navigate tab
+tap browser tabs [--json]               # List tabs in current context
+tap browser switch <tab-id>             # Change current tab
+tap browser close-tab [tab-id]          # Close current/specific tab
 tap browser status [--json]             # Show current browser context + tab state
+
+# Advanced session / tab management
 tap browser session list [--json]
 tap browser session new <name>
 tap browser session info [name] [--json]
 tap browser session close [name]
 tap browser tab new <name> --url <url>
+tap browser tab list
+tap browser tab select <name>
+tap browser tab close [name]
+
 # Page
-tap browser open <url>                  # Resolve current context, create/navigate tab
-tap browser navigate <url>              # Go to URL
+tap browser navigate <url>              # Go to URL in tracked tab
 tap browser back | forward | reload     # History navigation
 tap browser text [selector]             # Clean text via defuddle (token-efficient)
 tap browser evaluate <js>               # Run JavaScript
 tap browser screenshot | pdf            # Capture output
+
 # Interaction (real CDP events, human-like)
 tap browser click | hover <sel>         # Mouse actions
 tap browser type <sel> <text>           # Per-keystroke typing
@@ -117,9 +131,11 @@ tap browser fill <sel> <val> [--submit] # Set form values
 tap browser wait <sel> [--timeout 30s]  # Wait for element visible
 tap browser keypress Enter              # Keyboard (Enter, Tab, Escape, Ctrl+a...)
 tap browser dialog [--accept=false]     # Handle alert/confirm/prompt
+
 # State
 tap browser forms                       # Discover form fields
 tap browser cookies get | set | clear   # Cookie management (includes httpOnly)
+
 # Network — see references/network.md
 tap browser network wait --url-pattern "*/api/*" --body
 tap browser network log --resource-type XHR,Fetch
@@ -128,10 +144,16 @@ tap browser network intercept --block --url-pattern "*.ads.*"
 
 ## Electron apps
 
-Connect tap to any Electron (or CEF-based) desktop app via CDP — no plugins needed.
+tap currently exposes **two Electron entrypoints**:
+
+1. `tap electron ...` — session-oriented Electron workflow
+2. `tap attach electron ...` — make the Electron app the persisted default context immediately
 
 ```bash
-# Launch app with debugging + auto-create session
+# Session-oriented Electron workflow
+tap electron ps
+
+# Launch app with debugging + create named session
 tap electron launch "/Applications/MyApp.app/Contents/MacOS/MyApp" [--session <name>]
 
 # Attach to already-running app (started with --remote-debugging-port=PORT)
@@ -140,9 +162,12 @@ tap electron attach --port <port> [--session <name>]
 # Adopt open windows as tracked tabs (run after attach or launch)
 tap electron discover [--session <name>]
 
-# List running processes with debug ports
-tap electron ps
+# Alternative: persist Electron as the default browser context immediately
+tap attach electron --port <port>
+tap attach electron --launch "/Applications/MyApp.app/Contents/MacOS/MyApp"
 ```
+
+Use `tap electron ...` when you want an explicit named session. Use `tap attach electron ...` when you want later plain `tap browser ...` commands to reuse the Electron app as the default context.
 
 After `discover`, use `tap browser` commands with `--session <name>` normally — screenshot, evaluate, click, type, network intercept, etc.
 
