@@ -46,6 +46,8 @@ Use 'tap <command> --help' for details on any command.`,
 		Commands: []*cli.Command{
 			browserCmd(),
 			electronCmd(),
+			attachCmd(),
+			statusCmd(),
 			siteCmd(),
 			fetchCmd(),
 			loginCmd(),
@@ -80,7 +82,8 @@ func globalFlags() []cli.Flag {
 		},
 		&cli.StringFlag{
 			Name:    "ws-url",
-			Usage:   "Remote Chrome DevTools endpoint: WebSocket URL or HTTP base URL (e.g. ws://localhost:9222/devtools/browser/... or http://localhost:9222)",
+			Aliases: []string{"browser-url", "devtools-url"},
+			Usage:   "Remote Chrome DevTools endpoint: WebSocket URL or HTTP base URL (e.g. ws://localhost:9222/devtools/browser/... or http://localhost:9222). Aliases: --browser-url, --devtools-url",
 			Sources: cli.EnvVars("TAP_WS_URL"),
 		},
 		&cli.StringFlag{
@@ -95,8 +98,9 @@ func globalFlags() []cli.Flag {
 			Sources: cli.EnvVars("TAP_BROWSER"),
 		},
 		&cli.BoolFlag{
-			Name:  "no-headless",
-			Usage: "Run browser in visible mode (useful for debugging auth)",
+			Name:    "no-headless",
+			Aliases: []string{"show"},
+			Usage:   "Run browser in visible mode (useful for debugging auth). Alias: --show",
 		},
 		&cli.BoolFlag{
 			Name:    "lightpanda",
@@ -109,8 +113,9 @@ func globalFlags() []cli.Flag {
 			Usage: "Pause after navigation for manual interaction (requires interactive terminal)",
 		},
 		&cli.DurationFlag{
-			Name:  "delay",
-			Usage: "Wait a fixed duration after navigation before continuing (implies --browser)",
+			Name:    "delay",
+			Aliases: []string{"wait"},
+			Usage:   "Wait a fixed duration after navigation before continuing (implies --browser). Alias: --wait",
 		},
 		&cli.StringFlag{
 			Name:  "wait-selector",

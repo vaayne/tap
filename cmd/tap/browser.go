@@ -10,26 +10,34 @@ import (
 func browserCmd() *cli.Command {
 	return &cli.Command{
 		Name:  "browser",
-		Usage: "Manage persistent browser sessions and tracked tabs",
-		Description: `Persistent browser automation with named sessions and tracked tabs.
+		Usage: "Browser automation and page interaction",
+		Description: `Open pages, interact with elements, and extract content from websites.
 
-Quick start:
-  tap browser session new default          Start a headless browser
-  tap browser tab new main --url <url>     Open a tracked tab
-  tap browser text                         Extract clean content (Markdown)
-  tap browser click "button.submit"        Interact with elements
-  tap browser screenshot                   Capture the page
+Quick start (simple workflow):
+  tap browser open <url>                 Open or navigate to a URL
+  tap browser tabs                       List open tabs
+  tap browser switch <tab-id>            Switch to a different tab
+  tap browser click "#submit"            Click an element
+  tap browser text                       Extract readable page content
+  tap browser screenshot                 Capture the current page
 
-Commands are grouped by function:
-  Session & Tab:  session, tab
-  Navigation:     navigate, back, forward, reload
-  Page Content:   text, evaluate, screenshot, pdf
-  Interaction:    click, type, fill, hover, scroll, select, wait, keypress, dialog
-  State:          forms, cookies
-  Network:        network (wait, log, body, intercept, clear)
+For authenticated access, first run:
+  tap attach chrome                      Attach your existing Chrome
+  tap login <url>                        Log in and save cookies
 
-Session resolution: --session flag → "default" session (auto-created if needed).
-Tab resolution: --tab flag → selected tab → the only live tracked tab.`,
+Advanced commands (for power users):
+  tap browser session ...                Manage named sessions
+  tap browser tab ...                    Manage tracked tabs explicitly
+  tap browser proxy ...                  Run CDP proxy
+  tap browser network ...                Network capture and interception
+
+Default behavior:
+- Uses the default browser context (managed or attached)
+- Operates on the current tab (created automatically if needed)
+- Use --new-tab to open in a new tab instead of navigating current
+
+Session resolution: defaults to active context, or 'default' if none.
+Tab resolution: defaults to current tab, or creates one if needed.`,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:    "state-root",
@@ -38,6 +46,13 @@ Tab resolution: --tab flag → selected tab → the only live tracked tab.`,
 			},
 		},
 		Commands: []*cli.Command{
+			// Simple workflow commands (preferred for most users)
+			withCategory("Common", browserOpenCmd()),
+			withCategory("Common", browserTabsCmd()),
+			withCategory("Common", browserSwitchCmd()),
+			withCategory("Common", browserCloseTabCmd()),
+			withCategory("Common", browserStatusCmd()),
+			// Advanced commands
 			withCategory("Proxy", browserProxyCmd()),
 			withCategory("Session & Tab", browserSessionCmd()),
 			withCategory("Session & Tab", browserTabCmd()),
