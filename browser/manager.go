@@ -245,6 +245,33 @@ func (m *Manager) CreateTab(ctx context.Context, sessionName string, tabName str
 	return nil
 }
 
+// AdoptTab registers an existing CDP target as a tracked tab without creating
+// a new browser target. Use this to import pre-existing Electron windows or
+// other targets that were not launched by tap. targetID must be a live target
+// reachable through the session's debug URL.
+func (m *Manager) AdoptTab(ctx context.Context, sessionName string, tabName string, targetID string, url string) error {
+	resolved, err := m.resolveSessionName(ctx, sessionName, true)
+	if err != nil {
+		return fmt.Errorf("adopt tab: %w", err)
+	}
+	sessionName = resolved
+
+	now := time.Now()
+	return m.store.UpdateSession(sessionName, func(state *State, session *SessionRecord) error {
+		if _, exists := session.Tabs[tabName]; exists {
+			return fmt.Errorf("adopt tab: tab %q already exists in session %q", tabName, sessionName)
+		}
+		tab, err := NewTab(tabName, targetID, url, now)
+		if err != nil {
+			return fmt.Errorf("adopt tab: %w", err)
+		}
+		if err := state.UpsertTab(sessionName, tab); err != nil {
+			return fmt.Errorf("adopt tab: %w", err)
+		}
+		return nil
+	})
+}
+
 // CloseTab closes a browser tab and removes it from session metadata.
 func (m *Manager) CloseTab(ctx context.Context, sessionName string, tabName string) error {
 	resolved, err := m.resolveSessionName(ctx, sessionName, true)

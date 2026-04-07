@@ -45,6 +45,7 @@ Use 'tap <command> --help' for details on any command.`,
 		Flags: globalFlags(),
 		Commands: []*cli.Command{
 			browserCmd(),
+			electronCmd(),
 			siteCmd(),
 			fetchCmd(),
 			loginCmd(),

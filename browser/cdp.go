@@ -2,7 +2,10 @@ package browser
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"time"
 
 	"github.com/chromedp/cdproto/cdp"
@@ -51,6 +54,53 @@ func ListTargets(ctx context.Context, debugURL string) ([]TargetInfo, error) {
 	}))
 	if err != nil {
 		return nil, fmt.Errorf("list targets: %w", err)
+	}
+	return out, nil
+}
+
+// ListTargetsHTTP enumerates page targets via the HTTP /json/list endpoint.
+// This is more compatible with Electron apps and CEF-based browsers that may
+// not support the Target.getTargets CDP command over the browser WebSocket.
+func ListTargetsHTTP(ctx context.Context, debugURL string) ([]TargetInfo, error) {
+	httpBase, err := debugURLToHTTP(debugURL)
+	if err != nil {
+		return nil, fmt.Errorf("list targets: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, httpBase+"/json/list", nil)
+	if err != nil {
+		return nil, fmt.Errorf("list targets: build request: %w", err)
+	}
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("list targets: %w", err)
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	var raw []struct {
+		ID    string `json:"id"`
+		Title string `json:"title"`
+		URL   string `json:"url"`
+		Type  string `json:"type"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		return nil, fmt.Errorf("list targets: parse response: %w", err)
+	}
+
+	out := make([]TargetInfo, 0, len(raw))
+	for _, t := range raw {
+		if t.Type != TargetTypePage {
+			continue
+		}
+		out = append(out, TargetInfo{
+			TargetID: t.ID,
+			Title:    t.Title,
+			URL:      t.URL,
+			Type:     t.Type,
+		})
 	}
 	return out, nil
 }
