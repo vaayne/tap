@@ -41,10 +41,11 @@ type Proxy struct {
 
 	nextID atomic.Int64
 
-	mu            sync.RWMutex
-	upstreamConn  *websocket.Conn
-	upstreamReady bool
-	reconnecting  bool
+	mu              sync.RWMutex
+	upstreamWriteMu sync.Mutex
+	upstreamConn    *websocket.Conn
+	upstreamReady   bool
+	reconnecting    bool
 
 	pending       map[int64]*pendingRequest
 	sessionOwners map[string]*proxyClient
@@ -317,10 +318,7 @@ func (p *Proxy) handleBrowserWS(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err := p.handleClientMessage(client, msg); err != nil {
-			_ = client.writeJSON(map[string]any{
-				"id":    msg["id"],
-				"error": map[string]any{"code": -1, "message": err.Error()},
-			})
+			_ = client.writeJSON(proxyErrorResponse(msg, err))
 		}
 	}
 }
@@ -347,19 +345,29 @@ func (p *Proxy) handleClientMessage(client *proxyClient, msg map[string]any) err
 
 	if id, ok := messageID(msg); ok {
 		proxyID := p.nextID.Add(1)
-		p.mu.Lock()
-		state := p.clientState[client]
-		if state != nil {
-			state.proxyIDs[proxyID] = struct{}{}
-		}
-		p.pending[proxyID] = &pendingRequest{
+		req := &pendingRequest{
 			client:     client,
 			originalID: id,
 			method:     method,
 			createdAt:  time.Now(),
 		}
+
+		p.mu.Lock()
+		state := p.clientState[client]
+		if state != nil {
+			state.proxyIDs[proxyID] = struct{}{}
+		}
+		p.pending[proxyID] = req
 		p.mu.Unlock()
 		msg["id"] = proxyID
+
+		if err := p.sendUpstream(msg); err != nil {
+			p.mu.Lock()
+			p.removePendingRequestLocked(proxyID, req)
+			p.mu.Unlock()
+			return &proxyClientMessageError{originalID: id, sessionID: messageSessionID(msg), err: err}
+		}
+		return nil
 	}
 
 	return p.sendUpstream(msg)
@@ -373,6 +381,9 @@ func (p *Proxy) sendUpstream(msg map[string]any) error {
 	if !ready || conn == nil {
 		return fmt.Errorf("upstream browser not connected")
 	}
+
+	p.upstreamWriteMu.Lock()
+	defer p.upstreamWriteMu.Unlock()
 	return conn.WriteJSON(msg)
 }
 
@@ -573,6 +584,41 @@ func (c *proxyClient) writeJSON(msg map[string]any) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.conn.WriteJSON(msg)
+}
+
+type proxyClientMessageError struct {
+	originalID int64
+	sessionID  string
+	err        error
+}
+
+func (e *proxyClientMessageError) Error() string {
+	return e.err.Error()
+}
+
+func (e *proxyClientMessageError) Unwrap() error {
+	return e.err
+}
+
+func proxyErrorResponse(msg map[string]any, err error) map[string]any {
+	resp := map[string]any{
+		"id":    msg["id"],
+		"error": map[string]any{"code": -1, "message": err.Error()},
+	}
+
+	if typedErr, ok := err.(*proxyClientMessageError); ok {
+		resp["id"] = typedErr.originalID
+		if typedErr.sessionID != "" {
+			resp["sessionId"] = typedErr.sessionID
+		}
+	}
+
+	return resp
+}
+
+func messageSessionID(msg map[string]any) string {
+	sessionID, _ := msg["sessionId"].(string)
+	return sessionID
 }
 
 func messageID(msg map[string]any) (int64, bool) {
