@@ -101,6 +101,23 @@ tap browser fill <sel> <val> --submit <sel>
 
 `tap browser fill` uses React-compatible native setters — works with React, Vue, Angular, vanilla HTML.
 
+## Electron Apps
+
+Connect tap to any Electron (or CEF-based) desktop app via CDP.
+
+```bash
+tap electron ps                              # List running processes with --remote-debugging-port
+tap electron launch <binary> [app-args...]   # Launch with --remote-debugging-port=0
+tap electron launch <binary> --session <name>
+tap electron attach --port <port>            # Attach to running app
+tap electron attach --port <port> --session <name>
+tap electron discover [--session <name>]     # Adopt live windows as tracked tabs
+```
+
+After `discover`, all `tap browser` commands work against the session. macOS `.app` bundles: pass the inner binary (`/Applications/MyApp.app/Contents/MacOS/MyApp`).
+
+**Note:** Cherry Studio and similar apps use `<i role="button">` for the send icon rather than `<button>` — use `tap browser evaluate` to inspect the DOM when `click` targets need investigation.
+
 ## Resolution
 
 When `--session`/`--tab` omitted, tap resolves automatically:

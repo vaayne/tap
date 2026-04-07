@@ -2,17 +2,20 @@
 name: tap-web
 description: >
   Access websites, search the web, and extract clean content using the `tap` CLI.
-  Also manage persistent browser sessions for long-lived automation workflows.
+  Also manage persistent browser sessions for long-lived automation workflows,
+  and debug or automate Electron apps via CDP.
   Use when the user asks to search the web, read a webpage, fetch article content,
   get trending topics, look up social media posts, check stock prices, search videos,
   retrieve structured data from any supported site, manage browser sessions/tabs,
-  capture or intercept network requests, block or mock API calls.
+  capture or intercept network requests, block or mock API calls,
+  debug an Electron app, automate an Electron app, connect to a desktop app via CDP.
   Triggers on: "search for", "what's trending on", "fetch this page", "read this URL",
   "get content from", "look up on Twitter/Weibo/Reddit/YouTube/etc.", "check stock",
   "translate", "browser session", "open a tab", "navigate to", "take a screenshot",
   "evaluate javascript", "persistent browser", "fill form", "form fields",
   "discover inputs", "intercept requests", "capture network", "block requests",
   "mock API", "network log", "wait for request", "save as PDF", "export PDF",
+  "debug electron", "automate electron", "connect to electron app",
   or any web access task.
 ---
 
@@ -108,6 +111,28 @@ tap browser network wait --url-pattern "*/api/*" --body
 tap browser network log --resource-type XHR,Fetch
 tap browser network intercept --block --url-pattern "*.ads.*"
 ```
+
+## Electron apps
+
+Connect tap to any Electron (or CEF-based) desktop app via CDP — no plugins needed.
+
+```bash
+# Launch app with debugging + auto-create session
+tap electron launch "/Applications/MyApp.app/Contents/MacOS/MyApp" [--session <name>]
+
+# Attach to already-running app (started with --remote-debugging-port=PORT)
+tap electron attach --port <port> [--session <name>]
+
+# Adopt open windows as tracked tabs (run after attach or launch)
+tap electron discover [--session <name>]
+
+# List running processes with debug ports
+tap electron ps
+```
+
+After `discover`, use `tap browser` commands with `--session <name>` normally — screenshot, evaluate, click, type, network intercept, etc.
+
+See [references/browser.md](references/browser.md) for full browser command reference.
 
 ## Reading pages efficiently
 

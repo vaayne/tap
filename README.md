@@ -96,6 +96,29 @@ tap fetch https://example.com --wait-selector '.content'
 tap fetch https://example.com --wait-js 'document.body.innerText.includes("ready")'
 ```
 
+## Electron — debug and automate Electron apps
+
+Tap connects to any Electron app via Chrome DevTools Protocol. Electron exposes the same CDP as Chrome — no plugins or patches required, just launch with `--remote-debugging-port`.
+
+```bash
+# Launch an Electron app with debugging and create a session
+tap electron launch "/Applications/MyApp.app/Contents/MacOS/MyApp"
+
+# Attach to an already-running app (started with --remote-debugging-port=PORT)
+tap electron attach --port 9229
+
+# Discover open windows as tracked tabs
+tap electron discover --session electron
+
+# Then use all tap browser commands as normal
+tap browser screenshot --session electron
+tap browser evaluate "document.title" --session electron
+tap browser click "button.submit" --session electron
+
+# Find running Electron/CEF processes with debug ports
+tap electron ps
+```
+
 ## Agent skill
 
 Tap ships with a built-in [agent skill](https://agentskills.io) that gives AI coding agents web access, site scripts, and browser automation. Works with Claude Code, Cursor, Copilot, and [45+ other agents](https://github.com/vercel-labs/skills).

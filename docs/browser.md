@@ -186,6 +186,61 @@ tap browser session close forms-demo
 
 `tap browser fill` uses React-compatible native value setters with proper `input`/`change` event dispatch, so it works with React, Vue, Angular, and vanilla HTML forms.
 
+## Electron Apps
+
+Tap connects to any Electron app using the same CDP protocol as Chrome. No plugins or patches required.
+
+### Quickstart
+
+```bash
+# Launch an Electron app with debugging enabled; creates session "electron"
+tap electron launch "/Applications/MyApp.app/Contents/MacOS/MyApp"
+
+# Discover open windows as tracked tabs
+tap electron discover --session electron
+
+# Use any tap browser command against the session
+tap browser screenshot --session electron
+tap browser text --session electron
+tap browser evaluate "document.title" --session electron
+tap browser click "i.icon-ic_send" --session electron
+```
+
+### Commands
+
+```bash
+tap electron ps                              # List running processes with --remote-debugging-port
+tap electron attach --port <port>            # Attach to app already running with debug port
+tap electron attach --port <port> --session <name>
+tap electron launch <binary> [app-args...]   # Launch binary with --remote-debugging-port=0
+tap electron launch <binary> --session <name>
+tap electron discover [--session <name>]     # Adopt live windows as tracked tabs
+```
+
+### Workflow: attach to an existing app
+
+Start the app with `--remote-debugging-port`:
+
+```bash
+/path/to/MyApp --remote-debugging-port=9229
+```
+
+Then connect:
+
+```bash
+tap electron ps                              # Confirm port
+tap electron attach --port 9229 --session myapp
+tap electron discover --session myapp
+tap browser tab list --session myapp
+```
+
+### Notes
+
+- `tap electron launch` uses the same debug URL detection as `LaunchBrowser` — the binary must emit `"DevTools listening on ws://..."` to stderr (all Electron apps do this automatically).
+- `tap electron discover` uses the HTTP `/json/list` endpoint rather than the WebSocket CDP command, which is more compatible with Electron apps that do not support `Target.getTargets` over the browser WebSocket.
+- After `discover`, all `tap browser` commands work — screenshot, evaluate, click, type, network intercept, etc.
+- macOS `.app` bundles: pass the inner binary, not the `.app` directory (`/Applications/MyApp.app/Contents/MacOS/MyApp`).
+
 ## Browser Backends
 
 | | Chrome | Lightpanda (`--lp`) |
