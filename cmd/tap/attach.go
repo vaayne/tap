@@ -16,22 +16,17 @@ func attachCmd() *cli.Command {
 		Usage: "Connect tap to existing Chrome or Electron apps",
 		Description: `Attach tap to an already-running browser or app for reuse.
 
-This command establishes a persistent connection to:
-- Your existing Chrome/Chromium (with remote debugging enabled)
-- An Electron app with CDP debugging enabled
+This command establishes a persistent connection to your existing Chrome/Chromium.
 
 Once attached, all tap browser commands will use this context.
 
 Examples:
   tap attach chrome                    Auto-discover your Chrome
   tap attach chrome --browser-url http://localhost:9222
-  tap attach electron --port 9229      Attach to running Electron app
-  tap attach electron --launch /path/to/app
   tap attach status                    Show attachment info
   tap attach clear                     Detach from external target`,
 		Commands: []*cli.Command{
 			attachChromeCmd(),
-			attachElectronCmd(),
 			attachStatusCmd(),
 			attachClearCmd(),
 		},
@@ -136,41 +131,49 @@ Original error: %w`, err)
 		return fmt.Errorf("resolve debug URL: %w", err)
 	}
 
-	// Create manager
 	mgr, err := newBrowserManager(cmd)
 	if err != nil {
 		return err
 	}
+	store, err := newBrowserStore(cmd)
+	if err != nil {
+		return err
+	}
 
-	// Create or update default session as remote attached session
+	proxyRecord, health, reused, err := ensureAttachedChromeProxy(ctx, cmd, wsURL, cmd.String("listen"))
+	if err != nil {
+		return fmt.Errorf("ensure proxy daemon: %w", err)
+	}
+
 	sessionName := browser.DefaultSessionName
-	opts := browser.SessionOptions{WSURL: wsURL}
-
-	// Check if session exists
-	_, err = mgr.GetSession(ctx, sessionName)
-	if err == nil {
-		// Session exists - close it first
+	if _, err := mgr.GetSession(ctx, sessionName); err == nil {
 		if err := mgr.CloseSession(ctx, sessionName); err != nil {
 			return fmt.Errorf("close existing session: %w", err)
 		}
 	}
-
-	// Create new remote session
-	if err := mgr.CreateSession(ctx, sessionName, browser.ModeRemote, opts); err != nil {
+	if err := mgr.CreateSession(ctx, sessionName, browser.ModeRemote, browser.SessionOptions{WSURL: proxyRecord.Endpoint}); err != nil {
 		return fmt.Errorf("create attached session: %w", err)
 	}
 	if err := mgr.SetDefaultContext(ctx, sessionName, browser.DefaultContextAttached); err != nil {
 		return fmt.Errorf("set default context: %w", err)
+	}
+	if err := persistProxyDaemonRecord(store, proxyRecord, health); err != nil {
+		return fmt.Errorf("persist proxy daemon state: %w", err)
 	}
 
 	c := true
 	fmt.Fprintf(os.Stderr, "%s Attached to Chrome\n", green(c, "✓"))
 	fmt.Fprintf(os.Stderr, "  Source: %s\n", source)
 	fmt.Fprintf(os.Stderr, "  Session: %s\n", sessionName)
+	fmt.Fprintf(os.Stderr, "  Proxy: %s\n", proxyRecord.Endpoint)
+	if reused {
+		fmt.Fprintf(os.Stderr, "  Daemon: reused\n")
+	} else {
+		fmt.Fprintf(os.Stderr, "  Daemon: started (pid %d)\n", proxyRecord.PID)
+	}
 
-	// Auto-discover/adopt tabs from the attached browser
-	if err := autoAdoptTabs(ctx, mgr, sessionName, wsURL); err != nil {
-		// Non-fatal - just warn
+	// Auto-discover/adopt tabs from the attached browser.
+	if err := autoAdoptTabs(ctx, mgr, sessionName, proxyRecord.Endpoint); err != nil {
 		fmt.Fprintf(os.Stderr, "  Warning: could not auto-adopt tabs: %v\n", err)
 	}
 
@@ -203,108 +206,6 @@ func autoAdoptTabs(ctx context.Context, mgr *browser.Manager, sessionName, debug
 	return nil
 }
 
-func attachElectronCmd() *cli.Command {
-	return &cli.Command{
-		Name:  "electron",
-		Usage: "Attach to a running Electron app or launch one",
-		Description: `Connect tap to an Electron app via Chrome DevTools Protocol.
-
-The Electron app must expose a browser CDP endpoint (not Node inspector).
-
-Examples:
-  # Attach to already-running app
-  tap attach electron --port 9229
-
-  # Launch and attach
-  tap attach electron --launch /Applications/MyApp.app/Contents/MacOS/MyApp`,
-		Flags: []cli.Flag{
-			&cli.IntFlag{
-				Name:  "port",
-				Usage: "CDP debug port the Electron app is listening on",
-			},
-			&cli.StringFlag{
-				Name:  "launch",
-				Usage: "Path to Electron app binary to launch with debugging",
-			},
-			&cli.StringFlag{
-				Name:    "name",
-				Aliases: []string{"session", "s"},
-				Usage:   "Session name for this attachment",
-				Value:   "electron",
-				Hidden:  true,
-			},
-		},
-		Action: func(ctx context.Context, cmd *cli.Command) error {
-			configureLogging(cmd)
-			return runAttachElectron(ctx, cmd)
-		},
-	}
-}
-
-func runAttachElectron(ctx context.Context, cmd *cli.Command) error {
-	port := int(cmd.Int("port"))
-	launchPath := cmd.String("launch")
-	sessionName := cmd.String("name")
-
-	if port == 0 && launchPath == "" {
-		return fmt.Errorf("either --port or --launch required")
-	}
-
-	var wsURL string
-	var err error
-
-	mgr, err := newBrowserManager(cmd)
-	if err != nil {
-		return err
-	}
-
-	if port > 0 {
-		// Attach to existing
-		wsURL, err = browser.ResolveElectronDebugURL(ctx, port)
-		if err != nil {
-			return fmt.Errorf("attach to port %d: %w", port, err)
-		}
-	} else {
-		// Launch and attach
-		// Extract app args after --
-		args := cmd.Args().Slice()
-		proc, err := browser.LaunchElectronApp(ctx, launchPath, args)
-		if err != nil {
-			return fmt.Errorf("launch: %w", err)
-		}
-		wsURL = proc.DebugURL
-		// Port not directly available on ProcessRecord, but DebugURL contains it
-	}
-
-	// Close existing session if present
-	_, err = mgr.GetSession(ctx, sessionName)
-	if err == nil {
-		if err := mgr.CloseSession(ctx, sessionName); err != nil {
-			return fmt.Errorf("close existing session: %w", err)
-		}
-	}
-
-	// Create remote session
-	opts := browser.SessionOptions{WSURL: wsURL}
-	if err := mgr.CreateSession(ctx, sessionName, browser.ModeRemote, opts); err != nil {
-		return fmt.Errorf("create session: %w", err)
-	}
-	if err := mgr.SetDefaultContext(ctx, sessionName, browser.DefaultContextAttached); err != nil {
-		return fmt.Errorf("set default context: %w", err)
-	}
-
-	// Auto-adopt tabs
-	if err := autoAdoptTabs(ctx, mgr, sessionName, wsURL); err != nil {
-		fmt.Fprintf(os.Stderr, "  Warning: could not auto-adopt tabs: %v\n", err)
-	}
-
-	c := true
-	fmt.Fprintf(os.Stderr, "%s Attached to Electron app\n", green(c, "✓"))
-	fmt.Fprintf(os.Stderr, "  Session: %s\n", sessionName)
-
-	return nil
-}
-
 func attachStatusCmd() *cli.Command {
 	return &cli.Command{
 		Name:  "status",
@@ -327,54 +228,78 @@ func runAttachStatus(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return err
 	}
+	store, err := newBrowserStore(cmd)
+	if err != nil {
+		return err
+	}
+	state, err := store.Load()
+	if err != nil {
+		return err
+	}
 
 	defaultContext, _ := mgr.DefaultContext(ctx)
-	session, err := mgr.GetSession(ctx, "")
-	if err != nil {
+	var session *browser.SessionRecord
+	if current, err := mgr.GetSession(ctx, ""); err == nil {
+		session = current
+	}
+
+	var health browser.ProxyDaemonHealth
+	if state.ProxyDaemon != nil {
+		health = browser.CheckProxyDaemon(ctx, state.ProxyDaemon)
+		_ = persistProxyDaemonHealth(store, state.ProxyDaemon, health)
+	}
+
+	if session == nil && state.ProxyDaemon == nil {
 		if cmd.Bool("json") {
-			return printAttachStatusJSON(defaultContext, nil, "no_session")
+			return printAttachStatusJSON(defaultContext, nil, nil, browser.ProxyDaemonHealth{}, "no_session")
 		}
 		fmt.Println("No attachment active.")
 		fmt.Println()
 		fmt.Println("To attach:")
 		fmt.Println("  tap attach chrome")
-		fmt.Println("  tap attach electron --port 9229")
 		return nil
 	}
 
 	if cmd.Bool("json") {
-		return printAttachStatusJSON(defaultContext, session, "")
+		return printAttachStatusJSON(defaultContext, session, state.ProxyDaemon, health, "")
 	}
-
-	return printAttachStatusHuman(defaultContext, session)
+	return printAttachStatusHuman(defaultContext, session, state.ProxyDaemon, health)
 }
 
-func printAttachStatusHuman(defaultContext *browser.DefaultContextRecord, session *browser.SessionRecord) error {
+func printAttachStatusHuman(defaultContext *browser.DefaultContextRecord, session *browser.SessionRecord, proxy *browser.ProxyDaemonRecord, health browser.ProxyDaemonHealth) error {
 	c := true
-
-	contextType := "Managed local browser"
 	if defaultContext != nil {
 		fmt.Printf("%s %s (%s)\n", bold(c, "Default context:"), defaultContext.SessionName, defaultContext.Kind)
 		if defaultContext.Stale {
 			fmt.Printf("%s %s\n", bold(c, "State:"), yellow(c, "stale"))
+			if defaultContext.Reason != "" {
+				fmt.Printf("%s %s\n", bold(c, "Reason:"), defaultContext.Reason)
+			}
 		}
 	}
-	if session.Remote != nil {
-		contextType = "Attached remote browser"
+	if session != nil {
+		fmt.Printf("%s %s\n", bold(c, "Session:"), session.Name)
+		fmt.Printf("%s %s\n", bold(c, "Mode:"), session.Mode)
+		if session.Remote != nil {
+			fmt.Printf("%s %s\n", bold(c, "Remote URL:"), session.Remote.WSURL)
+		}
 	}
-
-	fmt.Printf("%s %s\n", bold(c, "Context type:"), contextType)
-	fmt.Printf("%s %s\n", bold(c, "Session:"), session.Name)
-	fmt.Printf("%s %s\n", bold(c, "Mode:"), session.Mode)
-
-	if session.Process != nil && session.Process.DebugURL != "" {
-		fmt.Printf("%s %s\n", bold(c, "Process:"), session.Process.DebugURL)
+	if proxy != nil {
+		fmt.Println()
+		fmt.Printf("%s %s\n", bold(c, "Proxy daemon:"), proxy.Endpoint)
+		fmt.Printf("%s %d\n", bold(c, "PID:"), proxy.PID)
+		fmt.Printf("%s %s\n", bold(c, "Listen:"), proxy.ListenAddr)
+		fmt.Printf("%s %s\n", bold(c, "Upstream:"), proxy.UpstreamWSURL)
+		statusColor := green(c, health.Status)
+		if !health.Healthy {
+			statusColor = yellow(c, health.Status)
+		}
+		fmt.Printf("%s %s\n", bold(c, "Health:"), statusColor)
+		if health.Reason != "" {
+			fmt.Printf("%s %s\n", bold(c, "Stale reason:"), health.Reason)
+		}
 	}
-	if session.Remote != nil {
-		fmt.Printf("%s %s\n", bold(c, "Remote URL:"), session.Remote.WSURL)
-	}
-
-	if len(session.Tabs) > 0 {
+	if session != nil && len(session.Tabs) > 0 {
 		fmt.Println()
 		fmt.Printf("%s %d\n", bold(c, "Adopted tabs:"), len(session.Tabs))
 		for name, tab := range session.Tabs {
@@ -385,15 +310,11 @@ func printAttachStatusHuman(defaultContext *browser.DefaultContextRecord, sessio
 			fmt.Printf("  %s: %s%s\n", name, tab.URL, marker)
 		}
 	}
-
 	return nil
 }
 
-func printAttachStatusJSON(defaultContext *browser.DefaultContextRecord, session *browser.SessionRecord, errorState string) error {
-	result := map[string]any{
-		"error": errorState,
-	}
-
+func printAttachStatusJSON(defaultContext *browser.DefaultContextRecord, session *browser.SessionRecord, proxy *browser.ProxyDaemonRecord, health browser.ProxyDaemonHealth, errorState string) error {
+	result := map[string]any{"error": errorState}
 	if defaultContext != nil {
 		result["defaultContext"] = map[string]any{
 			"sessionName": defaultContext.SessionName,
@@ -402,11 +323,12 @@ func printAttachStatusJSON(defaultContext *browser.DefaultContextRecord, session
 			"reason":      defaultContext.Reason,
 		}
 	}
-
 	if session != nil {
 		sessionMap := map[string]any{
-			"name": session.Name,
-			"mode": session.Mode,
+			"name":        session.Name,
+			"mode":        session.Mode,
+			"selectedTab": session.SelectedTab,
+			"tabs":        len(session.Tabs),
 		}
 		if session.Remote != nil {
 			sessionMap["remoteURL"] = session.Remote.WSURL
@@ -415,10 +337,19 @@ func printAttachStatusJSON(defaultContext *browser.DefaultContextRecord, session
 			sessionMap["processURL"] = session.Process.DebugURL
 		}
 		result["session"] = sessionMap
-		result["tabs"] = len(session.Tabs)
-		result["selectedTab"] = session.SelectedTab
 	}
-
+	if proxy != nil {
+		result["proxyDaemon"] = map[string]any{
+			"pid":             proxy.PID,
+			"listenAddr":      proxy.ListenAddr,
+			"endpoint":        proxy.Endpoint,
+			"upstreamWSURL":   proxy.UpstreamWSURL,
+			"status":          health.Status,
+			"healthy":         health.Healthy,
+			"reason":          health.Reason,
+			"lastHealthCheck": health.CheckedAt,
+		}
+	}
 	out, _ := json.MarshalIndent(result, "", "  ")
 	fmt.Println(string(out))
 	return nil
@@ -444,32 +375,38 @@ func runAttachClear(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return err
 	}
+	store, err := newBrowserStore(cmd)
+	if err != nil {
+		return err
+	}
+	state, err := store.Load()
+	if err != nil {
+		return err
+	}
 
-	defaultContext, err := mgr.DefaultContext(ctx)
-	if err != nil || defaultContext == nil {
+	defaultContext := state.DefaultContext
+	if defaultContext == nil && state.ProxyDaemon == nil {
 		fmt.Println("No attachment to clear.")
 		return nil
 	}
-
-	session, err := mgr.GetSession(ctx, defaultContext.SessionName)
-	if err != nil {
-		_ = mgr.ClearDefaultContext(ctx)
-		fmt.Println("Cleared stale attachment metadata.")
-		return nil
-	}
-
-	// Only clear if it's a remote session (attached, not managed)
-	if session.Remote != nil {
-		if err := mgr.CloseSession(ctx, defaultContext.SessionName); err != nil {
-			return fmt.Errorf("close session: %w", err)
+	if defaultContext != nil {
+		if session, err := mgr.GetSession(ctx, defaultContext.SessionName); err == nil && session.Remote != nil {
+			if err := mgr.CloseSession(ctx, defaultContext.SessionName); err != nil {
+				return fmt.Errorf("close session: %w", err)
+			}
 		}
-		_ = mgr.ClearDefaultContext(ctx)
-		c := true
-		fmt.Fprintf(os.Stderr, "%s Detached from external browser\n", green(c, "✓"))
-	} else {
-		fmt.Println("Default context is managed locally, not attached.")
-		fmt.Println("Nothing to detach.")
 	}
-
+	if state.ProxyDaemon != nil {
+		_ = stopOwnedProxyDaemon(ctx, state.ProxyDaemon)
+	}
+	if err := store.Update(func(state *browser.State) error {
+		state.ClearDefaultContext()
+		state.ProxyDaemon = nil
+		return nil
+	}); err != nil {
+		return fmt.Errorf("clear attachment metadata: %w", err)
+	}
+	c := true
+	fmt.Fprintf(os.Stderr, "%s Cleared attached Chrome metadata\n", green(c, "✓"))
 	return nil
 }

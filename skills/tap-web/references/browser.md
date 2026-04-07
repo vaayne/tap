@@ -3,7 +3,7 @@
 Tap's public browser model is:
 - one default browser context
 - one current tab
-- explicit attach flows for existing Chrome/Electron targets
+- explicit attach flow for existing Chrome targets
 
 ## Core commands
 
@@ -14,8 +14,6 @@ tap status [--json]
 tap attach chrome
 tap attach chrome --browser-url http://localhost:9222
 tap attach chrome --port-file ~/Library/Application\ Support/Google/Chrome/DevToolsActivePort
-tap attach electron --port <port>
-tap attach electron --launch <binary>
 tap attach status [--json]
 tap attach clear
 ```
@@ -84,21 +82,15 @@ tap browser switch tab-2
 tap browser screenshot --output github.png
 ```
 
-### Attach Electron / desktop app
+### Attached Chrome lifecycle
 
 ```bash
-tap attach electron --port 9333
-tap browser evaluate 'document.title'
-tap browser screenshot
+tap attach chrome
+tap attach status --json
+tap browser open https://example.com --show
 ```
 
-Or:
-
-```bash
-tap attach electron --launch /Applications/MyApp.app/Contents/MacOS/MyApp
-```
-
-`--port` must be a browser CDP port, not a generic Node inspector port.
+`tap attach chrome` persists an internal proxy-backed attached context. If that context becomes stale, normal browser-backed commands fail explicitly and should be repaired with `tap attach chrome`.
 
 ## Resolution rules
 

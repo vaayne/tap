@@ -82,19 +82,16 @@ tap browser screenshot --output github.png
 tap browser status
 ```
 
-### Electron workflow
+### Attached Chrome workflow
 
 ```bash
-tap attach electron --port 9333
+tap attach chrome
+tap attach status --json
 tap browser evaluate 'document.title'
 tap browser screenshot
 ```
 
-Or launch and attach:
-
-```bash
-tap attach electron --launch /Applications/MyApp.app/Contents/MacOS/MyApp
-```
+If the attached state becomes stale, rerun `tap attach chrome`.
 
 ## Command map
 
@@ -103,7 +100,7 @@ tap
 ├── site        structured extraction from known sites
 ├── fetch       clean readable content from arbitrary URLs
 ├── browser     open pages and automate the current browser context
-├── attach      connect tap to existing Chrome/Electron/browser targets
+├── attach      connect tap to an existing Chrome browser
 ├── status      show the active browser context and current tab
 ├── doctor      dependency and environment checks
 └── upgrade     update tap

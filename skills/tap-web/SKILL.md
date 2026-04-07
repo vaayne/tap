@@ -2,7 +2,7 @@
 name: tap-web
 description: >
   Access websites, search the web, and extract clean content using the `tap` CLI.
-  Also automate pages, reuse an existing Chrome/Electron browser context, and
+  Also automate pages, reuse an existing Chrome browser context, and
   capture network requests when interaction is required.
   Use when the user asks to search the web, read a webpage, fetch article content,
   get trending topics, look up social media posts, check stock prices, search videos,
@@ -59,8 +59,6 @@ tap status [--json]
 tap attach chrome
 tap attach chrome --browser-url http://localhost:9222
 tap attach chrome --port-file ~/Library/Application\ Support/Google/Chrome/DevToolsActivePort
-tap attach electron --port <port>
-tap attach electron --launch "/Applications/MyApp.app/Contents/MacOS/MyApp"
 tap attach status [--json]
 tap attach clear
 
@@ -125,6 +123,8 @@ tap browser open https://example.com/login --show
 ```
 
 Then reuse that same browser context with `tap site -b`, `tap fetch -b`, and later `tap browser ...` commands.
+
+`tap attach chrome` owns an internal proxy daemon for the attached browser. If that attached state goes stale, normal commands fail explicitly and should be repaired with `tap attach chrome`, not by switching contexts implicitly.
 
 ## Context resolution
 

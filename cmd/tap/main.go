@@ -46,6 +46,7 @@ Use 'tap <command> --help' for details on any command.`,
 			statusCmd(),
 			doctorCmd(),
 			upgradeCmd(),
+			internalCmd(),
 		},
 	}
 
@@ -235,8 +236,29 @@ func resolveBrowserClientOptions(ctx context.Context, cmd *cli.Command, forceMan
 	if err != nil {
 		return nil, err
 	}
+	store, err := newBrowserStore(cmd)
+	if err != nil {
+		return nil, err
+	}
+	state, err := store.Load()
+	if err != nil {
+		return nil, err
+	}
+	if defaultContext != nil && defaultContext.Kind == browser.DefaultContextAttached {
+		if state.ProxyDaemon == nil {
+			return nil, fmt.Errorf("attached Chrome is stale: proxy daemon metadata is missing (run 'tap attach chrome')")
+		}
+		health := browser.CheckProxyDaemon(ctx, state.ProxyDaemon)
+		if err := persistProxyDaemonHealth(store, state.ProxyDaemon, health); err == nil && !health.Healthy {
+			defaultContext.Reason = health.Reason
+			defaultContext.Stale = true
+		}
+		if !health.Healthy {
+			return nil, fmt.Errorf("attached Chrome is stale: %s (run 'tap attach chrome')", health.Reason)
+		}
+	}
 	if defaultContext != nil && defaultContext.Stale {
-		return nil, fmt.Errorf("default browser context %q is stale: %s (run 'tap attach clear' or re-attach explicitly)", defaultContext.SessionName, defaultContext.Reason)
+		return nil, fmt.Errorf("default browser context %q is stale: %s (run 'tap attach chrome')", defaultContext.SessionName, defaultContext.Reason)
 	}
 
 	session, err := mgr.GetSession(ctx, "")

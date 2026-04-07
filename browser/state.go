@@ -130,10 +130,27 @@ type DefaultContextRecord struct {
 	UpdatedAt   time.Time          `json:"updated_at,omitempty"`
 }
 
+// ProxyDaemonRecord stores the internal CDP proxy metadata used for attached Chrome.
+type ProxyDaemonRecord struct {
+	PID               int       `json:"pid,omitempty"`
+	ListenAddr        string    `json:"listen_addr,omitempty"`
+	Endpoint          string    `json:"endpoint,omitempty"`
+	UpstreamWSURL     string    `json:"upstream_ws_url,omitempty"`
+	OwnershipToken    string    `json:"ownership_token,omitempty"`
+	State             string    `json:"state,omitempty"`
+	Status            string    `json:"status,omitempty"`
+	LastHealthCheckAt time.Time `json:"last_health_check_at,omitempty"`
+	LastHealthyAt     time.Time `json:"last_healthy_at,omitempty"`
+	LastError         string    `json:"last_error,omitempty"`
+	StartedAt         time.Time `json:"started_at,omitempty"`
+	UpdatedAt         time.Time `json:"updated_at,omitempty"`
+}
+
 // State is the durable browser session metadata written to disk.
 type State struct {
 	Version        int                       `json:"version"`
 	DefaultContext *DefaultContextRecord     `json:"default_context,omitempty"`
+	ProxyDaemon    *ProxyDaemonRecord        `json:"proxy_daemon,omitempty"`
 	Sessions       map[string]*SessionRecord `json:"sessions"`
 }
 
@@ -311,6 +328,15 @@ func (s *State) Normalize() {
 			s.DefaultContext = nil
 		}
 	}
+	if s.ProxyDaemon != nil {
+		s.ProxyDaemon.ListenAddr = strings.TrimSpace(s.ProxyDaemon.ListenAddr)
+		s.ProxyDaemon.Endpoint = strings.TrimSpace(s.ProxyDaemon.Endpoint)
+		s.ProxyDaemon.UpstreamWSURL = strings.TrimSpace(s.ProxyDaemon.UpstreamWSURL)
+		s.ProxyDaemon.OwnershipToken = strings.TrimSpace(s.ProxyDaemon.OwnershipToken)
+		if s.ProxyDaemon.Endpoint == "" && s.ProxyDaemon.ListenAddr == "" && s.ProxyDaemon.PID == 0 {
+			s.ProxyDaemon = nil
+		}
+	}
 	for name, session := range s.Sessions {
 		if session == nil {
 			delete(s.Sessions, name)
@@ -356,6 +382,11 @@ func (s *State) Validate() error {
 	if s.DefaultContext != nil {
 		if err := s.DefaultContext.validate(s); err != nil {
 			return fmt.Errorf("default context: %w", err)
+		}
+	}
+	if s.ProxyDaemon != nil {
+		if err := s.ProxyDaemon.validate(); err != nil {
+			return fmt.Errorf("proxy daemon: %w", err)
 		}
 	}
 	return nil
@@ -414,6 +445,28 @@ func (s *SessionRecord) validate() error {
 		if err := tab.validate(); err != nil {
 			return fmt.Errorf("tab %q: %w", name, err)
 		}
+	}
+	return nil
+}
+
+func (pd *ProxyDaemonRecord) validate() error {
+	if pd == nil {
+		return nil
+	}
+	if pd.PID < 0 {
+		return errors.New("pid cannot be negative")
+	}
+	if pd.ListenAddr == "" {
+		return errors.New("listen address is required")
+	}
+	if pd.Endpoint == "" {
+		return errors.New("endpoint is required")
+	}
+	if pd.UpstreamWSURL == "" {
+		return errors.New("upstream WebSocket URL is required")
+	}
+	if pd.OwnershipToken == "" {
+		return errors.New("ownership token is required")
 	}
 	return nil
 }

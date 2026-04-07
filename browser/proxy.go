@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -14,7 +15,7 @@ import (
 )
 
 const (
-	DefaultProxyListenAddr = "127.0.0.1:9401"
+	DefaultProxyListenAddr = "127.0.0.1:12345"
 	pendingRequestTTL      = 60 * time.Second
 	pendingCleanupInterval = 30 * time.Second
 	reconnectInterval      = 2 * time.Second
@@ -28,8 +29,9 @@ var blockedClientMethods = map[string]struct{}{
 
 // ProxyConfig configures the local CDP proxy.
 type ProxyConfig struct {
-	ListenAddr string
-	Upstream   string
+	ListenAddr     string
+	Upstream       string
+	OwnershipToken string
 }
 
 type Proxy struct {
@@ -89,18 +91,26 @@ func NewProxy(cfg ProxyConfig) *Proxy {
 }
 
 func (p *Proxy) Serve(ctx context.Context) error {
+	ln, err := net.Listen("tcp", p.cfg.ListenAddr)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = ln.Close() }()
+	return p.ServeListener(ctx, ln)
+}
+
+func (p *Proxy) ServeListener(ctx context.Context, ln net.Listener) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/json/version", p.handleJSONVersion)
 	mux.HandleFunc("/json", p.handleJSONList)
 	mux.HandleFunc("/json/list", p.handleJSONList)
 	mux.HandleFunc("/json/new", p.handleJSONNew)
 	mux.HandleFunc("/proxy/status", p.handleStatus)
+	mux.HandleFunc("/healthz", p.handleHealthz)
+	mux.HandleFunc("/shutdown", p.handleShutdown)
 	mux.HandleFunc("/devtools/browser/proxy", p.handleBrowserWS)
 
-	p.httpServer = &http.Server{
-		Addr:    p.cfg.ListenAddr,
-		Handler: mux,
-	}
+	p.httpServer = &http.Server{Handler: mux}
 
 	if err := p.connectUpstream(ctx); err != nil {
 		return err
@@ -115,7 +125,7 @@ func (p *Proxy) Serve(ctx context.Context) error {
 		p.closeUpstream()
 	}()
 
-	err := p.httpServer.ListenAndServe()
+	err := p.httpServer.Serve(ln)
 	if err == nil || err == http.ErrServerClosed {
 		return nil
 	}
@@ -488,6 +498,38 @@ func (p *Proxy) handleStatus(w http.ResponseWriter, _ *http.Request) {
 		"targets":         len(p.targetOwners),
 		"pendingRequests": len(p.pending),
 	})
+}
+
+func (p *Proxy) handleHealthz(w http.ResponseWriter, _ *http.Request) {
+	p.mu.RLock()
+	upstreamReady := p.upstreamReady
+	p.mu.RUnlock()
+	status := http.StatusServiceUnavailable
+	if upstreamReady {
+		status = http.StatusOK
+	}
+	writeJSON(w, status, map[string]any{
+		"ok":            upstreamReady,
+		"upstreamReady": upstreamReady,
+	})
+}
+
+func (p *Proxy) handleShutdown(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if p.cfg.OwnershipToken == "" || r.Header.Get("X-Tap-Ownership-Token") != p.cfg.OwnershipToken {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+	go func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = p.httpServer.Shutdown(shutdownCtx)
+		p.closeUpstream()
+	}()
 }
 
 func (p *Proxy) removeClient(client *proxyClient) {

@@ -25,7 +25,7 @@ func TestResolveDebugURLFromEndpoint(t *testing.T) {
 			if r.URL.Path != "/json/version" {
 				t.Fatalf("unexpected path: %s", r.URL.Path)
 			}
-			_, _ = fmt.Fprint(w, `{"webSocketDebuggerUrl":"ws://127.0.0.1:9401/devtools/browser/proxy"}`)
+			_, _ = fmt.Fprint(w, `{"webSocketDebuggerUrl":"ws://127.0.0.1:12345/devtools/browser/proxy"}`)
 		}))
 		defer server.Close()
 
@@ -33,7 +33,7 @@ func TestResolveDebugURLFromEndpoint(t *testing.T) {
 		if err != nil {
 			t.Fatalf("ResolveDebugURL returned error: %v", err)
 		}
-		want := "ws://127.0.0.1:9401/devtools/browser/proxy"
+		want := "ws://127.0.0.1:12345/devtools/browser/proxy"
 		if got != want {
 			t.Fatalf("ResolveDebugURL = %q, want %q", got, want)
 		}
