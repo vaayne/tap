@@ -46,6 +46,7 @@ Use 'tap <command> --help' for details on any command.`,
 			statusCmd(),
 			doctorCmd(),
 			upgradeCmd(),
+			skillCmd(),
 			internalCmd(),
 		},
 	}

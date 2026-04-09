@@ -19,12 +19,20 @@ description: >
 ## Install
 
 ```bash
+# Install tap CLI (includes embedded skill)
 curl -fsSL https://raw.githubusercontent.com/vaayne/tap/main/scripts/install.sh | sh
-npx skills add vaayne/tap
-tap upgrade
+
+# Install/update the skill to default location (~/.config/tap/skills/tap-web/)
+tap skill install
+
+# Or install to custom path (for agent use)
+tap skill install --path /custom/path/to/skills/tap-web
+
+# Or via environment variable
+TAP_SKILL_DIR=/custom/path/to/skills/tap-web tap skill install
 ```
 
-> **⚠️ Version Check**: If `tap --version` output doesn't match the skill's `metadata.version` above, upgrade both the CLI and skill to the latest version to ensure compatibility.
+> **⚠️ Upgrade Note**: After upgrading `tap`, run `tap skill install` again so the local installed skill matches the bundled version in the current CLI. If you use a custom install location, rerun it with the same `--path` or `TAP_SKILL_DIR`.
 
 **Before accessing any site, check `$XDG_CONFIG_HOME/tap/site-notes/{domain}.md` for saved knowledge. Update after learning.** See [references/site-notes.md](references/site-notes.md).
 

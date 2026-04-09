@@ -137,6 +137,7 @@ func runUpgrade(ctx context.Context, force bool) error {
 	}
 
 	fmt.Printf("Upgraded tap: %s -> %s\n", current, latest)
+	fmt.Println("Run 'tap skill install' to update your local skill installation.")
 	return nil
 }
 
