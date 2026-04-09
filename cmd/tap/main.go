@@ -19,8 +19,6 @@ var version = "dev"
 func main() {
 	_ = godotenv.Load()
 
-	autoInstallEmbeddedSkill()
-
 	app := &cli.Command{
 		Name:    "tap",
 		Usage:   "Tap into any website from your terminal",

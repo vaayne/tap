@@ -194,21 +194,3 @@ func extractEmbeddedSkill(destDir string, verbose bool) error {
 		return nil
 	})
 }
-
-func installEmbeddedSkillIfNeeded(skillDir string) error {
-	if installed, _ := isSkillInstalled(skillDir); installed {
-		return nil
-	}
-	return extractEmbeddedSkill(skillDir, false)
-}
-
-func autoInstallEmbeddedSkill() {
-	skillDir := os.Getenv("TAP_SKILL_DIR")
-	if skillDir == "" {
-		skillDir = defaultSkillDir()
-	}
-	if err := installEmbeddedSkillIfNeeded(skillDir); err != nil {
-		// Silently ignore; user can manually install with `tap skill install`.
-		_ = err
-	}
-}
