@@ -54,6 +54,37 @@ func TestStateSessionResolution(t *testing.T) {
 	}
 }
 
+func TestResolveSessionByPreferenceUsesPersistedDefaultContext(t *testing.T) {
+	state := NewState()
+	now := time.Date(2026, 4, 1, 8, 0, 0, 0, time.UTC)
+
+	alpha, err := NewRemoteSession("alpha", "wss://example.com/devtools/browser/1", now)
+	if err != nil {
+		t.Fatalf("NewRemoteSession(alpha) failed: %v", err)
+	}
+	beta, err := NewLocalSession(DefaultSessionName, filepath.Join(t.TempDir(), "default"), true, now)
+	if err != nil {
+		t.Fatalf("NewLocalSession(default) failed: %v", err)
+	}
+	if err := state.CreateSession(alpha); err != nil {
+		t.Fatalf("CreateSession(alpha) failed: %v", err)
+	}
+	if err := state.CreateSession(beta); err != nil {
+		t.Fatalf("CreateSession(default) failed: %v", err)
+	}
+	if err := state.SetDefaultContext("alpha", DefaultContextAttached, now); err != nil {
+		t.Fatalf("SetDefaultContext failed: %v", err)
+	}
+
+	session, err := state.ResolveSessionByPreference("")
+	if err != nil {
+		t.Fatalf("ResolveSessionByPreference failed: %v", err)
+	}
+	if session.Name != "alpha" {
+		t.Fatalf("ResolveSessionByPreference(empty) = %q, want alpha", session.Name)
+	}
+}
+
 func TestResolveSessionWithoutDefault(t *testing.T) {
 	state := NewState()
 	now := time.Date(2026, 4, 1, 8, 0, 0, 0, time.UTC)

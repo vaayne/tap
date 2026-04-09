@@ -60,9 +60,10 @@ Run `go test ./... -timeout 60s -race` before pushing. CI: lint + test on ubuntu
 
 1. Ensure CI passes (`mise run lint && mise run test`).
 2. Update `CHANGELOG.md` ([Keep a Changelog](https://keepachangelog.com/) format).
-3. Commit: `📝 docs: update CHANGELOG for vx.y.z`.
-4. Tag and push: `git tag vx.y.z && git push origin main --tags`.
-5. GoReleaser publishes automatically.
+3. Update skill version: edit `skills/tap-web/SKILL.md` metadata.version to match the new release version.
+4. Commit: `📝 docs: update CHANGELOG for vx.y.z`.
+5. Tag and push: `git tag vx.y.z && git push origin main --tags`.
+6. GoReleaser publishes automatically.
 
 ## Documentation
 

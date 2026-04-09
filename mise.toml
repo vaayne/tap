@@ -1,5 +1,5 @@
 [tools]
-go = "latest"
+go = "1.26"
 goreleaser = "latest"
 "github:golangci/golangci-lint" = "latest"
 node = "latest"

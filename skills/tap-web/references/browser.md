@@ -1,185 +1,114 @@
-# Browser Sessions & Tabs
+# Browser Reference
 
-Manage long-lived browser instances that survive across CLI invocations.
+Tap's public browser model is:
+- one default browser context
+- one current tab
+- explicit attach flow for existing Chrome targets
 
-## Sessions
+## Core commands
 
-```bash
-tap browser session new <name>                # Launch headless Chrome
-tap browser session new <name> --no-headless  # Visible browser
-tap browser session new <name> --ws-url <url> # Remote CDP endpoint
-tap browser session list
-tap browser session info [name]
-tap browser session close [name]
-```
-
-## Tabs
+### Context and status
 
 ```bash
-tap browser tab new <name> [--url <url>]
-tap browser tab list
-tap browser tab select <name>
-tap browser tab close [name]
+tap status [--json]
+tap attach chrome
+tap attach chrome --browser-url http://localhost:9222
+tap attach chrome --port-file ~/Library/Application\ Support/Google/Chrome/DevToolsActivePort
+tap attach status [--json]
+tap attach clear
 ```
 
-## Actions
+### Tabs
 
-All accept `--session` and `--tab` to override defaults.
+```bash
+tap browser open <url>
+tap browser open <url> --new-tab
+tap browser open <url> --show
+tap browser tabs [--json]
+tap browser switch <tab-id>
+tap browser close-tab [tab-id]
+tap browser status [--json]
+```
 
-### Page actions
+### Actions
 
 ```bash
 tap browser navigate <url>
 tap browser back
 tap browser forward
 tap browser reload
+tap browser text [selector]
 tap browser evaluate <javascript>
 tap browser screenshot [--output <path>]
-tap browser text [selector]                    # Clean readable text (defuddle)
-tap browser text ".main-content"               # Scoped to selector
-tap browser text -f json                       # JSON with title, markdown, wordCount
-tap browser pdf [--output <path>] [--landscape] [--background] [--scale 1.0]
-```
-
-### Human-like interaction
-
-These dispatch real CDP events (mouse moves, key presses) — indistinguishable from a real user.
-
-```bash
-tap browser click <selector>                    # Full mouse event chain
-tap browser type <selector> <text>              # Per-keystroke typing
-tap browser hover <selector>                    # mouseMoved to element center
-tap browser scroll <selector>                   # Scroll element into view
-tap browser scroll --x 0 --y 1000              # Scroll to pixel position
-tap browser select <selector> <value>           # Pick <select> option
-tap browser wait <selector> [--timeout 30s]     # Wait for element visible
-```
-
-| Command | vs JS eval | When to use |
-|---|---|---|
-| `click` | Real mousedown/mouseup chain | Sites listening on mousedown, hover menus |
-| `type` | Individual keyDown/keyUp events | Anti-bot detection, per-keystroke validation |
-| `hover` | Real mouseMoved to coordinates | CSS :hover states, mouseenter listeners |
-| `scroll` | Triggers IntersectionObserver | Lazy-loaded content, infinite scroll |
-| `select` | Fires focus/input/change events | Native `<select>` elements |
-| `wait` | CDP visibility polling | Wait for dynamic content before acting |
-
-### Keyboard & dialogs
-
-```bash
-tap browser keypress Enter                  # Submit form
-tap browser keypress Tab                    # Move focus
-tap browser keypress Escape                 # Dismiss/close
-tap browser keypress Ctrl+a                 # Select all
-tap browser keypress Ctrl+c                 # Copy
-tap browser dialog                          # Accept pending alert/confirm/prompt
-tap browser dialog --accept=false           # Dismiss dialog
-tap browser dialog --text "answer"          # Fill prompt and accept
-```
-
-Keys: Enter, Tab, Escape, Backspace, Delete, Space, ArrowUp/Down/Left/Right, Home, End, PageUp, PageDown, Ctrl, Alt, Shift, Meta. Modifiers with `+`: `Ctrl+a`, `Shift+Tab`.
-
-### Cookies
-
-```bash
-tap browser cookies get                     # List all (includes httpOnly)
-tap browser cookies get -f json             # JSON output
-tap browser cookies set <name> <value>      # Set cookie
-tap browser cookies set <name> <value> --domain .example.com --path /
-tap browser cookies clear                   # Delete all cookies
-```
-
-### Forms
-
-```bash
+tap browser pdf [--output <path>]
+tap browser click <selector>
+tap browser type <selector> <text>
+tap browser fill <selector> <value> [<selector> <value> ...]
+tap browser hover <selector>
+tap browser scroll [selector]
+tap browser select <selector> <value>
+tap browser wait <selector>
+tap browser keypress <key>
+tap browser dialog
 tap browser forms
-tap browser fill <sel> <val> [<sel> <val>...]
-tap browser fill <sel> <val> --submit <sel>
+tap browser cookies get|set|clear
 ```
 
-`tap browser forms` returns JSON with each element's `selector`, `type`, `name`, `placeholder`, `label`, `value`, `role`.
+## Common workflows
 
-`tap browser fill` uses React-compatible native setters — works with React, Vue, Angular, vanilla HTML.
-
-## Electron Apps
-
-Connect tap to any Electron (or CEF-based) desktop app via CDP.
+### Reuse existing Chrome
 
 ```bash
-tap electron ps                              # List running processes with --remote-debugging-port
-tap electron launch <binary> [app-args...]   # Launch with --remote-debugging-port=0
-tap electron launch <binary> --session <name>
-tap electron attach --port <port>            # Attach to running app
-tap electron attach --port <port> --session <name>
-tap electron discover [--session <name>]     # Adopt live windows as tracked tabs
+tap attach chrome
+tap browser open https://example.com
+tap browser click '#submit'
 ```
 
-After `discover`, all `tap browser` commands work against the session. macOS `.app` bundles: pass the inner binary (`/Applications/MyApp.app/Contents/MacOS/MyApp`).
-
-**Note:** Cherry Studio and similar apps use `<i role="button">` for the send icon rather than `<button>` — use `tap browser evaluate` to inspect the DOM when `click` targets need investigation.
-
-## Resolution
-
-When `--session`/`--tab` omitted, tap resolves automatically:
-
-- **Session**: flag → `default` (auto-created if missing)
-- **Tab**: flag → selected tab → the only live tab
-
-## Session Strategy
-
-**The `default` session is always used when `--session` is omitted.** If it doesn't exist, tap auto-creates a headless `default` session. The profile directory is derived from the session name, so same name = same profile = same cookies. Only use `--session <name>` for isolation (parallel subagents, different accounts).
-
-### Quick start
+### Visible browser for auth
 
 ```bash
-tap browser tab new main --url <start-url>  # Auto-creates default session, opens a tab
+tap attach chrome
+tap browser open https://github.com/login --show
+tap browser open https://github.com
 ```
 
-### Recover a stale session
-
-If `default` is unresponsive (Chrome crashed, PID gone), close and recreate. **Note: closing deletes the profile directory (including cookies).** Use `tap login` for persistent auth that survives session close.
+### Multi-tab flow
 
 ```bash
-tap browser session close default
-tap browser session new default
-# Re-login if needed: tap login <url>
+tap browser open https://news.ycombinator.com
+tap browser open https://github.com --new-tab
+tap browser tabs
+tap browser switch tab-2
+tap browser screenshot --output github.png
 ```
 
-### When to create a named session
-
-- **Parallel subagents** — each agent needs its own Chrome (profile lock). Give each a unique name.
-- **Account isolation** — different login states that must not interfere.
+### Attached Chrome lifecycle
 
 ```bash
-tap browser session new research-a
-tap browser session new research-b
+tap attach chrome
+tap attach status --json
+tap browser open https://example.com --show
 ```
 
-### When to use `-b` vs persistent sessions
+`tap attach chrome` persists an internal proxy-backed attached context. If that context becomes stale, normal browser-backed commands fail explicitly and should be repaired with `tap attach chrome`.
 
-| Need | Use |
-|---|---|
-| Single script with auth | `tap site -b <script>` — ephemeral, no session needed |
-| Multi-step workflow | `tap browser` with `default` session |
-| Network interception + scripting | `tap browser` — intercept rules need a persistent session |
+## Resolution rules
 
-## Examples
+When browser-specific overrides are omitted, tap resolves:
+1. explicit one-shot override (`--browser-url`, `--profile-dir`)
+2. persisted default context from `tap attach ...`
+3. managed local default context
 
-```bash
-# Reuse default session for a workflow
-tap browser session new default
-tap browser tab new docs --url https://go.dev/doc
-tap browser evaluate 'document.title'
+Tab resolution is:
+1. explicit hidden `--tab` override
+2. current tab
+3. only live tab
+4. error with guidance
 
-# Open a second tab in the same session
-tap browser tab new api --url https://pkg.go.dev
-tap browser tab select docs
-tap browser evaluate 'document.querySelectorAll("a").length'
+## Notes
 
-# Form filling (visible browser for manual CAPTCHA)
-tap browser session new login --no-headless
-tap browser tab new page --url https://example.com/login
-tap browser forms
-tap browser fill "#email" "me@example.com" "#password" "secret" --submit "button[type=submit]"
-tap browser session close login
-```
+- `tap browser open <url>` navigates the current tab by default.
+- `--new-tab` creates a fresh tracked tab with the next stable ID (`tab-1`, `tab-2`, ...).
+- `tap browser tabs` is the common tab-management entrypoint.
+- `tap browser status --json` and `tap browser tabs --json` are the machine-readable contracts.
+- If an attached context goes stale, tap fails explicitly instead of silently switching browser state.

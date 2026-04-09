@@ -32,15 +32,16 @@ Examples:
   tap site search "weather"                  Search the online catalog
   tap site sync                              Force-refresh the script cache
   tap site hackernews/top -f json            Output as JSON`,
-		Flags: []cli.Flag{
+		Flags: append([]cli.Flag{
 			&cli.StringFlag{
 				Name:    "format",
 				Aliases: []string{"f"},
 				Usage:   "Output format: json, pretty (default), raw",
 				Value:   formatPretty,
 			},
-		},
+		}, browserClientFlags(true)...),
 		Commands: []*cli.Command{
+			siteRunCmd(),
 			siteListCmd(),
 			siteInfoCmd(),
 			siteSearchCmd(),
@@ -48,36 +49,59 @@ Examples:
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			configureLogging(cmd)
-			args := cmd.Args()
-			if args.Len() == 0 {
-				return fmt.Errorf("script name required. Run 'tap site list' to see available scripts")
-			}
-
-			scriptName := args.First()
-			scriptArgs := parseArgs(args.Tail())
-
-			client, err := newClient(ctx, cmd)
-			if err != nil {
-				return err
-			}
-			defer func() { _ = client.Close() }()
-
-			if cmd.Bool("verbose") {
-				mode := "auto (QuickJS → Browser)"
-				if cmd.Bool("browser") {
-					mode = "browser"
-				}
-				log.Printf("Running: %s [engine=%s]", scriptName, mode)
-			}
-
-			result, err := client.RunScript(ctx, scriptName, scriptArgs)
-			if err != nil {
-				return err
-			}
-
-			return printResult(cmd, result)
+			return runSiteScript(ctx, cmd, cmd.Args().Slice())
 		},
 	}
+}
+
+func siteRunCmd() *cli.Command {
+	return &cli.Command{
+		Name:      "run",
+		Usage:     "Run a site script",
+		ArgsUsage: "<script-name> [key=value ...]",
+		Flags: append([]cli.Flag{
+			&cli.StringFlag{
+				Name:    "format",
+				Aliases: []string{"f"},
+				Usage:   "Output format: json, pretty (default), raw",
+				Value:   formatPretty,
+			},
+		}, browserClientFlags(true)...),
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			configureLogging(cmd)
+			return runSiteScript(ctx, cmd, cmd.Args().Slice())
+		},
+	}
+}
+
+func runSiteScript(ctx context.Context, cmd *cli.Command, rawArgs []string) error {
+	if len(rawArgs) == 0 {
+		return fmt.Errorf("script name required. Run 'tap site list' to see available scripts")
+	}
+
+	scriptName := rawArgs[0]
+	scriptArgs := parseArgs(rawArgs[1:])
+
+	client, err := newClient(ctx, cmd)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = client.Close() }()
+
+	if cmd.Bool("verbose") {
+		mode := "auto (QuickJS → Browser)"
+		if cmd.Bool("browser") {
+			mode = "browser"
+		}
+		log.Printf("Running: %s [engine=%s]", scriptName, mode)
+	}
+
+	result, err := client.RunScript(ctx, scriptName, scriptArgs)
+	if err != nil {
+		return err
+	}
+
+	return printResult(cmd, result)
 }
 
 func siteListCmd() *cli.Command {

@@ -22,12 +22,12 @@ Examples:
   tap fetch --json https://example.com/article   Full metadata as JSON
   tap fetch -b https://example.com               Use browser for JS-rendered pages
   tap fetch --lp https://example.com             Use Lightpanda (fast headless, no auth)`,
-		Flags: []cli.Flag{
+		Flags: append([]cli.Flag{
 			&cli.BoolFlag{
 				Name:  "json",
 				Usage: "Output as JSON with full metadata",
 			},
-		},
+		}, browserClientFlags(true)...),
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			configureLogging(cmd)
 			if cmd.Args().Len() == 0 {

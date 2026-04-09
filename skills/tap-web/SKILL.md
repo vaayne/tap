@@ -1,22 +1,17 @@
 ---
 name: tap-web
+metadata:
+  author: vaayne/tap
+  version: "v0.4.0"
 description: >
   Access websites, search the web, and extract clean content using the `tap` CLI.
-  Also manage persistent browser sessions for long-lived automation workflows,
-  and debug or automate Electron apps via CDP.
+  Also automate pages, reuse an existing Chrome browser context, and
+  capture network requests when interaction is required.
   Use when the user asks to search the web, read a webpage, fetch article content,
   get trending topics, look up social media posts, check stock prices, search videos,
-  retrieve structured data from any supported site, manage browser sessions/tabs,
-  capture or intercept network requests, block or mock API calls,
-  debug an Electron app, automate an Electron app, connect to a desktop app via CDP.
-  Triggers on: "search for", "what's trending on", "fetch this page", "read this URL",
-  "get content from", "look up on Twitter/Weibo/Reddit/YouTube/etc.", "check stock",
-  "translate", "browser session", "open a tab", "navigate to", "take a screenshot",
-  "evaluate javascript", "persistent browser", "fill form", "form fields",
-  "discover inputs", "intercept requests", "capture network", "block requests",
-  "mock API", "network log", "wait for request", "save as PDF", "export PDF",
-  "debug electron", "automate electron", "connect to electron app",
-  or any web access task.
+  retrieve structured data from any supported site, open a page, switch tabs,
+  take a screenshot, evaluate JavaScript, fill a form, inspect cookies,
+  capture or intercept network requests, or connect to a desktop app via CDP.
 ---
 
 # tap-web
@@ -24,138 +19,142 @@ description: >
 ## Install
 
 ```bash
-# Install tap CLI
 curl -fsSL https://raw.githubusercontent.com/vaayne/tap/main/scripts/install.sh | sh
-# Install this skill
 npx skills add vaayne/tap
-# Upgrade tap
 tap upgrade
 ```
+
+> **⚠️ Version Check**: If `tap --version` output doesn't match the skill's `metadata.version` above, upgrade both the CLI and skill to the latest version to ensure compatibility.
 
 **Before accessing any site, check `$XDG_CONFIG_HOME/tap/site-notes/{domain}.md` for saved knowledge. Update after learning.** See [references/site-notes.md](references/site-notes.md).
 
 ## Pick the right tool
 
-tap has three tiers — always start from the top and escalate only when needed:
+Start simple and escalate only when needed:
 
-| Tier | Tool | What it's for | When to use |
-|---|---|---|---|
-| **1. Script** | `tap site` | Structured data from known sites | A script exists for the site (check `tap site list` / `search` first). Fastest, least tokens, returns clean JSON. |
-| **2. Fetch** | `tap fetch` | Clean article/page content | Reading a URL's main content as Markdown. No interaction needed. Works for blogs, docs, news. |
-| **3. Browser** | `tap browser` | Full browser automation | Multi-step workflows, form filling, JS-heavy SPAs, network interception, screenshots. Most powerful but most expensive. |
+| Tier | Tool | Use for |
+|---|---|---|
+| 1 | `tap site` | Structured data from known sites |
+| 2 | `tap fetch` | Clean readable content from a URL |
+| 3 | `tap browser` | Interaction, auth, screenshots, network capture |
 
-**Decision flow:**
-1. Is there a site script? → `tap site` (always check first — never guess script names)
-2. Just need to read a page? → `tap fetch <url>` (add `--lp` if JS-rendered, `-b` if auth needed)
-3. Need to interact, navigate multiple pages, or capture network? → `tap browser`
+Decision flow:
+1. Check for a site script first: `tap site list` / `tap site search <query>`
+2. If you just need readable content: `tap fetch <url>`
+3. If you need interaction/auth/network: `tap browser ...`
 
 ## Quick reference
 
 ```bash
+# Site scripts
+tap site list
+tap site search <query>
+tap site info <script>
+tap site sync
+tap site run <site/action> [key=value]
+tap site <site/action> [key=value]
+
 # Content extraction
-tap fetch <url>                          # Clean markdown from any URL
-tap fetch --json <url>                   # JSON with metadata
+tap fetch <url>
+tap fetch --json <url>
+tap fetch -b <url>
 
-# Site scripts — always discover first, never guess
-tap site list                            # List all local scripts
-tap site search <kw>                     # Search remote catalog
-tap site info <script>                   # Show script details
-tap site sync                            # Force re-sync from remote
-tap site <site/action> [key=value]       # Run a script
-tap site <site/action> -f json           # Run with JSON output
-tap site -b <script>                     # With auth (browser cookies)
+# Browser context
+tap status [--json]
+tap attach chrome
+tap attach chrome --browser-url http://localhost:9222
+tap attach chrome --port-file ~/Library/Application\ Support/Google/Chrome/DevToolsActivePort
+tap attach status [--json]
+tap attach clear
 
-# Login
-tap login <url>                          # Opens browser, press Enter when done
+# Browser workflow
+tap browser open <url>
+tap browser open <url> --new-tab
+tap browser open <url> --show
+tap browser tabs [--json]
+tap browser switch <tab-id>
+tap browser close-tab [tab-id]
+tap browser status [--json]
+
+# Page actions
+tap browser text [selector]
+tap browser evaluate <js>
+tap browser screenshot [--output <path>]
+tap browser pdf [--output <path>]
+tap browser click <selector>
+tap browser type <selector> <text>
+tap browser fill <selector> <value> [<selector> <value> ...]
+tap browser hover <selector>
+tap browser scroll [selector]
+tap browser select <selector> <value>
+tap browser wait <selector>
+tap browser keypress <key>
+tap browser dialog
+
+# Page state / network
+tap browser forms
+tap browser cookies get|set|clear
+tap browser network wait --url-pattern "*/api/*" --body
+tap browser network log --resource-type XHR,Fetch --timeout 30s
+tap browser network intercept --block --url-pattern "*.ads.*"
+tap browser network clear
 ```
+
+## Browser-backed flags
 
 | Flag | Use when |
 |---|---|
-| `--lp` | JS rendering without auth (implies `-b`, macOS/Linux only, not all sites work — fall back to `-b` if rendering fails) |
-| `-b` | Auth needed — run `tap login <url>` first to save cookies |
-| `--pause` | One-off CAPTCHA (implies `-b --no-headless`). **Requires interactive terminal — agents use `--delay` or `--wait-selector` instead** |
-| `--delay <dur>` | Wait fixed duration after navigation (e.g., `--delay 3s`, implies `-b`) |
-| `--wait-selector <sel>` | Wait until CSS selector visible before continuing (implies `-b`) |
-| `--wait-js <expr>` | Wait until JS expression truthy before continuing (implies `-b`) |
-| `--timeout <dur>` | Global execution timeout (e.g., `--timeout 30s`, `-t 2m`) |
+| `-b`, `--browser` | Force browser execution for `site` / `fetch` |
+| `--show` | Need a visible browser for auth or manual interaction |
+| `--wait <dur>` | Need a fixed post-navigation delay |
+| `--wait-selector <sel>` | Wait for a specific element |
+| `--wait-js <expr>` | Wait for a JS condition |
+| `--timeout <dur>` | Limit execution time |
+| `--browser-url <url>` | One-shot DevTools override |
+| `--profile-dir <path>` | One-shot profile override |
+| `--lp`, `--lightpanda` | Fast JS rendering without Chrome auth flows |
 
-## Browser sessions
+Compatibility aliases exist, but prefer the names above.
 
-**Always reuse the `default` session.** Only create named sessions for isolation (parallel subagents, different accounts). Stale recovery: close + recreate with same name. Note: closing a session deletes its profile directory (including cookies) — use `tap login` for persistent auth that survives session close.
+## Preferred auth flow
 
-See [references/browser.md](references/browser.md) for full commands, session strategy, and recovery.
+Do **not** use `tap login`.
 
-```bash
-tap browser session list | new <name> | info [name] | close [name]
-tap browser tab new <name> --url <url>
-# Page
-tap browser navigate <url>              # Go to URL
-tap browser back | forward | reload     # History navigation
-tap browser text [selector]             # Clean text via defuddle (token-efficient)
-tap browser evaluate <js>               # Run JavaScript
-tap browser screenshot | pdf            # Capture output
-# Interaction (real CDP events, human-like)
-tap browser click | hover <sel>         # Mouse actions
-tap browser type <sel> <text>           # Per-keystroke typing
-tap browser scroll <sel>                # Scroll into view
-tap browser select <sel> <value>        # Pick <select> option
-tap browser fill <sel> <val> [--submit] # Set form values
-tap browser wait <sel> [--timeout 30s]  # Wait for element visible
-tap browser keypress Enter              # Keyboard (Enter, Tab, Escape, Ctrl+a...)
-tap browser dialog [--accept=false]     # Handle alert/confirm/prompt
-# State
-tap browser forms                       # Discover form fields
-tap browser cookies get | set | clear   # Cookie management (includes httpOnly)
-# Network — see references/network.md
-tap browser network wait --url-pattern "*/api/*" --body
-tap browser network log --resource-type XHR,Fetch
-tap browser network intercept --block --url-pattern "*.ads.*"
-```
-
-## Electron apps
-
-Connect tap to any Electron (or CEF-based) desktop app via CDP — no plugins needed.
+Use:
 
 ```bash
-# Launch app with debugging + auto-create session
-tap electron launch "/Applications/MyApp.app/Contents/MacOS/MyApp" [--session <name>]
-
-# Attach to already-running app (started with --remote-debugging-port=PORT)
-tap electron attach --port <port> [--session <name>]
-
-# Adopt open windows as tracked tabs (run after attach or launch)
-tap electron discover [--session <name>]
-
-# List running processes with debug ports
-tap electron ps
+tap attach chrome
+tap browser open https://example.com/login --show
 ```
 
-After `discover`, use `tap browser` commands with `--session <name>` normally — screenshot, evaluate, click, type, network intercept, etc.
+Then reuse that same browser context with `tap site -b`, `tap fetch -b`, and later `tap browser ...` commands.
 
-See [references/browser.md](references/browser.md) for full browser command reference.
+`tap attach chrome` owns an internal proxy daemon for the attached browser. If that attached state goes stale, normal commands fail explicitly and should be repaired with `tap attach chrome`, not by switching contexts implicitly.
 
-## Reading pages efficiently
+## Context resolution
 
-**Never use `evaluate "document.documentElement.outerHTML"`.** Pick the cheapest path:
+Browser-backed commands resolve context in this order:
+1. explicit `--browser-url` / `--profile-dir`
+2. persisted default context from `tap attach ...`
+3. managed local default browser context
 
-1. **API exists?** → `network wait --body` (~1-5k tokens)
-2. **Readable content?** → `text [selector]` (~2-10k tokens, defuddle strips boilerplate)
-3. **Form fields?** → `forms` (~0.5-2k tokens)
-4. **Specific data?** → `evaluate` with targeted selector (~0.5-5k tokens)
-5. **Visual layout?** → `screenshot` (fixed cost)
+If an attached context becomes unreachable, tap marks it stale and fails explicitly. It does **not** silently switch to another browser/account context.
 
-## Doctor — browser dependencies
+## Efficiency rules
 
-```bash
-tap doctor              # Check tap, Chrome, Lightpanda status
-tap doctor --install    # Install or update Lightpanda to latest nightly
-```
+Never dump full HTML unless there is no cheaper path.
 
-**Lightpanda limitations:** macOS/Linux only. Not all sites work (advanced Web APIs, heavy JS frameworks may fail). No network interception, no persistent sessions/cookies. Use Chrome (`-b`) when `--lp` doesn't work.
+Preferred order:
+1. Site script
+2. `tap fetch`
+3. `tap browser network wait --body`
+4. `tap browser text`
+5. targeted `tap browser evaluate`
+6. screenshot
 
 ## References
 
-- [browser.md](references/browser.md) — Sessions, tabs, actions, session strategy
-- [network.md](references/network.md) — Network capture & interception
-- [script-development.md](references/script-development.md) — Writing site scripts
-- [site-notes.md](references/site-notes.md) — Per-site knowledge system
+- [browser.md](references/browser.md)
+- [network.md](references/network.md)
+- [script-development.md](references/script-development.md)
+- [site-notes.md](references/site-notes.md)

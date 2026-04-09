@@ -1,18 +1,17 @@
 # Network Interception
 
-Tap can capture, inspect, and intercept network requests on tracked browser tabs using Chrome DevTools Protocol (CDP). This covers two use cases:
+Tap can capture, inspect, and intercept network requests on the current browser tab using Chrome DevTools Protocol (CDP). This covers two use cases:
 
 - **Passive capture** (Network domain): observe requests, wait for specific API responses, stream network logs
 - **Active interception** (Fetch domain): block, mock, or modify requests
 
-All commands operate on the resolved tracked tab. Use `--session` and `--tab` to override defaults.
+All commands operate on the resolved current tab. Advanced `--session` and `--tab` overrides still exist but are hidden from the common UX.
 
 ## Quick Start
 
 ```bash
-# Set up a session and tab
-tap browser session new demo
-tap browser tab new page --url https://example.com
+# Open a page in the default browser context
+tap browser open https://example.com
 
 # Wait for a specific API request to complete
 tap browser network wait --url-pattern "*/api/*"
@@ -23,9 +22,8 @@ tap browser network log
 # Block ad requests
 tap browser network intercept --block --url-pattern "*.ads.*"
 
-# Clean up
+# Clear interception rules
 tap browser network clear
-tap browser session close demo
 ```
 
 ## Commands
@@ -222,8 +220,7 @@ Use `--resource-type XHR,Fetch` to capture only API calls.
 Many modern sites (Twitter/X, Instagram, Reddit) load data via internal API calls. The JSON from these APIs is far cleaner than scraping the DOM.
 
 ```bash
-tap browser session new twitter
-tap browser tab new feed --url https://x.com/elonmusk
+tap browser open https://x.com/elonmusk --show
 
 # Wait for the tweets API endpoint
 tap browser network wait --url-pattern "*/UserTweets*" --body --format json

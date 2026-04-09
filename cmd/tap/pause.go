@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/chromedp/cdproto/runtime"
@@ -137,11 +136,4 @@ func stdinIsTTY() bool {
 		return false
 	}
 	return (fi.Mode() & os.ModeCharDevice) != 0
-}
-
-func normalizeURL(url string) string {
-	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
-		return "https://" + url
-	}
-	return url
 }

@@ -10,26 +10,25 @@ import (
 func browserCmd() *cli.Command {
 	return &cli.Command{
 		Name:  "browser",
-		Usage: "Manage persistent browser sessions and tracked tabs",
-		Description: `Persistent browser automation with named sessions and tracked tabs.
+		Usage: "Browser automation and page interaction",
+		Description: `Open pages, interact with elements, and extract content from websites.
 
 Quick start:
-  tap browser session new default          Start a headless browser
-  tap browser tab new main --url <url>     Open a tracked tab
-  tap browser text                         Extract clean content (Markdown)
-  tap browser click "button.submit"        Interact with elements
-  tap browser screenshot                   Capture the page
+  tap browser open <url>                 Open or navigate to a URL
+  tap browser tabs                       List open tabs
+  tap browser switch <tab-id>            Switch to a different tab
+  tap browser click "#submit"            Click an element
+  tap browser text                       Extract readable page content
+  tap browser screenshot                 Capture the current page
 
-Commands are grouped by function:
-  Session & Tab:  session, tab
-  Navigation:     navigate, back, forward, reload
-  Page Content:   text, evaluate, screenshot, pdf
-  Interaction:    click, type, fill, hover, scroll, select, wait, keypress, dialog
-  State:          forms, cookies
-  Network:        network (wait, log, body, intercept, clear)
+For authenticated access:
+  tap attach chrome                      Attach your existing Chrome
+  tap browser open https://example.com/login --show
 
-Session resolution: --session flag → "default" session (auto-created if needed).
-Tab resolution: --tab flag → selected tab → the only live tracked tab.`,
+Default behavior:
+- Uses the default browser context (managed or attached)
+- Operates on the current tab (created automatically if needed)
+- Use --new-tab to open in a new tab instead of navigating current`,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:    "state-root",
@@ -38,9 +37,11 @@ Tab resolution: --tab flag → selected tab → the only live tracked tab.`,
 			},
 		},
 		Commands: []*cli.Command{
-			withCategory("Proxy", browserProxyCmd()),
-			withCategory("Session & Tab", browserSessionCmd()),
-			withCategory("Session & Tab", browserTabCmd()),
+			withCategory("Common", browserOpenCmd()),
+			withCategory("Common", browserTabsCmd()),
+			withCategory("Common", browserSwitchCmd()),
+			withCategory("Common", browserCloseTabCmd()),
+			withCategory("Common", browserStatusCmd()),
 			withCategory("Navigation", browserNavigateCmd()),
 			withCategory("Navigation", browserBackCmd()),
 			withCategory("Navigation", browserForwardCmd()),
@@ -77,12 +78,14 @@ func newBrowserManager(cmd *cli.Command) (*browser.Manager, error) {
 func browserActionFlags(includeOutput bool) []cli.Flag {
 	flags := []cli.Flag{
 		&cli.StringFlag{
-			Name:  "session",
-			Usage: "Browser session name; defaults to 'default' when omitted",
+			Name:   "session",
+			Usage:  "Advanced session override",
+			Hidden: true,
 		},
 		&cli.StringFlag{
-			Name:  "tab",
-			Usage: "Tracked tab name; defaults to the selected tab in the resolved session when omitted",
+			Name:   "tab",
+			Usage:  "Advanced tab override",
+			Hidden: true,
 		},
 	}
 	if includeOutput {
