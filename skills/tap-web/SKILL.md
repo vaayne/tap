@@ -1,5 +1,8 @@
 ---
 name: tap-web
+metadata:
+  author: vaayne/tap
+  version: "v0.3.3"
 description: >
   Access websites, search the web, and extract clean content using the `tap` CLI.
   Also automate pages, reuse an existing Chrome browser context, and
@@ -20,6 +23,8 @@ curl -fsSL https://raw.githubusercontent.com/vaayne/tap/main/scripts/install.sh 
 npx skills add vaayne/tap
 tap upgrade
 ```
+
+> **⚠️ Version Check**: If `tap --version` output doesn't match the skill's `metadata.version` above, upgrade both the CLI and skill to the latest version to ensure compatibility.
 
 **Before accessing any site, check `$XDG_CONFIG_HOME/tap/site-notes/{domain}.md` for saved knowledge. Update after learning.** See [references/site-notes.md](references/site-notes.md).
 
