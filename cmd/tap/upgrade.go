@@ -137,6 +137,16 @@ func runUpgrade(ctx context.Context, force bool) error {
 	}
 
 	fmt.Printf("Upgraded tap: %s -> %s\n", current, latest)
+
+	// Also update the embedded skill
+	fmt.Println("Updating skill...")
+	if err := extractEmbeddedSkill(defaultSkillDir(), false); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to update skill: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Run 'tap skill install' to manually update the skill.\n")
+	} else {
+		fmt.Printf("✓ Skill updated to %s\n", getEmbeddedSkillVersion())
+	}
+
 	return nil
 }
 

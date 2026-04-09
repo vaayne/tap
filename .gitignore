@@ -28,3 +28,6 @@ Thumbs.db
 .env
 !.env.example
 /tap
+
+# User data directories
+twitter_bookmarks/

@@ -19,6 +19,17 @@ var version = "dev"
 func main() {
 	_ = godotenv.Load()
 
+	// Auto-install embedded skill on first run (non-blocking)
+	// Respect TAP_SKILL_DIR env var for custom install path
+	skillDir := os.Getenv("TAP_SKILL_DIR")
+	if skillDir == "" {
+		skillDir = defaultSkillDir()
+	}
+	if err := installEmbeddedSkillIfNeeded(skillDir); err != nil {
+		// Silently ignore - user can manually install with `tap skill install`
+		_ = err
+	}
+
 	app := &cli.Command{
 		Name:    "tap",
 		Usage:   "Tap into any website from your terminal",
@@ -46,6 +57,7 @@ Use 'tap <command> --help' for details on any command.`,
 			statusCmd(),
 			doctorCmd(),
 			upgradeCmd(),
+			skillCmd(),
 			internalCmd(),
 		},
 	}
