@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"embed"
 	"fmt"
 	"io/fs"
 	"log"
@@ -11,17 +10,14 @@ import (
 	"strings"
 
 	"github.com/urfave/cli/v3"
+	"github.com/vaayne/tap"
 	"gopkg.in/yaml.v3"
 )
 
 const (
-	embeddedSkillRoot   = "skills/tap-web"
-	embeddedSkillConfig = embeddedSkillRoot + "/SKILL.md"
+	embeddedSkillRoot   = tap.EmbeddedTapWebSkillRoot
+	embeddedSkillConfig = tap.EmbeddedTapWebSkillConfig
 )
-
-//go:embed skills/tap-web/*
-//go:embed skills/tap-web/references/*
-var embeddedSkillFS embed.FS
 
 type skillMetadata struct {
 	Author  string `yaml:"author"`
@@ -151,7 +147,7 @@ func resolveSkillDir(cmd *cli.Command) string {
 }
 
 func getEmbeddedSkillVersion() string {
-	content, err := embeddedSkillFS.ReadFile(embeddedSkillConfig)
+	content, err := fs.ReadFile(tap.EmbeddedTapWebSkillFS(), embeddedSkillConfig)
 	if err != nil {
 		return "unknown"
 	}
@@ -201,7 +197,9 @@ func extractEmbeddedSkill(destDir string, verbose bool) error {
 		return fmt.Errorf("create skill directory: %w", err)
 	}
 
-	return fs.WalkDir(embeddedSkillFS, embeddedSkillRoot, func(path string, d fs.DirEntry, err error) error {
+	embeddedFS := tap.EmbeddedTapWebSkillFS()
+
+	return fs.WalkDir(embeddedFS, embeddedSkillRoot, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -221,7 +219,7 @@ func extractEmbeddedSkill(destDir string, verbose bool) error {
 		}
 
 		// Copy file
-		content, err := embeddedSkillFS.ReadFile(path)
+		content, err := fs.ReadFile(embeddedFS, path)
 		if err != nil {
 			return fmt.Errorf("read embedded file %s: %w", path, err)
 		}
