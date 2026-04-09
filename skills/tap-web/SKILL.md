@@ -5,13 +5,10 @@ metadata:
   version: "v0.4.1"
 description: >
   Access websites, search the web, and extract clean content using the `tap` CLI.
-  Also automate pages, reuse an existing Chrome browser context, and
-  capture network requests when interaction is required.
-  Use when the user asks to search the web, read a webpage, fetch article content,
-  get trending topics, look up social media posts, check stock prices, search videos,
-  retrieve structured data from any supported site, open a page, switch tabs,
-  take a screenshot, evaluate JavaScript, fill a form, inspect cookies,
-  capture or intercept network requests, or connect to a desktop app via CDP.
+  Supports structured site scripts, readable page extraction, and browser automation
+  for tabs, screenshots, forms, cookies, JavaScript evaluation, and network capture.
+  Use for web lookup, page reading, content extraction, browser interaction,
+  authenticated sessions, request interception, or CDP-connected desktop apps.
 ---
 
 # tap-web
