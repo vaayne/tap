@@ -65,7 +65,15 @@ func (m *Manager) CreateSession(ctx context.Context, name string, mode Mode, opt
 		session.Process = proc
 
 		if err := m.store.Update(func(state *State) error {
-			return state.CreateSession(session)
+			if err := state.CreateSession(session); err != nil {
+				return err
+			}
+			if name == DefaultSessionName {
+				if err := state.SetDefaultContext(name, DefaultContextManaged, now); err != nil {
+					return err
+				}
+			}
+			return nil
 		}); err != nil {
 			_ = KillProcess(proc)
 			return fmt.Errorf("create session: %w", err)
@@ -87,7 +95,15 @@ func (m *Manager) CreateSession(ctx context.Context, name string, mode Mode, opt
 		session.Process = &ProcessRecord{DebugURL: resolvedURL}
 
 		if err := m.store.Update(func(state *State) error {
-			return state.CreateSession(session)
+			if err := state.CreateSession(session); err != nil {
+				return err
+			}
+			if name == DefaultSessionName {
+				if err := state.SetDefaultContext(name, DefaultContextAttached, now); err != nil {
+					return err
+				}
+			}
+			return nil
 		}); err != nil {
 			return fmt.Errorf("create session: %w", err)
 		}
@@ -174,14 +190,38 @@ func (m *Manager) ListSessions(_ context.Context) (*SessionList, error) {
 	return &SessionList{Sessions: sessions}, nil
 }
 
-// GetSession resolves a session by name (or falls back to the selected/only session).
+// DefaultContext returns the persisted default browser context metadata.
+func (m *Manager) DefaultContext(_ context.Context) (*DefaultContextRecord, error) {
+	state, err := m.store.Load()
+	if err != nil {
+		return nil, fmt.Errorf("default context: %w", err)
+	}
+	return state.DefaultContext, nil
+}
+
+// SetDefaultContext persists the default browser context resolution.
+func (m *Manager) SetDefaultContext(_ context.Context, sessionName string, kind DefaultContextKind) error {
+	return m.store.Update(func(state *State) error {
+		return state.SetDefaultContext(sessionName, kind, time.Now())
+	})
+}
+
+// ClearDefaultContext removes the persisted default browser context.
+func (m *Manager) ClearDefaultContext(_ context.Context) error {
+	return m.store.Update(func(state *State) error {
+		state.ClearDefaultContext()
+		return nil
+	})
+}
+
+// GetSession resolves a session by name or the persisted default context.
 func (m *Manager) GetSession(_ context.Context, name string) (*SessionRecord, error) {
 	state, err := m.store.Load()
 	if err != nil {
 		return nil, fmt.Errorf("get session: %w", err)
 	}
 
-	session, err := state.ResolveSession(name)
+	session, err := state.ResolveSessionByPreference(name)
 	if err != nil {
 		return nil, fmt.Errorf("get session: %w", err)
 	}
@@ -337,7 +377,7 @@ func (m *Manager) ListTabs(_ context.Context, sessionName string) (*TabList, err
 		return nil, fmt.Errorf("list tabs: %w", err)
 	}
 
-	session, err := state.ResolveSession(sessionName)
+	session, err := state.ResolveSessionByPreference(sessionName)
 	if err != nil {
 		return nil, fmt.Errorf("list tabs: %w", err)
 	}
@@ -852,6 +892,7 @@ func (m *Manager) resolveTarget(ctx context.Context, sessionName string, tabName
 	}
 	sessionName = resolved
 	var rt resolvedTarget
+	var mode Mode
 	rt.SessionName = sessionName
 	err = m.store.WithSessionLock(sessionName, func() error {
 		state, err := m.store.Load()
@@ -862,6 +903,7 @@ func (m *Manager) resolveTarget(ctx context.Context, sessionName string, tabName
 		if err != nil {
 			return err
 		}
+		mode = session.Mode
 		tab, err := session.ResolveTab(tabName)
 		if err != nil {
 			return err
@@ -881,6 +923,16 @@ func (m *Manager) resolveTarget(ctx context.Context, sessionName string, tabName
 	if err != nil {
 		return resolvedTarget{}, fmt.Errorf("%s: %w", op, err)
 	}
+	if mode == ModeRemote {
+		if err := checkDebugEndpoint(ctx, rt.DebugURL); err != nil {
+			markErr := m.markSessionStale(sessionName, fmt.Sprintf("debug endpoint unreachable: %v", err))
+			if markErr != nil {
+				return resolvedTarget{}, fmt.Errorf("%s: %w (also failed to mark session stale: %v)", op, err, markErr)
+			}
+			return resolvedTarget{}, fmt.Errorf("%s: remote session %q is unreachable: %w", op, sessionName, err)
+		}
+		_ = m.markSessionHealthy(sessionName)
+	}
 	return rt, nil
 }
 
@@ -893,26 +945,30 @@ func (m *Manager) resolveSessionName(ctx context.Context, name string, autoCreat
 	if err != nil {
 		return "", err
 	}
-	session, err := state.ResolveSession(name)
-	if err == nil {
+	if name != "" {
+		session, err := state.ResolveSession(name)
+		if err != nil {
+			return "", err
+		}
 		return session.Name, nil
 	}
 
-	// Resolve the effective name for the error/auto-create path.
-	if name == "" {
-		name = DefaultSessionName
-	}
-	if !autoCreate || name != DefaultSessionName {
-		return "", fmt.Errorf("%w: %s", ErrSessionNotFound, name)
+	if session, err := state.ResolveSessionByPreference(""); err == nil {
+		return session.Name, nil
+	} else if state.DefaultContext != nil {
+		return "", err
 	}
 
-	// Auto-create the default session. Handle the race where a concurrent
-	// caller already created it between our Load and now.
+	if !autoCreate {
+		return "", fmt.Errorf("%w: %s", ErrSessionNotFound, DefaultSessionName)
+	}
+
+	// Auto-create the managed local default session only when no persisted
+	// default context exists. This preserves explicit attached-context failures.
 	if err := m.CreateSession(ctx, DefaultSessionName, ModeLocal, SessionOptions{Headless: true}); err != nil {
-		// Re-check: another goroutine may have won the race.
 		if s, loadErr := m.store.Load(); loadErr == nil {
-			if _, ok := s.Sessions[DefaultSessionName]; ok {
-				return DefaultSessionName, nil
+			if session, resolveErr := s.ResolveSessionByPreference(""); resolveErr == nil {
+				return session.Name, nil
 			}
 		}
 		return "", fmt.Errorf("auto-create default session: %w", err)
@@ -929,6 +985,28 @@ func resolveDebugURL(session *SessionRecord) (string, error) {
 		return session.Remote.WSURL, nil
 	}
 	return "", fmt.Errorf("session %q has no debug endpoint", session.Name)
+}
+
+// markSessionStale reconciles a session to an all-stale state and annotates the
+// persisted default context when it points at the same session.
+func (m *Manager) markSessionStale(sessionName string, reason string) error {
+	now := time.Now()
+	return m.store.UpdateSession(sessionName, func(state *State, _ *SessionRecord) error {
+		if err := state.ReconcileSession(sessionName, nil, now); err != nil {
+			return err
+		}
+		state.MarkDefaultContextStale(sessionName, reason, now)
+		return nil
+	})
+}
+
+// markSessionHealthy clears any stale marker from the persisted default context.
+func (m *Manager) markSessionHealthy(sessionName string) error {
+	now := time.Now()
+	return m.store.Update(func(state *State) error {
+		state.MarkDefaultContextHealthy(sessionName, now)
+		return nil
+	})
 }
 
 // requireLiveTab ensures a tab is in a usable state for browser actions.
