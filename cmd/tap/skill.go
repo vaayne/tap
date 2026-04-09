@@ -14,17 +14,20 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const (
+	embeddedSkillRoot   = "skills/tap-web"
+	embeddedSkillConfig = embeddedSkillRoot + "/SKILL.md"
+)
+
 //go:embed skills/tap-web/*
 //go:embed skills/tap-web/references/*
 var embeddedSkillFS embed.FS
 
-// skillMetadata represents the skill.yaml/metadata section
- type skillMetadata struct {
+type skillMetadata struct {
 	Author  string `yaml:"author"`
 	Version string `yaml:"version"`
 }
 
-// skillConfig represents the full skill.yaml structure
 type skillConfig struct {
 	Metadata skillMetadata `yaml:"metadata"`
 }
@@ -40,45 +43,36 @@ It is embedded in the tap binary and can be installed to the skills directory.`,
 				Name:   "install",
 				Usage:  "Install or update the embedded skill",
 				Action: skillInstallAction,
-				Flags: []cli.Flag{
+				Flags: append([]cli.Flag{
 					&cli.BoolFlag{
 						Name:  "force",
 						Usage: "Reinstall even if already up to date",
 					},
-					&cli.StringFlag{
-						Name:    "path",
-						Aliases: []string{"dir"},
-						Usage:   "Custom installation directory (default: ~/.config/tap/skills/tap-web/)",
-						Sources: cli.EnvVars("TAP_SKILL_DIR"),
-					},
-				},
+				}, skillPathFlags("Custom installation directory (default: ~/.config/tap/skills/tap-web/)")...),
 			},
 			{
 				Name:   "version",
 				Usage:  "Show embedded skill version",
 				Action: skillVersionAction,
-				Flags: []cli.Flag{
-					&cli.StringFlag{
-						Name:    "path",
-						Aliases: []string{"dir"},
-						Usage:   "Custom installation directory to check",
-						Sources: cli.EnvVars("TAP_SKILL_DIR"),
-					},
-				},
+				Flags:  skillPathFlags("Custom installation directory to check"),
 			},
 			{
 				Name:   "path",
 				Usage:  "Show skill installation path",
 				Action: skillPathAction,
-				Flags: []cli.Flag{
-					&cli.StringFlag{
-						Name:    "path",
-						Aliases: []string{"dir"},
-						Usage:   "Custom installation directory",
-						Sources: cli.EnvVars("TAP_SKILL_DIR"),
-					},
-				},
+				Flags:  skillPathFlags("Custom installation directory"),
 			},
+		},
+	}
+}
+
+func skillPathFlags(usage string) []cli.Flag {
+	return []cli.Flag{
+		&cli.StringFlag{
+			Name:    "path",
+			Aliases: []string{"dir"},
+			Usage:   usage,
+			Sources: cli.EnvVars("TAP_SKILL_DIR"),
 		},
 	}
 }
@@ -156,59 +150,49 @@ func resolveSkillDir(cmd *cli.Command) string {
 	return defaultSkillDir()
 }
 
-// getEmbeddedSkillVersion reads version from embedded SKILL.md
 func getEmbeddedSkillVersion() string {
-	content, err := embeddedSkillFS.ReadFile("skills/tap-web/SKILL.md")
+	content, err := embeddedSkillFS.ReadFile(embeddedSkillConfig)
 	if err != nil {
 		return "unknown"
 	}
-
-	// Parse YAML frontmatter
-	str := string(content)
-	if !strings.HasPrefix(str, "---") {
-		return "unknown"
-	}
-
-	// Extract frontmatter between --- markers
-	end := strings.Index(str[3:], "---")
-	if end == -1 {
-		return "unknown"
-	}
-	frontmatter := str[3 : end+3]
-
-	var config skillConfig
-	if err := yaml.Unmarshal([]byte(frontmatter), &config); err != nil {
-		return "unknown"
-	}
-
-	return config.Metadata.Version
+	return parseSkillVersion(content)
 }
 
-// isSkillInstalled checks if skill is installed and returns its version
 func isSkillInstalled(skillDir string) (bool, string) {
-	skillPath := filepath.Join(skillDir, "SKILL.md")
-	content, err := os.ReadFile(skillPath)
+	content, err := os.ReadFile(filepath.Join(skillDir, "SKILL.md"))
 	if err != nil {
 		return false, ""
 	}
+	return true, parseSkillVersion(content)
+}
 
-	str := string(content)
-	if !strings.HasPrefix(str, "---") {
-		return true, "unknown"
+func parseSkillVersion(content []byte) string {
+	frontmatter, ok := extractFrontmatter(string(content))
+	if !ok {
+		return "unknown"
 	}
-
-	end := strings.Index(str[3:], "---")
-	if end == -1 {
-		return true, "unknown"
-	}
-	frontmatter := str[3 : end+3]
 
 	var config skillConfig
 	if err := yaml.Unmarshal([]byte(frontmatter), &config); err != nil {
-		return true, "unknown"
+		return "unknown"
+	}
+	if config.Metadata.Version == "" {
+		return "unknown"
+	}
+	return config.Metadata.Version
+}
+
+func extractFrontmatter(content string) (string, bool) {
+	if !strings.HasPrefix(content, "---") {
+		return "", false
 	}
 
-	return true, config.Metadata.Version
+	end := strings.Index(content[3:], "---")
+	if end == -1 {
+		return "", false
+	}
+
+	return content[3 : end+3], true
 }
 
 // extractEmbeddedSkill extracts all embedded skill files to the destination
@@ -217,13 +201,12 @@ func extractEmbeddedSkill(destDir string, verbose bool) error {
 		return fmt.Errorf("create skill directory: %w", err)
 	}
 
-	return fs.WalkDir(embeddedSkillFS, "skills/tap-web", func(path string, d fs.DirEntry, err error) error {
+	return fs.WalkDir(embeddedSkillFS, embeddedSkillRoot, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 
-		// Calculate relative path from skills/tap-web
-		relPath, err := filepath.Rel("skills/tap-web", path)
+		relPath, err := filepath.Rel(embeddedSkillRoot, path)
 		if err != nil {
 			return err
 		}
@@ -255,14 +238,20 @@ func extractEmbeddedSkill(destDir string, verbose bool) error {
 	})
 }
 
-// installEmbeddedSkillIfNeeded installs the embedded skill if not present
 func installEmbeddedSkillIfNeeded(skillDir string) error {
 	if installed, _ := isSkillInstalled(skillDir); installed {
 		return nil
 	}
-
-	// Auto-install on first run
 	return extractEmbeddedSkill(skillDir, false)
 }
 
-
+func autoInstallEmbeddedSkill() {
+	skillDir := os.Getenv("TAP_SKILL_DIR")
+	if skillDir == "" {
+		skillDir = defaultSkillDir()
+	}
+	if err := installEmbeddedSkillIfNeeded(skillDir); err != nil {
+		// Silently ignore; user can manually install with `tap skill install`.
+		_ = err
+	}
+}
