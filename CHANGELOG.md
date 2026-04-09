@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-04-09
+
+### Added
+
+- **Electron app debugging via CDP** — `tap electron` commands to connect to, inspect, and control Electron apps
+- **Built-in Chrome proxy** — `tap chrome` command manages a dedicated Chrome process with configurable port and headless mode
+- **Attach to user's existing Chrome** — `tap attach` connects to an already-running Chrome instance via CDP WebSocket
+- **Simplified CLI commands** — streamlined `tap open`/`tap do` shorthand for common browser operations
+- **Persisted default browser context** — automatic reuse of the "default" session without explicit session management
+
+### Changed
+
+- Pinned Go version to 1.26 for reproducible builds
+- Refactored CLI surface around attach and browser commands for cleaner UX
+- Updated documentation to cover Chrome proxy and browser attachment workflows
+
+### Fixed
+
+- Accept valid CDP WebSocket endpoints during attach (relaxed URL validation)
+
 ## [0.3.3] - 2026-04-07
 
 ### Added
