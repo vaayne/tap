@@ -77,44 +77,47 @@ func skillPathFlags(usage string) []cli.Flag {
 func skillInstallAction(ctx context.Context, cmd *cli.Command) error {
 	force := cmd.Bool("force")
 	skillDir := resolveSkillDir(cmd)
+	targetVersion := targetSkillVersion()
 
-	// Check if already installed and up to date
 	if !force {
 		if installed, current := isSkillInstalled(skillDir); installed {
-			embeddedVersion := getEmbeddedSkillVersion()
-			if current == embeddedVersion {
+			if current == targetVersion {
 				fmt.Printf("Skill already up to date (%s) at %s\n", current, skillDir)
 				return nil
 			}
-			fmt.Printf("Updating skill: %s -> %s\n", current, embeddedVersion)
+			fmt.Printf("Updating skill: %s -> %s\n", current, targetVersion)
 		}
 	}
 
-	// Extract embedded skill
 	if err := extractEmbeddedSkill(skillDir, cmd.Root().Bool("verbose")); err != nil {
 		return fmt.Errorf("failed to extract skill: %w", err)
 	}
 
-	embeddedVersion := getEmbeddedSkillVersion()
-	fmt.Printf("✓ Skill installed (%s) at %s\n", embeddedVersion, skillDir)
+	fmt.Printf("✓ Skill installed (%s) at %s\n", getEmbeddedSkillVersion(), skillDir)
 	return nil
 }
 
-// skillVersionAction shows the embedded skill version
+// skillVersionAction shows the installed skill version relative to the current tap CLI version.
 func skillVersionAction(ctx context.Context, cmd *cli.Command) error {
-	embeddedVersion := getEmbeddedSkillVersion()
-
-	// Check installed version
+	cliVersion := currentCLIVersion()
+	targetVersion := targetSkillVersion()
 	skillDir := resolveSkillDir(cmd)
+
+	fmt.Printf("tap CLI version: %s\n", cliVersion)
+	if targetVersion != cliVersion {
+		fmt.Printf("Bundled skill version: %s\n", targetVersion)
+	}
+
 	if installed, installedVersion := isSkillInstalled(skillDir); installed {
-		if installedVersion == embeddedVersion {
-			fmt.Printf("Skill version: %s (installed, in sync with CLI)\n", embeddedVersion)
+		fmt.Printf("Installed skill version: %s\n", installedVersion)
+		if installedVersion == targetVersion {
+			fmt.Println("Status: in sync")
 		} else {
-			fmt.Printf("Skill version: %s (installed: %s, run 'tap skill install' to update)\n",
-				embeddedVersion, installedVersion)
+			fmt.Println("Status: mismatch (run 'tap skill install')")
 		}
 	} else {
-		fmt.Printf("Skill version: %s (not installed, run 'tap skill install')\n", embeddedVersion)
+		fmt.Println("Installed skill version: not installed")
+		fmt.Println("Status: missing (run 'tap skill install')")
 	}
 	return nil
 }
@@ -152,6 +155,24 @@ func getEmbeddedSkillVersion() string {
 		return "unknown"
 	}
 	return parseSkillVersion(content)
+}
+
+func currentCLIVersion() string {
+	if version == "" {
+		return "unknown"
+	}
+	if version == "dev" || strings.HasPrefix(version, "v") {
+		return version
+	}
+	return "v" + version
+}
+
+func targetSkillVersion() string {
+	cliVersion := currentCLIVersion()
+	if cliVersion == "dev" || cliVersion == "unknown" {
+		return getEmbeddedSkillVersion()
+	}
+	return cliVersion
 }
 
 func isSkillInstalled(skillDir string) (bool, string) {
