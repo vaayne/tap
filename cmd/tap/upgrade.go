@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -138,16 +139,21 @@ func runUpgrade(ctx context.Context, force bool) error {
 
 	fmt.Printf("Upgraded tap: %s -> %s\n", current, latest)
 
-	// Also update the embedded skill
 	fmt.Println("Updating skill...")
-	if err := extractEmbeddedSkill(defaultSkillDir(), false); err != nil {
+	if err := installSkillWithUpgradedBinary(ctx, exe); err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: failed to update skill: %v\n", err)
 		fmt.Fprintf(os.Stderr, "Run 'tap skill install' to manually update the skill.\n")
-	} else {
-		fmt.Printf("✓ Skill updated to %s\n", getEmbeddedSkillVersion())
 	}
 
 	return nil
+}
+
+func installSkillWithUpgradedBinary(ctx context.Context, exe string) error {
+	cmd := exec.CommandContext(ctx, exe, "skill", "install")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Env = os.Environ()
+	return cmd.Run()
 }
 
 func extractTapBinary(r io.Reader) ([]byte, error) {
