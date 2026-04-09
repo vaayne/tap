@@ -5,13 +5,13 @@ metadata:
   version: "v0.4.0"
 description: >
   Access websites, search the web, and extract clean content using the `tap` CLI.
-  Also manage persistent browser sessions for long-lived automation workflows,
-  and debug or automate Electron apps via CDP.
+  Also automate pages, reuse an existing Chrome browser context, and
+  capture network requests when interaction is required.
   Use when the user asks to search the web, read a webpage, fetch article content,
   get trending topics, look up social media posts, check stock prices, search videos,
-  retrieve structured data from any supported site, manage browser sessions/tabs,
-  capture or intercept network requests, block or mock API calls, debug an Electron app,
-  automate an Electron app, or connect to a desktop app via CDP.
+  retrieve structured data from any supported site, open a page, switch tabs,
+  take a screenshot, evaluate JavaScript, fill a form, inspect cookies,
+  capture or intercept network requests, or connect to a desktop app via CDP.
 ---
 
 # tap-web
@@ -32,7 +32,7 @@ tap skill install --path /custom/path/to/skills/tap-web
 TAP_SKILL_DIR=/custom/path/to/skills/tap-web tap skill install
 ```
 
-> **⚠️ Upgrade Note**: After upgrading `tap`, run `tap skill install` again so the local installed skill matches the bundled version in the current CLI.
+> **⚠️ Upgrade Note**: After upgrading `tap`, run `tap skill install` again so the local installed skill matches the bundled version in the current CLI. If you use a custom install location, rerun it with the same `--path` or `TAP_SKILL_DIR`.
 
 **Before accessing any site, check `$XDG_CONFIG_HOME/tap/site-notes/{domain}.md` for saved knowledge. Update after learning.** See [references/site-notes.md](references/site-notes.md).
 
