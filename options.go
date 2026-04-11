@@ -11,12 +11,12 @@ type options struct {
 	sitesDir         string
 	localOverrideDir string
 	wsURL            string
-	profileDir   string
-	forceBrowser bool
-	headless     bool
-	browserType  transport.BrowserType
-	pauseFn      transport.PauseFunc
-	timeout      time.Duration
+	profileDir       string
+	forceBrowser     bool
+	headless         bool
+	browserType      transport.BrowserType
+	pauseFn          transport.PauseFunc
+	timeout          time.Duration
 }
 
 func defaultOptions() options {

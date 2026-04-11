@@ -9,8 +9,8 @@ import (
 
 // Registry indexes scripts by their meta name.
 type Registry struct {
-	scripts         map[string]*Script
-	dir             string
+	scripts          map[string]*Script
+	dir              string
 	localOverrideDir string // checked first; empty = disabled
 }
 
@@ -23,8 +23,8 @@ func NewRegistry(dir string) (*Registry, error) {
 // before the main cache dir. Scripts found there shadow the cached versions.
 func NewRegistryWithOverride(dir, localOverrideDir string) (*Registry, error) {
 	r := &Registry{
-		scripts:         make(map[string]*Script),
-		dir:             dir,
+		scripts:          make(map[string]*Script),
+		dir:              dir,
 		localOverrideDir: localOverrideDir,
 	}
 	if err := r.scan(); err != nil {

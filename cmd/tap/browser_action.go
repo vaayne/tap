@@ -244,6 +244,62 @@ Examples:
 	}
 }
 
+func browserSnapshotCmd() *cli.Command {
+	return &cli.Command{
+		Name:  "snapshot",
+		Usage: "Capture an AI-friendly semantic page snapshot with stable refs",
+		Flags: append(browserActionFlags(false),
+			&cli.BoolFlag{
+				Name:  "interactive",
+				Usage: "Only include interactive nodes (button/link/input/etc)",
+			},
+			&cli.StringFlag{
+				Name:  "selector",
+				Usage: "Optional scope selector (reserved for future use)",
+			},
+			&cli.IntFlag{
+				Name:  "depth",
+				Usage: "Maximum AX tree depth to capture",
+			},
+			&cli.StringFlag{
+				Name:    "format",
+				Aliases: []string{"f"},
+				Usage:   "Output format: json, pretty (default), raw",
+				Value:   formatPretty,
+			},
+		),
+		Description: `Capture a compact semantic tree from the current page and assign stable refs
+for interactive elements (e.g. @e1, @e2). Refs can be reused in click/type/fill/select.
+
+Examples:
+  tap browser snapshot
+  tap browser snapshot --interactive -f json
+  tap browser click @e3
+  tap browser type @e1 "hello"`,
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			configureLogging(cmd)
+			mgr, err := newBrowserManager(cmd)
+			if err != nil {
+				return err
+			}
+			result, err := mgr.Snapshot(ctx, cmd.String("session"), cmd.String("tab"), browser.SnapshotOptions{
+				InteractiveOnly: cmd.Bool("interactive"),
+				Selector:        cmd.String("selector"),
+				Depth:           int64(cmd.Int("depth")),
+				Mode:            "auto",
+			})
+			if err != nil {
+				return err
+			}
+			if len(result.Nodes) == 0 {
+				fmt.Fprintln(os.Stderr, "No snapshot nodes captured.")
+				return nil
+			}
+			return printResult(cmd, result)
+		},
+	}
+}
+
 func browserPDFCmd() *cli.Command {
 	return &cli.Command{
 		Name:  "pdf",
@@ -338,19 +394,21 @@ func browserFillCmd() *cli.Command {
 	return &cli.Command{
 		Name:      "fill",
 		Usage:     "Fill form fields in a tracked browser tab",
-		ArgsUsage: "<selector> <value> [<selector> <value> ...]",
+		ArgsUsage: "<selector|@eN> <value> [<selector|@eN> <value> ...]",
 		Flags: append(browserActionFlags(false), &cli.StringFlag{
 			Name:  "submit",
 			Usage: "CSS selector of element to click after filling (e.g. button[type=submit])",
 		}),
 		Description: `Fill one or more form fields by CSS selector, then optionally submit.
 
-Arguments are selector/value pairs. Values are set using React-compatible
+Arguments are target/value pairs. Targets can be CSS selectors or snapshot refs.
+Values are set using React-compatible
 native setters with proper input/change event dispatch, so this works with
 React, Vue, Angular, and vanilla HTML forms.
 
 Examples:
   tap browser fill "#username" "myuser"
+  tap browser fill @e1 "me@example.com"
   tap browser fill "#email" "me@example.com" "#password" "secret" --submit "button[type=submit]"
   tap browser fill "input[type=search]" "query text"`,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
@@ -360,11 +418,11 @@ Examples:
 				return fmt.Errorf("arguments must be selector/value pairs (got %d args)", len(args))
 			}
 
-			var fields []browser.FillField
+			var inputs []browser.FillInput
 			for i := 0; i < len(args); i += 2 {
-				fields = append(fields, browser.FillField{
-					Selector: args[i],
-					Value:    args[i+1],
+				inputs = append(inputs, browser.FillInput{
+					Target: args[i],
+					Value:  args[i+1],
 				})
 			}
 
@@ -376,12 +434,12 @@ Examples:
 			tabName := cmd.String("tab")
 			submitSelector := cmd.String("submit")
 
-			if err := mgr.Fill(ctx, sessionName, tabName, fields, submitSelector); err != nil {
+			if err := mgr.FillElements(ctx, sessionName, tabName, inputs, submitSelector); err != nil {
 				return err
 			}
 
-			for _, f := range fields {
-				fmt.Fprintf(os.Stderr, "Filled %s\n", f.Selector)
+			for _, f := range inputs {
+				fmt.Fprintf(os.Stderr, "Filled %s\n", f.Target)
 			}
 			if submitSelector != "" {
 				fmt.Fprintf(os.Stderr, "Clicked %s\n", submitSelector)
@@ -571,8 +629,8 @@ func browserCookiesClearCmd() *cli.Command {
 func browserClickCmd() *cli.Command {
 	return &cli.Command{
 		Name:      "click",
-		Usage:     "Click an element by CSS selector",
-		ArgsUsage: "<selector>",
+		Usage:     "Click an element by CSS selector or snapshot ref",
+		ArgsUsage: "<selector|@eN>",
 		Flags:     browserActionFlags(false),
 		Description: `Dispatch a real mouse click (mouseMoved → mousePressed → mouseReleased)
 on the first visible element matching the CSS selector.
@@ -582,6 +640,7 @@ sites that listen on mousedown or have hover-triggered menus.
 
 Examples:
   tap browser click "button.submit"
+  tap browser click @e3
   tap browser click "a[href='/login']"`,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			configureLogging(cmd)
@@ -593,7 +652,7 @@ Examples:
 			if err != nil {
 				return err
 			}
-			if err := mgr.Click(ctx, cmd.String("session"), cmd.String("tab"), sel); err != nil {
+			if err := mgr.ClickElement(ctx, cmd.String("session"), cmd.String("tab"), sel); err != nil {
 				return err
 			}
 			fmt.Fprintf(os.Stderr, "Clicked %s\n", sel)
@@ -606,7 +665,7 @@ func browserTypeCmd() *cli.Command {
 	return &cli.Command{
 		Name:      "type",
 		Usage:     "Type text into an element with real key events",
-		ArgsUsage: "<selector> <text>",
+		ArgsUsage: "<selector|@eN> <text>",
 		Flags:     browserActionFlags(false),
 		Description: `Focus the element matching the CSS selector and send individual
 keyDown/keyUp events for each character — behaving like a real user typing.
@@ -616,6 +675,7 @@ or has anti-bot detection.
 
 Examples:
   tap browser type "#search" "golang tutorials"
+  tap browser type @e1 "hello world"
   tap browser type "input[name=q]" "hello world"`,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			configureLogging(cmd)
@@ -627,7 +687,7 @@ Examples:
 			if err != nil {
 				return err
 			}
-			if err := mgr.Type(ctx, cmd.String("session"), cmd.String("tab"), args[0], args[1]); err != nil {
+			if err := mgr.TypeElement(ctx, cmd.String("session"), cmd.String("tab"), args[0], args[1]); err != nil {
 				return err
 			}
 			fmt.Fprintf(os.Stderr, "Typed into %s\n", args[0])
@@ -721,7 +781,7 @@ func browserSelectCmd() *cli.Command {
 	return &cli.Command{
 		Name:      "select",
 		Usage:     "Select an option in a <select> element",
-		ArgsUsage: "<selector> <value>",
+		ArgsUsage: "<selector|@eN> <value>",
 		Flags:     browserActionFlags(false),
 		Description: `Select an option by value in a <select> element, dispatching
 focus, input, and change events. Works with native HTML selects.
@@ -731,13 +791,13 @@ For custom dropdown components (React Select, etc.), use 'click' instead.`,
 			configureLogging(cmd)
 			args := cmd.Args().Slice()
 			if len(args) < 2 {
-				return fmt.Errorf("usage: tap browser select <selector> <value>")
+				return fmt.Errorf("usage: tap browser select <selector|@eN> <value>")
 			}
 			mgr, err := newBrowserManager(cmd)
 			if err != nil {
 				return err
 			}
-			if err := mgr.Select(ctx, cmd.String("session"), cmd.String("tab"), args[0], args[1]); err != nil {
+			if err := mgr.SelectElement(ctx, cmd.String("session"), cmd.String("tab"), args[0], args[1]); err != nil {
 				return err
 			}
 			fmt.Fprintf(os.Stderr, "Selected %q in %s\n", args[1], args[0])

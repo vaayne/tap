@@ -47,6 +47,7 @@ Default behavior:
 			withCategory("Navigation", browserForwardCmd()),
 			withCategory("Navigation", browserReloadCmd()),
 			withCategory("Page Content", browserTextCmd()),
+			withCategory("Page Content", browserSnapshotCmd()),
 			withCategory("Page Content", browserEvaluateCmd()),
 			withCategory("Page Content", browserScreenshotCmd()),
 			withCategory("Page Content", browserPDFCmd()),

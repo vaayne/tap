@@ -8,6 +8,8 @@ import (
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/chromedp/cdproto/cdp"
 )
 
 // SessionOptions holds optional settings for session creation.
@@ -528,6 +530,29 @@ func (m *Manager) Fill(ctx context.Context, sessionName string, tabName string, 
 	return nil
 }
 
+// FillInput represents a fill target (CSS selector or snapshot ref) and value.
+type FillInput struct {
+	Target string
+	Value  string
+}
+
+// Snapshot captures and persists the latest semantic page snapshot for a tab.
+func (m *Manager) Snapshot(ctx context.Context, sessionName string, tabName string, opts SnapshotOptions) (*SnapshotResult, error) {
+	rt, err := m.resolveTarget(ctx, sessionName, tabName, "snapshot")
+	if err != nil {
+		return nil, err
+	}
+	result, err := SnapshotTarget(ctx, rt.DebugURL, rt.TargetID, opts)
+	if err != nil {
+		return nil, fmt.Errorf("snapshot: %w", err)
+	}
+	result.GeneratedAt = time.Now().UTC()
+	if err := m.saveSnapshot(rt.SessionName, rt.TabName, result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
 // PDFResult holds the PDF data and resolved names.
 type PDFResult struct {
 	Data        []byte
@@ -560,6 +585,28 @@ func (m *Manager) Click(ctx context.Context, sessionName string, tabName string,
 	return nil
 }
 
+// ClickElement clicks an element by CSS selector or snapshot ref (e.g. @e12).
+func (m *Manager) ClickElement(ctx context.Context, sessionName, tabName, arg string) error {
+	rt, err := m.resolveTarget(ctx, sessionName, tabName, "click")
+	if err != nil {
+		return err
+	}
+	selector, backendNodeID, err := m.resolveElementArg(rt.SessionName, rt.TabName, arg)
+	if err != nil {
+		return err
+	}
+	if backendNodeID > 0 {
+		if err := ClickTargetByBackendNodeID(ctx, rt.DebugURL, rt.TargetID, backendNodeID); err != nil {
+			return fmt.Errorf("click: %w", err)
+		}
+		return nil
+	}
+	if err := ClickTarget(ctx, rt.DebugURL, rt.TargetID, selector); err != nil {
+		return fmt.Errorf("click: %w", err)
+	}
+	return nil
+}
+
 // Type sends individual key events to the element matching sel in a tracked tab.
 func (m *Manager) Type(ctx context.Context, sessionName string, tabName string, sel string, text string) error {
 	rt, err := m.resolveTarget(ctx, sessionName, tabName, "type")
@@ -567,6 +614,28 @@ func (m *Manager) Type(ctx context.Context, sessionName string, tabName string, 
 		return err
 	}
 	if err := TypeTarget(ctx, rt.DebugURL, rt.TargetID, sel, text); err != nil {
+		return fmt.Errorf("type: %w", err)
+	}
+	return nil
+}
+
+// TypeElement types into an element by CSS selector or snapshot ref.
+func (m *Manager) TypeElement(ctx context.Context, sessionName, tabName, arg, text string) error {
+	rt, err := m.resolveTarget(ctx, sessionName, tabName, "type")
+	if err != nil {
+		return err
+	}
+	selector, backendNodeID, err := m.resolveElementArg(rt.SessionName, rt.TabName, arg)
+	if err != nil {
+		return err
+	}
+	if backendNodeID > 0 {
+		if err := TypeTargetByBackendNodeID(ctx, rt.DebugURL, rt.TargetID, backendNodeID, text); err != nil {
+			return fmt.Errorf("type: %w", err)
+		}
+		return nil
+	}
+	if err := TypeTarget(ctx, rt.DebugURL, rt.TargetID, selector, text); err != nil {
 		return fmt.Errorf("type: %w", err)
 	}
 	return nil
@@ -608,6 +677,74 @@ func (m *Manager) Select(ctx context.Context, sessionName string, tabName string
 	return nil
 }
 
+// SelectElement selects option value by CSS selector or snapshot ref.
+func (m *Manager) SelectElement(ctx context.Context, sessionName, tabName, arg, value string) error {
+	rt, err := m.resolveTarget(ctx, sessionName, tabName, "select")
+	if err != nil {
+		return err
+	}
+	selector, backendNodeID, err := m.resolveElementArg(rt.SessionName, rt.TabName, arg)
+	if err != nil {
+		return err
+	}
+	if backendNodeID > 0 {
+		if err := SelectTargetByBackendNodeID(ctx, rt.DebugURL, rt.TargetID, backendNodeID, value); err != nil {
+			return fmt.Errorf("select: %w", err)
+		}
+		return nil
+	}
+	if err := SelectTarget(ctx, rt.DebugURL, rt.TargetID, selector, value); err != nil {
+		return fmt.Errorf("select: %w", err)
+	}
+	return nil
+}
+
+// FillElements fills values by CSS selector or snapshot refs.
+func (m *Manager) FillElements(ctx context.Context, sessionName, tabName string, inputs []FillInput, submitArg string) error {
+	rt, err := m.resolveTarget(ctx, sessionName, tabName, "fill")
+	if err != nil {
+		return err
+	}
+
+	selectorFields := make([]FillField, 0, len(inputs))
+	for _, in := range inputs {
+		selector, backendNodeID, err := m.resolveElementArg(rt.SessionName, rt.TabName, in.Target)
+		if err != nil {
+			return err
+		}
+		if backendNodeID > 0 {
+			if err := FillTargetByBackendNodeID(ctx, rt.DebugURL, rt.TargetID, backendNodeID, in.Value); err != nil {
+				return fmt.Errorf("fill: %w", err)
+			}
+			continue
+		}
+		selectorFields = append(selectorFields, FillField{Selector: selector, Value: in.Value})
+	}
+
+	submitSelector := submitArg
+	if isElementRef(submitArg) {
+		selector, backendNodeID, err := m.resolveElementArg(rt.SessionName, rt.TabName, submitArg)
+		if err != nil {
+			return err
+		}
+		if backendNodeID > 0 {
+			if err := ClickTargetByBackendNodeID(ctx, rt.DebugURL, rt.TargetID, backendNodeID); err != nil {
+				return fmt.Errorf("fill submit: %w", err)
+			}
+			submitSelector = ""
+		} else {
+			submitSelector = selector
+		}
+	}
+
+	if len(selectorFields) > 0 || submitSelector != "" {
+		if err := FillTarget(ctx, rt.DebugURL, rt.TargetID, selectorFields, submitSelector); err != nil {
+			return fmt.Errorf("fill: %w", err)
+		}
+	}
+	return nil
+}
+
 // WaitFor waits until the element matching sel is visible in a tracked tab.
 func (m *Manager) WaitFor(ctx context.Context, sessionName string, tabName string, sel string, timeout time.Duration) error {
 	rt, err := m.resolveTarget(ctx, sessionName, tabName, "wait")
@@ -618,6 +755,29 @@ func (m *Manager) WaitFor(ctx context.Context, sessionName string, tabName strin
 		return fmt.Errorf("wait: %w", err)
 	}
 	return nil
+}
+
+func (m *Manager) resolveElementArg(sessionName, tabName, arg string) (string, cdp.BackendNodeID, error) {
+	if !isElementRef(arg) {
+		return arg, 0, nil
+	}
+	s, err := m.loadSnapshot(sessionName, tabName)
+	if err != nil {
+		return "", 0, fmt.Errorf("resolve %s: snapshot not found, run 'tap browser snapshot' first: %w", arg, err)
+	}
+	for _, ref := range s.Refs {
+		if ref.Ref != arg {
+			continue
+		}
+		if ref.BackendDOMNodeID > 0 {
+			return ref.SelectorHint, cdp.BackendNodeID(ref.BackendDOMNodeID), nil
+		}
+		if ref.SelectorHint != "" {
+			return ref.SelectorHint, 0, nil
+		}
+		return "", 0, fmt.Errorf("resolve %s: missing backend node ID", arg)
+	}
+	return "", 0, fmt.Errorf("resolve %s: ref not found in latest snapshot", arg)
 }
 
 // Back navigates the tracked tab backwards in history.
