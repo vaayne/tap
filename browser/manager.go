@@ -591,7 +591,7 @@ func (m *Manager) ClickElement(ctx context.Context, sessionName, tabName, arg st
 	if err != nil {
 		return err
 	}
-	selector, backendNodeID, err := m.resolveElementArg(rt.SessionName, rt.TabName, arg)
+	selector, backendNodeID, err := m.resolveElementArg(ctx, rt, arg)
 	if err != nil {
 		return err
 	}
@@ -625,7 +625,7 @@ func (m *Manager) TypeElement(ctx context.Context, sessionName, tabName, arg, te
 	if err != nil {
 		return err
 	}
-	selector, backendNodeID, err := m.resolveElementArg(rt.SessionName, rt.TabName, arg)
+	selector, backendNodeID, err := m.resolveElementArg(ctx, rt, arg)
 	if err != nil {
 		return err
 	}
@@ -683,7 +683,7 @@ func (m *Manager) SelectElement(ctx context.Context, sessionName, tabName, arg, 
 	if err != nil {
 		return err
 	}
-	selector, backendNodeID, err := m.resolveElementArg(rt.SessionName, rt.TabName, arg)
+	selector, backendNodeID, err := m.resolveElementArg(ctx, rt, arg)
 	if err != nil {
 		return err
 	}
@@ -708,7 +708,7 @@ func (m *Manager) FillElements(ctx context.Context, sessionName, tabName string,
 
 	selectorFields := make([]FillField, 0, len(inputs))
 	for _, in := range inputs {
-		selector, backendNodeID, err := m.resolveElementArg(rt.SessionName, rt.TabName, in.Target)
+		selector, backendNodeID, err := m.resolveElementArg(ctx, rt, in.Target)
 		if err != nil {
 			return err
 		}
@@ -722,15 +722,14 @@ func (m *Manager) FillElements(ctx context.Context, sessionName, tabName string,
 	}
 
 	submitSelector := submitArg
+	var submitBackendNodeID cdp.BackendNodeID
 	if isElementRef(submitArg) {
-		selector, backendNodeID, err := m.resolveElementArg(rt.SessionName, rt.TabName, submitArg)
+		selector, backendNodeID, err := m.resolveElementArg(ctx, rt, submitArg)
 		if err != nil {
 			return err
 		}
 		if backendNodeID > 0 {
-			if err := ClickTargetByBackendNodeID(ctx, rt.DebugURL, rt.TargetID, backendNodeID); err != nil {
-				return fmt.Errorf("fill submit: %w", err)
-			}
+			submitBackendNodeID = backendNodeID
 			submitSelector = ""
 		} else {
 			submitSelector = selector
@@ -740,6 +739,11 @@ func (m *Manager) FillElements(ctx context.Context, sessionName, tabName string,
 	if len(selectorFields) > 0 || submitSelector != "" {
 		if err := FillTarget(ctx, rt.DebugURL, rt.TargetID, selectorFields, submitSelector); err != nil {
 			return fmt.Errorf("fill: %w", err)
+		}
+	}
+	if submitBackendNodeID > 0 {
+		if err := ClickTargetByBackendNodeID(ctx, rt.DebugURL, rt.TargetID, submitBackendNodeID); err != nil {
+			return fmt.Errorf("fill submit: %w", err)
 		}
 	}
 	return nil
@@ -757,13 +761,16 @@ func (m *Manager) WaitFor(ctx context.Context, sessionName string, tabName strin
 	return nil
 }
 
-func (m *Manager) resolveElementArg(sessionName, tabName, arg string) (string, cdp.BackendNodeID, error) {
+func (m *Manager) resolveElementArg(ctx context.Context, rt resolvedTarget, arg string) (string, cdp.BackendNodeID, error) {
 	if !isElementRef(arg) {
 		return arg, 0, nil
 	}
-	s, err := m.loadSnapshot(sessionName, tabName)
+	s, err := m.loadSnapshot(rt.SessionName, rt.TabName)
 	if err != nil {
 		return "", 0, fmt.Errorf("resolve %s: snapshot not found, run 'tap browser snapshot' first: %w", arg, err)
+	}
+	if err := ensureSnapshotFresh(ctx, rt.DebugURL, rt.TargetID, s); err != nil {
+		return "", 0, fmt.Errorf("resolve %s: %w", arg, err)
 	}
 	for _, ref := range s.Refs {
 		if ref.Ref != arg {
@@ -778,6 +785,41 @@ func (m *Manager) resolveElementArg(sessionName, tabName, arg string) (string, c
 		return "", 0, fmt.Errorf("resolve %s: missing backend node ID", arg)
 	}
 	return "", 0, fmt.Errorf("resolve %s: ref not found in latest snapshot", arg)
+}
+
+func ensureSnapshotFresh(ctx context.Context, debugURL, targetID string, snapshot *SnapshotResult) error {
+	if snapshot == nil {
+		return fmt.Errorf("snapshot not found, run 'tap browser snapshot' first")
+	}
+	if snapshot.DocumentKey == "" {
+		return fmt.Errorf("snapshot is missing document metadata, run 'tap browser snapshot' again")
+	}
+	currentKey, err := documentKey(ctx, debugURL, targetID)
+	if err != nil {
+		return fmt.Errorf("validate snapshot freshness: %w", err)
+	}
+	if currentKey != snapshot.DocumentKey {
+		return fmt.Errorf("snapshot is stale for the current page, run 'tap browser snapshot' again")
+	}
+	return nil
+}
+
+func documentKey(ctx context.Context, debugURL, targetID string) (string, error) {
+	meta, err := EvalTarget(ctx, debugURL, targetID, `({
+  key: [location.href, performance.timeOrigin || 0, document.body ? document.body.childElementCount : 0].join("|")
+})`)
+	if err != nil {
+		return "", err
+	}
+	m, ok := meta.(map[string]any)
+	if !ok {
+		return "", fmt.Errorf("unexpected metadata result type %T", meta)
+	}
+	key, ok := m["key"].(string)
+	if !ok || key == "" {
+		return "", fmt.Errorf("missing document key")
+	}
+	return key, nil
 }
 
 // Back navigates the tracked tab backwards in history.

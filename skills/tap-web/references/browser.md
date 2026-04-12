@@ -41,12 +41,13 @@ tap browser text [selector]
 tap browser evaluate <javascript>
 tap browser screenshot [--output <path>]
 tap browser pdf [--output <path>]
-tap browser click <selector>
-tap browser type <selector> <text>
-tap browser fill <selector> <value> [<selector> <value> ...]
+tap browser snapshot [--interactive] [-f json]
+tap browser click <selector|@eN>
+tap browser type <selector|@eN> <text>
+tap browser fill <selector|@eN> <value> [<selector|@eN> <value> ...] [--submit <selector|@eN>]
 tap browser hover <selector>
 tap browser scroll [selector]
-tap browser select <selector> <value>
+tap browser select <selector|@eN> <value>
 tap browser wait <selector>
 tap browser keypress <key>
 tap browser dialog
@@ -63,6 +64,18 @@ tap attach chrome
 tap browser open https://example.com
 tap browser click '#submit'
 ```
+
+### Snapshot-driven interaction
+
+```bash
+tap browser snapshot --interactive -f json
+tap browser click @e3
+tap browser type @e1 "search terms"
+tap browser fill @e1 "me@example.com" @e2 "secret" --submit @e4
+tap browser select @e5 "us"
+```
+
+Use this when selectors are brittle, generated, or unknown. Refs come from the latest snapshot for the current tab and document.
 
 ### Visible browser for auth
 
@@ -111,4 +124,7 @@ Tab resolution is:
 - `--new-tab` creates a fresh tracked tab with the next stable ID (`tab-1`, `tab-2`, ...).
 - `tap browser tabs` is the common tab-management entrypoint.
 - `tap browser status --json` and `tap browser tabs --json` are the machine-readable contracts.
+- `tap browser snapshot` captures a semantic tree and assigns stable refs like `@e1` for interactive nodes.
+- Snapshot refs are validated against the current page document. After navigation, reload, or substantial DOM changes, re-run `tap browser snapshot` before reusing refs.
+- In mixed `tap browser fill` flows, selector-based fills complete before a ref-based `--submit @eN` click is fired.
 - If an attached context goes stale, tap fails explicitly instead of silently switching browser state.
