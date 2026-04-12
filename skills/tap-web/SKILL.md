@@ -2,7 +2,7 @@
 name: tap-web
 metadata:
   author: vaayne/tap
-  version: "v0.4.1"
+  version: "v0.4.2"
 description: >
   Access websites, search the web, and extract clean content using the `tap` CLI.
   Supports structured site scripts, readable page extraction, and browser automation
@@ -86,12 +86,13 @@ tap browser text [selector]
 tap browser evaluate <js>
 tap browser screenshot [--output <path>]
 tap browser pdf [--output <path>]
-tap browser click <selector>
-tap browser type <selector> <text>
-tap browser fill <selector> <value> [<selector> <value> ...]
+tap browser snapshot [--interactive] [-f json]
+tap browser click <selector|@eN>
+tap browser type <selector|@eN> <text>
+tap browser fill <selector|@eN> <value> [<selector|@eN> <value> ...] [--submit <selector|@eN>]
 tap browser hover <selector>
 tap browser scroll [selector]
-tap browser select <selector> <value>
+tap browser select <selector|@eN> <value>
 tap browser wait <selector>
 tap browser keypress <key>
 tap browser dialog
@@ -145,6 +146,24 @@ Browser-backed commands resolve context in this order:
 
 If an attached context becomes unreachable, tap marks it stale and fails explicitly. It does **not** silently switch to another browser/account context.
 
+## Snapshot refs
+
+When CSS selectors are unstable or unknown, capture a semantic snapshot and reuse its refs:
+
+```bash
+tap browser snapshot --interactive -f json
+tap browser click @e3
+tap browser type @e1 "hello"
+tap browser fill @e1 "me@example.com" @e2 "secret" --submit @e4
+tap browser select @e5 "us"
+```
+
+Rules:
+- Refs like `@e1` come from the latest snapshot for the current tab.
+- Refs are only valid for the same page document.
+- After navigation, reload, or major page updates, re-run `tap browser snapshot` before using old refs.
+- Mixed fills are safe: selector-based fills complete before a ref-based `--submit @eN` click is dispatched.
+
 ## Efficiency rules
 
 Never dump full HTML unless there is no cheaper path.
@@ -153,9 +172,10 @@ Preferred order:
 1. Site script
 2. `tap fetch`
 3. `tap browser network wait --body`
-4. `tap browser text`
-5. targeted `tap browser evaluate`
-6. screenshot
+4. `tap browser snapshot` for semantic interactive discovery
+5. `tap browser text`
+6. targeted `tap browser evaluate`
+7. screenshot
 
 ## References
 

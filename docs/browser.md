@@ -14,7 +14,9 @@ tap attach status
 tap fetch -b https://example.com/private
 tap site -b github/notifications
 tap browser open https://example.com
+tap browser snapshot --interactive
 tap browser click '#submit'
+tap browser click @e1
 ```
 
 Supported attach inputs:
@@ -117,6 +119,7 @@ tap browser status
 
 ```bash
 tap browser evaluate ...
+tap browser snapshot
 tap browser forms
 tap browser cookies ...
 tap browser network ...
@@ -143,4 +146,3 @@ Compatibility aliases remain accepted:
 - `--ws-url` -> `--browser-url`
 - `--delay` -> `--wait`
 - `--no-headless` -> `--show`
-

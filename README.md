@@ -60,7 +60,9 @@ Chrome must already expose DevTools.
 tap attach chrome
 tap attach status
 tap browser open https://example.com
+tap browser snapshot --interactive
 tap browser click '#submit'
+tap browser click @e1
 tap browser text
 ```
 
@@ -133,6 +135,7 @@ The browser command still includes lower-level tools when needed:
 
 ```bash
 tap browser evaluate ...
+tap browser snapshot
 tap browser forms
 tap browser cookies ...
 tap browser network ...
