@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-04-12
+
+### Added
+
+- Browser snapshot refs (`@eN`) for stable element targeting across `tap browser` actions
+- Ref-based `tap browser` commands for click, type, fill submit, and select workflows on dynamic pages
+
+### Changed
+
+- Shortened the embedded `tap-web` skill description for cleaner quick-reference guidance
+
 ## [0.4.1] - 2026-04-09
 
 ### Added
@@ -229,7 +240,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - CI workflows for lint, test, and release
 - GoReleaser configuration for cross-platform builds
 
-[Unreleased]: https://github.com/vaayne/tap/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/vaayne/tap/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/vaayne/tap/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/vaayne/tap/compare/v0.4.0...v0.4.1
 [0.3.3]: https://github.com/vaayne/tap/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/vaayne/tap/compare/v0.3.1...v0.3.2
