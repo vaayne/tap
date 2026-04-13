@@ -24,26 +24,28 @@ Examples:
 }
 
 func completeSiteRoot(ctx context.Context, cmd *cli.Command) {
-	if hasCompletionFlagPrefix(cmd) {
+	prefix, completeFlags := completionState(cmd)
+	if completeFlags {
 		cli.DefaultCompleteWithFlags(ctx, cmd)
 		return
 	}
 
-	prefix := completionPrefix(cmd)
 	printVisibleCommands(cmd, prefix)
 	printScriptCompletions(cmd, prefix)
 }
 
 func completeSiteScripts(ctx context.Context, cmd *cli.Command) {
-	if hasCompletionFlagPrefix(cmd) {
+	prefix, completeFlags := completionState(cmd)
+	if completeFlags {
 		cli.DefaultCompleteWithFlags(ctx, cmd)
 		return
 	}
-	printScriptCompletions(cmd, completionPrefix(cmd))
+	printScriptCompletions(cmd, prefix)
 }
 
-func hasCompletionFlagPrefix(cmd *cli.Command) bool {
-	return strings.HasPrefix(completionPrefix(cmd), "-")
+func completionState(cmd *cli.Command) (prefix string, completeFlags bool) {
+	prefix = completionPrefix(cmd)
+	return prefix, strings.HasPrefix(prefix, "-")
 }
 
 func completionPrefix(cmd *cli.Command) string {

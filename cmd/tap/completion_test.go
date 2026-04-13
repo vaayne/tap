@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -97,27 +98,29 @@ func runTapExternal(t *testing.T, args []string, shell string, extraEnv []string
 
 	cmd := exec.Command("go", append([]string{"run", "."}, args...)...)
 	cmd.Dir = "."
-	cmd.Env = os.Environ()
+	cmd.Env = append(os.Environ(), extraEnv...)
 	if shell != "" {
 		cmd.Env = append(cmd.Env, "SHELL="+shell)
 	}
-	cmd.Env = append(cmd.Env, extraEnv...)
 	out, err := cmd.CombinedOutput()
 	return string(out), err
 }
 
 func testScript(name, description string) string {
-	return `/* @meta
+	return fmt.Sprintf(`/* @meta
 {
-  "name": "` + name + `",
-  "description": "` + description + `",
+  "name": %q,
+  "description": %q,
   "domain": "example.com"
 }
 */
 
 async function(args) {
   return {};
-}`
+}`,
+		name,
+		description,
+	)
 }
 
 func writeTestScript(t *testing.T, path, content string) {
