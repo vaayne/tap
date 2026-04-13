@@ -69,7 +69,11 @@ export const Route = createFileRoute("/api/batch")({
         try {
           await batchUpdate(scripts)
         } catch (error) {
-          console.error("batchUpdate failed:", error)
+          console.error("batchUpdate failed:", {
+            message:
+              error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined,
+          })
           return Response.json(
             { error: "Failed to update scripts" },
             { status: 500 },

@@ -227,6 +227,13 @@ export async function batchUpdate(
 ): Promise<void> {
   const { DB } = env
 
+  const scriptsTableInfo = await DB.prepare(
+    "PRAGMA table_info(scripts)",
+  ).all<{ name: string }>()
+  const hasCapabilitiesColumn = scriptsTableInfo.results.some(
+    (column) => column.name === "capabilities",
+  )
+
   // D1 batch supports up to 100 statements; chunk inserts to stay safe.
   // To guarantee atomicity we insert into a temp table first, then
   // swap via DELETE + INSERT … SELECT in a single batch call.
@@ -271,14 +278,22 @@ export async function batchUpdate(
     await DB.batch(chunk)
   }
 
+  const swapScripts = hasCapabilitiesColumn
+    ? DB.prepare(
+        `INSERT INTO scripts (name, site, description, domain, args, read_only, example, capabilities, content, hash, created_at, updated_at)
+         SELECT name, site, description, domain, args, read_only, example, capabilities, content, hash, created_at, updated_at
+         FROM _scripts_staging`,
+      )
+    : DB.prepare(
+        `INSERT INTO scripts (name, site, description, domain, args, read_only, example, content, hash, created_at, updated_at)
+         SELECT name, site, description, domain, args, read_only, example, content, hash, created_at, updated_at
+         FROM _scripts_staging`,
+      )
+
   // Phase 2: atomic swap — single batch so scripts is never empty
   await DB.batch([
     DB.prepare("DELETE FROM scripts"),
-    DB.prepare(
-      `INSERT INTO scripts (name, site, description, domain, args, read_only, example, capabilities, content, hash, created_at, updated_at)
-       SELECT name, site, description, domain, args, read_only, example, capabilities, content, hash, created_at, updated_at
-       FROM _scripts_staging`,
-    ),
+    swapScripts,
     DB.prepare("DROP TABLE _scripts_staging"),
   ])
 }
