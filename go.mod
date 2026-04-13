@@ -10,7 +10,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/refraction-networking/utls v1.8.2
 	github.com/urfave/cli/v3 v3.8.0
-	github.com/vaayne/go-defuddle v0.0.0-20260331111254-c5da35168e90
+	github.com/vaayne/go-defuddle v0.1.2
 	golang.org/x/net v0.47.0
 	golang.org/x/sys v0.42.0
 	gopkg.in/yaml.v3 v3.0.1
