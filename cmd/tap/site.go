@@ -13,9 +13,10 @@ import (
 
 func siteCmd() *cli.Command {
 	return &cli.Command{
-		Name:      "site",
-		Usage:     "Run site scripts",
-		ArgsUsage: "<script-name> [key=value ...]",
+		Name:          "site",
+		Usage:         "Run site scripts",
+		ArgsUsage:     "<script-name> [key=value ...]",
+		ShellComplete: completeSiteRoot,
 		Description: `Run site-specific JavaScript scripts that extract structured data from websites.
 
 Scripts are organized as site/action (e.g. hackernews/top, google/search) and
@@ -56,9 +57,10 @@ Examples:
 
 func siteRunCmd() *cli.Command {
 	return &cli.Command{
-		Name:      "run",
-		Usage:     "Run a site script",
-		ArgsUsage: "<script-name> [key=value ...]",
+		Name:          "run",
+		Usage:         "Run a site script",
+		ArgsUsage:     "<script-name> [key=value ...]",
+		ShellComplete: completeSiteScripts,
 		Flags: append([]cli.Flag{
 			&cli.StringFlag{
 				Name:    "format",
@@ -160,9 +162,10 @@ func siteListCmd() *cli.Command {
 
 func siteInfoCmd() *cli.Command {
 	return &cli.Command{
-		Name:      "info",
-		Usage:     "Show detailed info for a script",
-		ArgsUsage: "<script-name>",
+		Name:          "info",
+		Usage:         "Show detailed info for a script",
+		ArgsUsage:     "<script-name>",
+		ShellComplete: completeSiteScripts,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			configureLogging(cmd)
 			if cmd.Args().Len() == 0 {

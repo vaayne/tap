@@ -19,10 +19,31 @@ var version = "dev"
 func main() {
 	_ = godotenv.Load()
 
-	app := &cli.Command{
-		Name:    "tap",
-		Usage:   "Tap into any website from your terminal",
-		Version: version,
+	app := newApp()
+
+	if err := app.Run(context.Background(), os.Args); err != nil {
+		if snf, ok := err.(*tap.ScriptNotFoundError); ok {
+			fmt.Fprintf(os.Stderr, "Error: %s\n", snf.Error())
+			if suggestions := snf.Suggestions(5); len(suggestions) > 0 {
+				fmt.Fprintf(os.Stderr, "\nDid you mean?\n")
+				for _, s := range suggestions {
+					fmt.Fprintf(os.Stderr, "  tap site %s\n", s)
+				}
+			}
+			os.Exit(1)
+		}
+		fmt.Fprintf(os.Stderr, "Error: %s\n", err)
+		os.Exit(1)
+	}
+}
+
+func newApp() *cli.Command {
+	return &cli.Command{
+		Name:                            "tap",
+		Usage:                           "Tap into any website from your terminal",
+		Version:                         version,
+		EnableShellCompletion:           true,
+		ConfigureShellCompletionCommand: configureCompletionCommand,
 		Description: `Tap runs site-specific JS scripts against websites and extracts clean content
 from URLs. Scripts execute in QuickJS (fast, no browser) with automatic fallback
 to a real Chrome browser when auth or JS rendering is needed.
@@ -49,21 +70,6 @@ Use 'tap <command> --help' for details on any command.`,
 			skillCmd(),
 			internalCmd(),
 		},
-	}
-
-	if err := app.Run(context.Background(), os.Args); err != nil {
-		if snf, ok := err.(*tap.ScriptNotFoundError); ok {
-			fmt.Fprintf(os.Stderr, "Error: %s\n", snf.Error())
-			if suggestions := snf.Suggestions(5); len(suggestions) > 0 {
-				fmt.Fprintf(os.Stderr, "\nDid you mean?\n")
-				for _, s := range suggestions {
-					fmt.Fprintf(os.Stderr, "  tap site %s\n", s)
-				}
-			}
-			os.Exit(1)
-		}
-		fmt.Fprintf(os.Stderr, "Error: %s\n", err)
-		os.Exit(1)
 	}
 }
 

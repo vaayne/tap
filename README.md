@@ -105,7 +105,39 @@ tap
 ├── attach      connect tap to an existing Chrome browser
 ├── status      show the active browser context and current tab
 ├── doctor      dependency and environment checks
-└── upgrade     update tap
+├── upgrade     update tap
+└── completion  generate shell completion scripts
+```
+
+## Shell completion
+
+Tap can generate shell completion scripts for bash, zsh, fish, and pwsh.
+
+```bash
+# Bash
+source <(tap completion bash)
+
+# Zsh
+source <(tap completion zsh)
+
+# Fish
+mkdir -p ~/.config/fish/completions
+tap completion fish > ~/.config/fish/completions/tap.fish
+
+# PowerShell / pwsh
+tap completion pwsh > ~/.config/powershell/tap.ps1
+```
+
+Persistent install paths commonly used by package managers and dotfiles:
+
+```bash
+# Bash
+mkdir -p ~/.local/share/bash-completion/completions
+tap completion bash > ~/.local/share/bash-completion/completions/tap
+
+# Zsh
+mkdir -p ~/.zfunc
+tap completion zsh > ~/.zfunc/_tap
 ```
 
 ## Common browser-backed flags
