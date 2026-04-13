@@ -232,8 +232,9 @@ export async function batchUpdate(
   // swap via DELETE + INSERT … SELECT in a single batch call.
   const CHUNK_SIZE = 95
 
+  const dropTemp = DB.prepare("DROP TABLE IF EXISTS _scripts_staging")
   const createTemp = DB.prepare(
-    `CREATE TABLE IF NOT EXISTS _scripts_staging (
+    `CREATE TABLE _scripts_staging (
       name TEXT PRIMARY KEY, site TEXT NOT NULL, description TEXT NOT NULL DEFAULT '',
       domain TEXT NOT NULL DEFAULT '', args TEXT NOT NULL DEFAULT '{}',
       read_only INTEGER NOT NULL DEFAULT 1, example TEXT NOT NULL DEFAULT '',
@@ -243,10 +244,9 @@ export async function batchUpdate(
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
   )
-  const clearTemp = DB.prepare("DELETE FROM _scripts_staging")
 
-  // Phase 1: populate staging table
-  await DB.batch([createTemp, clearTemp])
+  // Phase 1: recreate staging table to avoid stale schema from prior runs
+  await DB.batch([dropTemp, createTemp])
 
   const insertStmts = scripts.map((s) =>
     DB.prepare(
@@ -279,6 +279,6 @@ export async function batchUpdate(
        SELECT name, site, description, domain, args, read_only, example, capabilities, content, hash, created_at, updated_at
        FROM _scripts_staging`,
     ),
-    DB.prepare("DELETE FROM _scripts_staging"),
+    DB.prepare("DROP TABLE _scripts_staging"),
   ])
 }
