@@ -29,7 +29,7 @@ tap skill install --path /custom/path/to/skills/tap-web
 TAP_SKILL_DIR=/custom/path/to/skills/tap-web tap skill install
 ```
 
-> **⚠️ Upgrade Note**: After upgrading `tap`, run `tap skill install` again so the local installed skill matches the bundled version in the current CLI. If you use a custom install location, rerun it with the same `--path` or `TAP_SKILL_DIR`.
+> **⚠️ Version Check**: The installed skill's `metadata.version` should match `tap --version`. If they differ after installing or upgrading `tap`, run `tap skill install` again. If you use a custom install location, rerun it with the same `--path` or `TAP_SKILL_DIR`.
 
 **Before accessing any site, check `$XDG_CONFIG_HOME/tap/site-notes/{domain}.md` for saved knowledge. Update after learning.** See [references/site-notes.md](references/site-notes.md).
 
