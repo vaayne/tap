@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.4] - 2026-04-13
+
+### Added
+
+- Shell completion support for bash, zsh, fish, and PowerShell via `tap completion`
+- Command coverage and regression tests for shell completion generation
+
+### Fixed
+
+- Check out the tap repo before the bb-sites sync workflow runs
+- Recreate the D1 staging table during batch sync so repeated syncs stay consistent
+- Tolerate a missing D1 capabilities migration during batch sync
+
 ## [0.4.3] - 2026-04-13
 
 ### Changed
@@ -247,7 +260,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - CI workflows for lint, test, and release
 - GoReleaser configuration for cross-platform builds
 
-[Unreleased]: https://github.com/vaayne/tap/compare/v0.4.3...HEAD
+[Unreleased]: https://github.com/vaayne/tap/compare/v0.4.4...HEAD
+[0.4.4]: https://github.com/vaayne/tap/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/vaayne/tap/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/vaayne/tap/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/vaayne/tap/compare/v0.4.0...v0.4.1
