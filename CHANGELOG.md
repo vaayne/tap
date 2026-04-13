@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-04-13
+
+### Changed
+
+- Updated `github.com/vaayne/go-defuddle` to `v0.1.2`
+- Restored the embedded `tap-web` skill version-check note so installed skills can be verified against `tap --version`
+
 ## [0.4.2] - 2026-04-12
 
 ### Added
@@ -240,7 +247,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - CI workflows for lint, test, and release
 - GoReleaser configuration for cross-platform builds
 
-[Unreleased]: https://github.com/vaayne/tap/compare/v0.4.2...HEAD
+[Unreleased]: https://github.com/vaayne/tap/compare/v0.4.3...HEAD
+[0.4.3]: https://github.com/vaayne/tap/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/vaayne/tap/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/vaayne/tap/compare/v0.4.0...v0.4.1
 [0.3.3]: https://github.com/vaayne/tap/compare/v0.3.2...v0.3.3
