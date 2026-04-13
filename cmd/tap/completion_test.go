@@ -21,7 +21,7 @@ func TestHelpShowsCompletionCommand(t *testing.T) {
 }
 
 func TestCompletionCommandOutputsBashScript(t *testing.T) {
-	out, err := runTapExternal(t, []string{"completion", "bash"}, "")
+	out, err := runTapExternal(t, []string{"completion", "bash"}, "", nil)
 	if err != nil {
 		t.Fatalf("run tap completion bash: %v", err)
 	}
@@ -32,24 +32,33 @@ func TestCompletionCommandOutputsBashScript(t *testing.T) {
 
 func TestSiteShellCompletionUsesLocalRegistry(t *testing.T) {
 	dir := t.TempDir()
-	writeTestScript(t, filepath.Join(dir, "hackernews", "top.js"), `/* @meta
-{
-  "name": "hackernews/top",
-  "description": "Top stories",
-  "domain": "news.ycombinator.com"
-}
-*/
+	writeTestScript(t, filepath.Join(dir, "hackernews", "top.js"), testScript("hackernews/top", "Top stories"))
 
-async function(args) {
-  return {};
-}`)
-
-	out, err := runTapExternal(t, []string{"--sites-dir", dir, "site", "ha", "--generate-shell-completion"}, "/bin/bash")
+	out, err := runTapExternal(t, []string{"--sites-dir", dir, "site", "ha", "--generate-shell-completion"}, "/bin/bash", nil)
 	if err != nil {
 		t.Fatalf("run site shell completion: %v", err)
 	}
 	if !strings.Contains(out, "hackernews/top") {
 		t.Fatalf("expected script completion from local registry, got:\n%s", out)
+	}
+}
+
+func TestSiteShellCompletionFallsBackToOverrideDirWhenCacheMissing(t *testing.T) {
+	configHome := t.TempDir()
+	overrideDir := filepath.Join(configHome, "tap", "sites")
+	writeTestScript(t, filepath.Join(overrideDir, "lobsters", "frontpage.js"), testScript("lobsters/frontpage", "Front page stories"))
+
+	out, err := runTapExternal(
+		t,
+		[]string{"--sites-dir", filepath.Join(t.TempDir(), "missing-cache"), "site", "lo", "--generate-shell-completion"},
+		"/bin/bash",
+		[]string{"XDG_CONFIG_HOME=" + configHome},
+	)
+	if err != nil {
+		t.Fatalf("run site shell completion with missing cache: %v", err)
+	}
+	if !strings.Contains(out, "lobsters/frontpage") {
+		t.Fatalf("expected override script completion when cache is missing, got:\n%s", out)
 	}
 }
 
@@ -83,7 +92,7 @@ func runTap(t *testing.T, args []string, shell string) (string, error) {
 	return out.String(), err
 }
 
-func runTapExternal(t *testing.T, args []string, shell string) (string, error) {
+func runTapExternal(t *testing.T, args []string, shell string, extraEnv []string) (string, error) {
 	t.Helper()
 
 	cmd := exec.Command("go", append([]string{"run", "."}, args...)...)
@@ -92,8 +101,23 @@ func runTapExternal(t *testing.T, args []string, shell string) (string, error) {
 	if shell != "" {
 		cmd.Env = append(cmd.Env, "SHELL="+shell)
 	}
+	cmd.Env = append(cmd.Env, extraEnv...)
 	out, err := cmd.CombinedOutput()
 	return string(out), err
+}
+
+func testScript(name, description string) string {
+	return `/* @meta
+{
+  "name": "` + name + `",
+  "description": "` + description + `",
+  "domain": "example.com"
+}
+*/
+
+async function(args) {
+  return {};
+}`
 }
 
 func writeTestScript(t *testing.T, path, content string) {

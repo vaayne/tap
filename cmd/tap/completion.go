@@ -85,18 +85,24 @@ func loadCompletionRegistry(cmd *cli.Command) (*script.Registry, error) {
 		dir = defaultSitesDir()
 	}
 
+	overrideDir := defaultLocalOverrideDir()
 	if cmd.Bool("local-only") {
-		reg, err := script.NewRegistry(defaultLocalOverrideDir())
-		if err != nil {
-			if errors.Is(err, os.ErrNotExist) {
-				return emptyRegistry(), nil
-			}
-			return nil, err
-		}
-		return reg, nil
+		return loadRegistryDir(overrideDir)
 	}
 
-	reg, err := script.NewRegistryWithOverride(dir, defaultLocalOverrideDir())
+	reg, err := script.NewRegistryWithOverride(dir, overrideDir)
+	if err == nil {
+		return reg, nil
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+
+	return loadRegistryDir(overrideDir)
+}
+
+func loadRegistryDir(dir string) (*script.Registry, error) {
+	reg, err := script.NewRegistry(dir)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return emptyRegistry(), nil
