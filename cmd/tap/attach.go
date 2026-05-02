@@ -249,7 +249,8 @@ func runAttachStatus(ctx context.Context, cmd *cli.Command) error {
 		_ = persistProxyDaemonHealth(store, state.ProxyDaemon, health)
 	}
 
-	if session == nil && state.ProxyDaemon == nil {
+	isAttached := (defaultContext != nil && defaultContext.Kind == browser.DefaultContextAttached) || state.ProxyDaemon != nil
+	if !isAttached {
 		if cmd.Bool("json") {
 			return printAttachStatusJSON(defaultContext, nil, nil, browser.ProxyDaemonHealth{}, "no_session")
 		}
