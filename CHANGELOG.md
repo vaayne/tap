@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.5] - 2026-05-11
+
+### Fixed
+
+- `tap browser attach` status no longer incorrectly shows local sessions as Chrome attachment candidates
+
 ## [0.4.4] - 2026-04-13
 
 ### Added
