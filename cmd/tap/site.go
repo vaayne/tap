@@ -146,9 +146,14 @@ func siteListCmd() *cli.Command {
 					if _, after, ok := strings.Cut(actionName, "/"); ok {
 						actionName = after
 					}
-					fmt.Printf("  %-24s %s%s\n",
+					runtimeBadge := ""
+					if s.Meta.Runtime != "" && s.Meta.Runtime != "auto" {
+						runtimeBadge = dim(color, " ["+s.Meta.Runtime+"]")
+					}
+					fmt.Printf("  %-24s %s%s%s\n",
 						green(color, actionName),
 						s.Meta.Description,
+						runtimeBadge,
 						argHints,
 					)
 				}
@@ -191,8 +196,52 @@ func siteInfoCmd() *cli.Command {
 
 			fmt.Printf("  %s  %s\n", bold(color, "Domain:"), s.Meta.Domain)
 
+			if s.Meta.Runtime != "" && s.Meta.Runtime != "auto" {
+				fmt.Printf("  %s %s\n\n", bold(color, "Runtime:"), s.Meta.Runtime)
+			}
+
 			if s.Meta.Example != "" {
 				fmt.Printf("  %s %s\n", bold(color, "Example:"), s.Meta.Example)
+			}
+
+			if len(s.Meta.Env) > 0 {
+				fmt.Printf("\n  %s\n", bold(color, "Env:"))
+				envNames := make([]string, 0, len(s.Meta.Env))
+				for name := range s.Meta.Env {
+					envNames = append(envNames, name)
+				}
+				sort.Strings(envNames)
+				for _, envName := range envNames {
+					def := s.Meta.Env[envName]
+					req := dim(color, "optional")
+					if def.Required {
+						req = yellow(color, "required")
+					}
+					fmt.Printf("    %-16s %s  %s\n",
+						green(color, envName),
+						dim(color, "("+req+")"),
+						def.Description,
+					)
+				}
+			}
+
+			if len(s.Meta.Headers) > 0 {
+				fmt.Printf("\n  %s\n", bold(color, "Headers:"))
+				headerKeys := make([]string, 0, len(s.Meta.Headers))
+				for k := range s.Meta.Headers {
+					headerKeys = append(headerKeys, k)
+				}
+				sort.Strings(headerKeys)
+				for _, k := range headerKeys {
+					v := s.Meta.Headers[k]
+					if strings.Contains(v, "${") {
+						v = "***"
+					}
+					fmt.Printf("    %-16s %s\n",
+						green(color, k),
+						v,
+					)
+				}
 			}
 
 			if len(s.Meta.Args) > 0 {

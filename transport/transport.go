@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/chromedp"
@@ -169,12 +170,12 @@ func (t *Transport) BrowseHTMLWithPause(ctx context.Context, url string, pauseFn
 }
 
 // BrowseEval navigates to a URL in a browser and evaluates JavaScript.
-func (t *Transport) BrowseEval(ctx context.Context, url string, js string) (any, error) {
-	return t.BrowseEvalWithPause(ctx, url, js, nil)
+func (t *Transport) BrowseEval(ctx context.Context, url string, js string, headers map[string]string) (any, error) {
+	return t.BrowseEvalWithPause(ctx, url, js, nil, headers)
 }
 
 // BrowseEvalWithPause is like BrowseEval but calls pauseFn after navigation.
-func (t *Transport) BrowseEvalWithPause(ctx context.Context, url string, js string, pauseFn PauseFunc) (any, error) {
+func (t *Transport) BrowseEvalWithPause(ctx context.Context, url string, js string, pauseFn PauseFunc, headers map[string]string) (any, error) {
 	bctx, cancel := t.newBrowserContext(ctx)
 	defer cancel()
 
@@ -189,14 +190,25 @@ func (t *Transport) BrowseEvalWithPause(ctx context.Context, url string, js stri
 		js,
 	)
 
-	if err := chromedp.Run(bctx,
+	actions := []chromedp.Action{
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			_, err := page.AddScriptToEvaluateOnNewDocument(preserveNativeFetch).Do(ctx)
 			return err
 		}),
+	}
+	if len(headers) > 0 {
+		nh := make(network.Headers, len(headers))
+		for k, v := range headers {
+			nh[k] = v
+		}
+		actions = append(actions, network.SetExtraHTTPHeaders(nh))
+	}
+	actions = append(actions,
 		chromedp.Navigate(url),
 		chromedp.WaitReady("body"),
-	); err != nil {
+	)
+
+	if err := chromedp.Run(bctx, actions...); err != nil {
 		return nil, fmt.Errorf("browse eval: %w", err)
 	}
 

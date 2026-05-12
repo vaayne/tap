@@ -23,7 +23,7 @@ func NewBrowser(tp *transport.Transport, pauseFn transport.PauseFunc) *Browser {
 func (b *Browser) Name() string { return "Browser" }
 func (b *Browser) Close() error { return nil }
 
-func (b *Browser) Run(ctx context.Context, s *script.Script, args map[string]string) (any, error) {
+func (b *Browser) Run(ctx context.Context, s *script.Script, args map[string]string, opts RunOpts) (any, error) {
 	argsJSON, err := json.Marshal(args)
 	if err != nil {
 		return nil, fmt.Errorf("marshal args: %w", err)
@@ -36,5 +36,5 @@ func (b *Browser) Run(ctx context.Context, s *script.Script, args map[string]str
 		navURL = "https://" + s.Meta.Domain
 	}
 
-	return b.transport.BrowseEvalWithPause(ctx, navURL, js, b.pauseFn)
+	return b.transport.BrowseEvalWithPause(ctx, navURL, js, b.pauseFn, opts.Headers)
 }

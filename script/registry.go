@@ -2,30 +2,32 @@ package script
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
 )
 
+// Source describes one script source for the registry.
+type Source struct {
+	FS   fs.FS        // virtual filesystem (nil → use Path)
+	Path string       // filesystem path (ignored if FS is set)
+	Type ScriptSource // how to tag scripts from this source
+}
+
 // Registry indexes scripts by their meta name.
 type Registry struct {
-	scripts          map[string]*Script
-	dir              string
-	localOverrideDir string // checked first; empty = disabled
+	scripts map[string]*Script
+	sources []Source
 }
 
-// NewRegistry scans a directory for .js script files and indexes them by meta name.
-func NewRegistry(dir string) (*Registry, error) {
-	return NewRegistryWithOverride(dir, "")
-}
-
-// NewRegistryWithOverride is like NewRegistry but also checks localOverrideDir
-// before the main cache dir. Scripts found there shadow the cached versions.
-func NewRegistryWithOverride(dir, localOverrideDir string) (*Registry, error) {
+// NewRegistry creates a Registry from one or more sources.
+// Sources are scanned in order; later sources overwrite earlier ones
+// with the same script name.
+func NewRegistry(sources ...Source) (*Registry, error) {
 	r := &Registry{
-		scripts:          make(map[string]*Script),
-		dir:              dir,
-		localOverrideDir: localOverrideDir,
+		scripts: make(map[string]*Script),
+		sources: sources,
 	}
 	if err := r.scan(); err != nil {
 		return nil, err
@@ -34,26 +36,26 @@ func NewRegistryWithOverride(dir, localOverrideDir string) (*Registry, error) {
 }
 
 func (r *Registry) scan() error {
-	// Load main cache dir first.
-	if err := r.scanDir(r.dir, false); err != nil {
-		return err
-	}
-	// Load local override dir second — overwrites any same-named cache entry.
-	if r.localOverrideDir != "" {
-		if err := r.scanDir(r.localOverrideDir, true); err != nil {
-			return err
+	for _, src := range r.sources {
+		if src.FS != nil {
+			if err := r.scanFS(src.FS, ".", src.Type); err != nil {
+				return err
+			}
+		} else if src.Path != "" {
+			if err := r.scanDir(src.Path, src.Type); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
 }
 
-func (r *Registry) scanDir(dir string, isOverride bool) error {
+func (r *Registry) scanDir(dir string, source ScriptSource) error {
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		return nil // skip silently
+	}
 	return filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			// Ignore missing override dir — it may not exist yet.
-			if os.IsNotExist(err) && isOverride {
-				return filepath.SkipDir
-			}
 			return err
 		}
 		if info.IsDir() || filepath.Ext(path) != ".js" {
@@ -72,7 +74,37 @@ func (r *Registry) scanDir(dir string, isOverride bool) error {
 		}
 
 		s.Path = path
-		s.LocalOverride = isOverride
+		s.Source = source
+		r.scripts[s.Meta.Name] = s
+		return nil
+	})
+}
+
+func (r *Registry) scanFS(fsys fs.FS, root string, source ScriptSource) error {
+	return fs.WalkDir(fsys, root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			if path == "." {
+				return nil // missing root in FS — skip silently
+			}
+			return err
+		}
+		if d.IsDir() || filepath.Ext(path) != ".js" {
+			return nil
+		}
+
+		content, err := fs.ReadFile(fsys, path)
+		if err != nil {
+			return fmt.Errorf("read %s: %w", path, err)
+		}
+
+		s, err := Parse(string(content))
+		if err != nil {
+			// Skip scripts that fail to parse
+			return nil
+		}
+
+		s.Path = path
+		s.Source = source
 		r.scripts[s.Meta.Name] = s
 		return nil
 	})
@@ -96,11 +128,11 @@ func (r *Registry) List() []*Script {
 	return scripts
 }
 
-// ListLocalOnly returns only scripts loaded from the local override directory.
-func (r *Registry) ListLocalOnly() []*Script {
+// ListOverrides returns only scripts loaded from the local override directory.
+func (r *Registry) ListOverrides() []*Script {
 	scripts := make([]*Script, 0)
 	for _, s := range r.scripts {
-		if s.LocalOverride {
+		if s.Source == ScriptSourceOverride {
 			scripts = append(scripts, s)
 		}
 	}

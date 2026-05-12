@@ -2,12 +2,12 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/urfave/cli/v3"
+	"github.com/vaayne/tap"
 	"github.com/vaayne/tap/script"
 )
 
@@ -86,36 +86,12 @@ func loadCompletionRegistry(cmd *cli.Command) (*script.Registry, error) {
 	if dir == "" {
 		dir = defaultSitesDir()
 	}
-
 	overrideDir := defaultLocalOverrideDir()
+
 	if cmd.Bool("local-only") {
-		return loadRegistryDir(overrideDir)
+		return tap.DefaultRegistry(overrideDir, "")
 	}
-
-	reg, err := script.NewRegistryWithOverride(dir, overrideDir)
-	if err == nil {
-		return reg, nil
-	}
-	if !errors.Is(err, os.ErrNotExist) {
-		return nil, err
-	}
-
-	return loadRegistryDir(overrideDir)
-}
-
-func loadRegistryDir(dir string) (*script.Registry, error) {
-	reg, err := script.NewRegistry(dir)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return emptyRegistry(), nil
-		}
-		return nil, err
-	}
-	return reg, nil
-}
-
-func emptyRegistry() *script.Registry {
-	return &script.Registry{}
+	return tap.DefaultRegistry(dir, overrideDir)
 }
 
 func printCompletion(cmd *cli.Command, value, description string) {

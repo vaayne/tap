@@ -10,10 +10,15 @@ import (
 	"github.com/vaayne/tap/script"
 )
 
+// RunOpts holds per-run configuration for script execution.
+type RunOpts struct {
+	Headers map[string]string // resolved meta headers (env vars interpolated)
+}
+
 // Engine can execute a site script with arguments and return a JSON-compatible result.
 type Engine interface {
 	// Run executes a script with the given arguments.
-	Run(ctx context.Context, s *script.Script, args map[string]string) (any, error)
+	Run(ctx context.Context, s *script.Script, args map[string]string, opts RunOpts) (any, error)
 
 	// Name returns the engine name for logging.
 	Name() string
@@ -26,10 +31,10 @@ type Engine interface {
 // If a result contains an "error" field (e.g. {"error":"HTTP 400"}), it is
 // treated as a failure and the next engine is tried.
 // If all engines fail, returns the last error.
-func RunScript(ctx context.Context, engines []Engine, s *script.Script, args map[string]string) (any, error) {
+func RunScript(ctx context.Context, engines []Engine, s *script.Script, args map[string]string, opts RunOpts) (any, error) {
 	var lastErr error
 	for _, e := range engines {
-		result, err := e.Run(ctx, s, args)
+		result, err := e.Run(ctx, s, args, opts)
 		if err != nil {
 			lastErr = err
 			log.Printf("%s failed: %v", e.Name(), err)
