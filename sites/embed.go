@@ -2,5 +2,5 @@ package sites
 
 import "embed"
 
-//go:embed all:* all:*/*
+//go:embed */*.js
 var FS embed.FS

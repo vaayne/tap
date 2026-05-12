@@ -178,7 +178,7 @@ func (c *Client) enginesByRuntime(runtime string) []engine.Engine {
 			}
 		}
 		return httpEngines
-	case "browser", "lightpanda":
+	case "browser":
 		var browserEngines []engine.Engine
 		for _, e := range c.engines {
 			if e.Name() == "Browser" {

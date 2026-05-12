@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 )
 
@@ -110,6 +111,7 @@ func (m *Meta) ValidateEnv() error {
 			}
 		}
 	}
+	sort.Strings(missing)
 	if len(missing) > 0 {
 		return fmt.Errorf("missing required environment variables: %s", strings.Join(missing, ", "))
 	}

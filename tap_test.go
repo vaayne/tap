@@ -104,7 +104,7 @@ func TestEnginesByRuntime(t *testing.T) {
 		{"normal empty", []engine.Engine{quickjs, browser}, false, "", []string{"QuickJS", "Browser"}},
 		{"normal http", []engine.Engine{quickjs, browser}, false, "http", []string{"QuickJS"}},
 		{"normal browser", []engine.Engine{quickjs, browser}, false, "browser", []string{"Browser"}},
-		{"normal lightpanda", []engine.Engine{quickjs, browser}, false, "lightpanda", []string{"Browser"}},
+		{"normal lightpanda falls through", []engine.Engine{quickjs, browser}, false, "lightpanda", []string{"QuickJS", "Browser"}},
 		{"normal unknown", []engine.Engine{quickjs, browser}, false, "unknown", []string{"QuickJS", "Browser"}},
 		{"forceBrowser http", []engine.Engine{browser}, true, "http", []string{"Browser"}},
 		{"forceBrowser browser", []engine.Engine{browser}, true, "browser", []string{"Browser"}},

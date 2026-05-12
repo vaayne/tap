@@ -197,7 +197,7 @@ func siteInfoCmd() *cli.Command {
 			fmt.Printf("  %s  %s\n", bold(color, "Domain:"), s.Meta.Domain)
 
 			if s.Meta.Runtime != "" && s.Meta.Runtime != "auto" {
-				fmt.Printf("  %s %s\n\n", bold(color, "Runtime:"), s.Meta.Runtime)
+				fmt.Printf("  %s  %s\n", bold(color, "Runtime:"), s.Meta.Runtime)
 			}
 
 			if s.Meta.Example != "" {
@@ -234,9 +234,6 @@ func siteInfoCmd() *cli.Command {
 				sort.Strings(headerKeys)
 				for _, k := range headerKeys {
 					v := s.Meta.Headers[k]
-					if strings.Contains(v, "${") {
-						v = "***"
-					}
 					fmt.Printf("    %-16s %s\n",
 						green(color, k),
 						v,
