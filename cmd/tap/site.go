@@ -234,6 +234,9 @@ func siteInfoCmd() *cli.Command {
 				sort.Strings(headerKeys)
 				for _, k := range headerKeys {
 					v := s.Meta.Headers[k]
+					if strings.Contains(v, "${") {
+						v = dim(color, "(from env)")
+					}
 					fmt.Printf("    %-16s %s\n",
 						green(color, k),
 						v,

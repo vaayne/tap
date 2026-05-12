@@ -26,8 +26,8 @@ type ScriptSource int
 
 const (
 	ScriptSourceCache    ScriptSource = iota // ~/.cache/tap/sites/
-	ScriptSourceBuiltin                        // sites/ (embedded)
-	ScriptSourceOverride                       // ~/.config/tap/sites/
+	ScriptSourceBuiltin                      // sites/ (embedded)
+	ScriptSourceOverride                     // ~/.config/tap/sites/
 )
 
 // Meta holds the metadata extracted from a script's @meta block.

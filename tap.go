@@ -167,28 +167,32 @@ func (c *Client) RunScript(ctx context.Context, name string, args map[string]str
 
 func (c *Client) enginesByRuntime(runtime string) []engine.Engine {
 	if c.opts.forceBrowser {
-		return c.engines
+		return c.browserEngines()
 	}
 	switch runtime {
 	case "http":
-		var httpEngines []engine.Engine
+		var out []engine.Engine
 		for _, e := range c.engines {
 			if e.Name() == "QuickJS" {
-				httpEngines = append(httpEngines, e)
+				out = append(out, e)
 			}
 		}
-		return httpEngines
-	case "browser":
-		var browserEngines []engine.Engine
-		for _, e := range c.engines {
-			if e.Name() == "Browser" {
-				browserEngines = append(browserEngines, e)
-			}
-		}
-		return browserEngines
+		return out
+	case "browser", "lightpanda":
+		return c.browserEngines()
 	default: // "auto", "", or unknown
 		return c.engines
 	}
+}
+
+func (c *Client) browserEngines() []engine.Engine {
+	var out []engine.Engine
+	for _, e := range c.engines {
+		if e.Name() == "Browser" {
+			out = append(out, e)
+		}
+	}
+	return out
 }
 
 // Fetch retrieves a URL and extracts clean content using go-defuddle.
