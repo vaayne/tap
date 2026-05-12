@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.6] - 2026-05-12
+
+### Added
+
+- **Runtime-based engine routing** — site scripts can declare `runtime` (http/browser/lightpanda) to control which engine executes them
+- **Environment variables and headers for site scripts** — `EnvDef`/`Env` fields in script Meta with validation and header resolution; resolved headers auto-injected into QuickJS fetch and Browser CDP requests
+- **Twitter site scripts** — `twitter/getxapi-tweet-detail`, `twitter/getxapi-article`, `twitter/post-tweet`
+- **Embedded sites sync to D1** — batch sync now accepts multiple script directories with override-by-name priority
+- Full metadata display in `tap site info` and `tap site list` (runtime, env, headers)
+
+### Changed
+
+- Narrowed embed pattern to `*/*.js` to exclude markdown files from binary
+- Added field-level godoc to `Meta` struct
+- Added `sites/CLAUDE.md` documenting script structure and conventions
+
+### Fixed
+
+- Removed redundant authorization header from `fetch()` in scripts (meta headers are injected automatically)
+- `forceBrowser` now returns only browser engines
+
 ## [0.4.5] - 2026-05-11
 
 ### Fixed
@@ -266,7 +287,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - CI workflows for lint, test, and release
 - GoReleaser configuration for cross-platform builds
 
-[Unreleased]: https://github.com/vaayne/tap/compare/v0.4.4...HEAD
+[Unreleased]: https://github.com/vaayne/tap/compare/v0.4.6...HEAD
+[0.4.6]: https://github.com/vaayne/tap/compare/v0.4.5...v0.4.6
+[0.4.5]: https://github.com/vaayne/tap/compare/v0.4.4...v0.4.5
 [0.4.4]: https://github.com/vaayne/tap/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/vaayne/tap/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/vaayne/tap/compare/v0.4.1...v0.4.2
