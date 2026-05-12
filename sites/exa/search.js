@@ -14,8 +14,6 @@
   "headers": {
     "X-API-Key": "${EXA_API_KEY}"
   },
-  "capabilities": ["network"],
-  "readOnly": true,
   "example": "tap site exa/search \"vaayne\""
 }
 */
