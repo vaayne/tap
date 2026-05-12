@@ -114,7 +114,13 @@ func injectFetch(ctx *qjs.Context, tp *transport.Transport, metaHeaders map[stri
 			}
 		}
 
-		go func() {
+		// The HTTP request must complete synchronously within this callback.
+		// WASM is suspended while a host callback runs, so resolving the promise
+		// here (before returning) avoids a concurrent-WASM-access race that
+		// causes the wazero module to corrupt state and spin at 100% CPU when
+		// the goroutine later tries to write large bodies into WASM memory while
+		// js_std_await is looping inside QJS_Eval.
+		doFetch := func() {
 			var bodyReader io.Reader
 			if body != "" {
 				bodyReader = strings.NewReader(body)
@@ -155,7 +161,8 @@ func injectFetch(ctx *qjs.Context, tp *transport.Transport, metaHeaders map[stri
 			respObj.SetPropertyStr("_body", c.NewString(string(respBody)))
 
 			_ = this.Promise().Resolve(respObj)
-		}()
+		}
+		doFetch()
 	})
 
 	_, _ = ctx.Eval("fetch-polyfill.js", qjs.Code(`
