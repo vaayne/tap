@@ -28,6 +28,7 @@ import (
 	"github.com/vaayne/tap/engine"
 	"github.com/vaayne/tap/fetch"
 	"github.com/vaayne/tap/script"
+	"github.com/vaayne/tap/sites"
 	"github.com/vaayne/tap/transport"
 )
 
@@ -51,7 +52,7 @@ func New(ctx context.Context, optFns ...Option) (*Client, error) {
 	var reg *script.Registry
 	if opts.sitesDir != "" {
 		var err error
-		reg, err = script.NewRegistryWithOverride(opts.sitesDir, opts.localOverrideDir)
+		reg, err = DefaultRegistry(opts.sitesDir, opts.localOverrideDir)
 		if err != nil {
 			return nil, fmt.Errorf("load scripts: %w", err)
 		}
@@ -94,6 +95,16 @@ func New(ctx context.Context, optFns ...Option) (*Client, error) {
 	}, nil
 }
 
+// DefaultRegistry creates the standard tap registry with cache, built-in,
+// and override sources in the correct priority order.
+func DefaultRegistry(cacheDir, overrideDir string) (*script.Registry, error) {
+	return script.NewRegistry(
+		script.Source{Path: cacheDir, Type: script.ScriptSourceCache},
+		script.Source{FS: sites.FS, Type: script.ScriptSourceBuiltin},
+		script.Source{Path: overrideDir, Type: script.ScriptSourceOverride},
+	)
+}
+
 // Close releases all resources.
 func (c *Client) Close() error {
 	if c.fetcher != nil {
@@ -120,7 +131,7 @@ func (c *Client) RunScript(ctx context.Context, name string, args map[string]str
 		return nil, &ScriptNotFoundError{Name: name, Available: c.scriptNames()}
 	}
 
-	if s.LocalOverride {
+	if s.Source == script.ScriptSourceOverride {
 		fmt.Fprintf(os.Stderr, "Using local script: %s\n", name)
 	}
 	if args == nil {
@@ -136,13 +147,52 @@ func (c *Client) RunScript(ctx context.Context, name string, args map[string]str
 		}
 	}
 
+	if err := s.Meta.ValidateEnv(); err != nil {
+		return nil, err
+	}
+
+	engines := c.enginesByRuntime(s.Meta.Runtime)
+	if len(engines) == 0 {
+		return nil, fmt.Errorf("no engines available for runtime: %q", s.Meta.Runtime)
+	}
+
 	if c.opts.timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, c.opts.timeout)
 		defer cancel()
 	}
 
-	return engine.RunScript(ctx, c.engines, s, args)
+	return engine.RunScript(ctx, engines, s, args, engine.RunOpts{Headers: s.Meta.ResolveHeaders()})
+}
+
+func (c *Client) enginesByRuntime(runtime string) []engine.Engine {
+	if c.opts.forceBrowser {
+		return c.browserEngines()
+	}
+	switch runtime {
+	case "http":
+		var out []engine.Engine
+		for _, e := range c.engines {
+			if e.Name() == "QuickJS" {
+				out = append(out, e)
+			}
+		}
+		return out
+	case "browser", "lightpanda":
+		return c.browserEngines()
+	default: // "auto", "", or unknown
+		return c.engines
+	}
+}
+
+func (c *Client) browserEngines() []engine.Engine {
+	var out []engine.Engine
+	for _, e := range c.engines {
+		if e.Name() == "Browser" {
+			out = append(out, e)
+		}
+	}
+	return out
 }
 
 // Fetch retrieves a URL and extracts clean content using go-defuddle.
@@ -184,12 +234,12 @@ func (c *Client) ListScripts() []*script.Script {
 	return c.registry.List()
 }
 
-// ListScriptsLocalOnly returns only scripts loaded from the local override directory.
-func (c *Client) ListScriptsLocalOnly() []*script.Script {
+// ListScriptsOverrides returns only scripts loaded from the local override directory.
+func (c *Client) ListScriptsOverrides() []*script.Script {
 	if c.registry == nil {
 		return nil
 	}
-	return c.registry.ListLocalOnly()
+	return c.registry.ListOverrides()
 }
 
 // GetScript returns a script by name.

@@ -1,6 +1,7 @@
 package script
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -77,6 +78,133 @@ func TestParse_NoBody(t *testing.T) {
 */`)
 	if err == nil {
 		t.Error("expected error for missing body")
+	}
+}
+
+func TestParse_EnvDef(t *testing.T) {
+	content := `/* @meta
+{
+  "name": "test/env",
+  "description": "env test",
+  "domain": "example.com",
+  "env": {
+    "API_KEY": {"required": true, "description": "API key for service"},
+    "OPTIONAL_VAR": {"required": false, "description": "Optional setting"}
+  }
+}
+*/
+
+async function(args) { return {}; }`
+
+	s, err := Parse(content)
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+	if len(s.Meta.Env) != 2 {
+		t.Fatalf("env count = %d, want 2", len(s.Meta.Env))
+	}
+	if !s.Meta.Env["API_KEY"].Required {
+		t.Error("env[API_KEY].required = false, want true")
+	}
+	if s.Meta.Env["OPTIONAL_VAR"].Required {
+		t.Error("env[OPTIONAL_VAR].required = true, want false")
+	}
+	if s.Meta.Env["API_KEY"].Description != "API key for service" {
+		t.Errorf("env[API_KEY].description = %q, want %q", s.Meta.Env["API_KEY"].Description, "API key for service")
+	}
+}
+
+func TestMeta_ValidateEnv_RequiredMissing(t *testing.T) {
+	m := Meta{
+		Env: map[string]EnvDef{
+			"REQ1": {Required: true, Description: "First required var"},
+			"REQ2": {Required: true, Description: "Second required var"},
+		},
+	}
+	err := m.ValidateEnv()
+	if err == nil {
+		t.Fatal("expected error for missing required env vars")
+	}
+	msg := err.Error()
+	if !strings.Contains(msg, "REQ1") || !strings.Contains(msg, "REQ2") {
+		t.Errorf("error message should list both missing vars: %s", msg)
+	}
+}
+
+func TestMeta_ValidateEnv_RequiredPresent(t *testing.T) {
+	t.Setenv("REQ_VAR", "value")
+	m := Meta{
+		Env: map[string]EnvDef{
+			"REQ_VAR": {Required: true, Description: "A required var"},
+		},
+	}
+	if err := m.ValidateEnv(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestMeta_ValidateEnv_OptionalMissing(t *testing.T) {
+	m := Meta{
+		Env: map[string]EnvDef{
+			"OPT_VAR": {Required: false, Description: "Optional"},
+		},
+	}
+	if err := m.ValidateEnv(); err != nil {
+		t.Fatalf("optional missing var should not error: %v", err)
+	}
+}
+
+func TestMeta_ResolveHeaders_AllSet(t *testing.T) {
+	t.Setenv("API_KEY", "secret123")
+	t.Setenv("USER_ID", "42")
+	m := Meta{
+		Headers: map[string]string{
+			"X-API-Key": "${API_KEY}",
+			"X-User-ID": "Bearer ${USER_ID}",
+		},
+	}
+	resolved := m.ResolveHeaders()
+	if len(resolved) != 2 {
+		t.Fatalf("resolved count = %d, want 2", len(resolved))
+	}
+	if resolved["X-API-Key"] != "secret123" {
+		t.Errorf("X-API-Key = %q, want %q", resolved["X-API-Key"], "secret123")
+	}
+	if resolved["X-User-ID"] != "Bearer 42" {
+		t.Errorf("X-User-ID = %q, want %q", resolved["X-User-ID"], "Bearer 42")
+	}
+}
+
+func TestMeta_ResolveHeaders_SkipMissing(t *testing.T) {
+	// API_KEY is set, MISSING_VAR is not
+	t.Setenv("API_KEY", "secret123")
+	m := Meta{
+		Headers: map[string]string{
+			"X-API-Key":  "${API_KEY}",
+			"X-Missing":  "${MISSING_VAR}",
+			"X-Partial":  "prefix-${MISSING_VAR}-suffix",
+		},
+	}
+	resolved := m.ResolveHeaders()
+	if len(resolved) != 1 {
+		t.Fatalf("resolved count = %d, want 1", len(resolved))
+	}
+	if _, ok := resolved["X-API-Key"]; !ok {
+		t.Error("X-API-Key should be present")
+	}
+	if _, ok := resolved["X-Missing"]; ok {
+		t.Error("X-Missing should be skipped")
+	}
+	if _, ok := resolved["X-Partial"]; ok {
+		t.Error("X-Partial should be skipped")
+	}
+}
+
+func TestMeta_ResolveHeaders_EmptyHeaders(t *testing.T) {
+	m := Meta{Headers: map[string]string{}}
+	resolved := m.ResolveHeaders()
+	if len(resolved) != 0 {
+		t.Fatalf("resolved count = %d, want 0", len(resolved))
 	}
 }
 

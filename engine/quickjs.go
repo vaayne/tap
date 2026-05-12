@@ -27,7 +27,7 @@ func NewQuickJS(tp *transport.Transport) *QuickJS {
 func (q *QuickJS) Name() string { return "QuickJS" }
 func (q *QuickJS) Close() error { return nil }
 
-func (q *QuickJS) Run(_ context.Context, s *script.Script, args map[string]string) (result any, err error) {
+func (q *QuickJS) Run(_ context.Context, s *script.Script, args map[string]string, opts RunOpts) (result any, err error) {
 	// The QJS WASM runtime can panic on certain async patterns (e.g. out of
 	// bounds memory access). Recover so the engine fallback chain continues.
 	defer func() {
@@ -44,7 +44,7 @@ func (q *QuickJS) Run(_ context.Context, s *script.Script, args map[string]strin
 	defer rt.Close()
 	ctx := rt.Context()
 
-	injectFetch(ctx, q.transport)
+	injectFetch(ctx, q.transport, opts.Headers)
 
 	argsJSON, qErr := json.Marshal(args)
 	if qErr != nil {
@@ -83,7 +83,8 @@ func stringify(ctx *qjs.Context, val *qjs.Value) string {
 }
 
 // injectFetch adds a fetch() function backed by the shared transport's HTTP client.
-func injectFetch(ctx *qjs.Context, tp *transport.Transport) {
+// metaHeaders are set first; JS-level headers override them.
+func injectFetch(ctx *qjs.Context, tp *transport.Transport, metaHeaders map[string]string) {
 	ctx.SetAsyncFunc("fetch", func(this *qjs.This) {
 		c := this.Context()
 
@@ -127,6 +128,9 @@ func injectFetch(ctx *qjs.Context, tp *transport.Transport) {
 
 			req.Header.Set("User-Agent", transport.UserAgent)
 			req.Header.Set("Accept", "application/json, text/plain, */*")
+			for k, v := range metaHeaders {
+				req.Header.Set(k, v)
+			}
 			for k, v := range headers {
 				req.Header.Set(k, v)
 			}

@@ -4,7 +4,10 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
+
+	"github.com/vaayne/tap/engine"
 )
 
 func testSitesDir(t *testing.T) string {
@@ -83,6 +86,48 @@ func TestRunScript_MissingRequiredArg(t *testing.T) {
 	_, err = client.RunScript(context.Background(), "twitter/search", nil)
 	if err == nil {
 		t.Error("expected error for missing required arg")
+	}
+}
+
+func TestEnginesByRuntime(t *testing.T) {
+	quickjs := engine.NewQuickJS(nil)
+	browser := engine.NewBrowser(nil, nil)
+
+	tests := []struct {
+		name         string
+		engines      []engine.Engine
+		forceBrowser bool
+		runtime      string
+		want         []string
+	}{
+		{"normal auto", []engine.Engine{quickjs, browser}, false, "auto", []string{"QuickJS", "Browser"}},
+		{"normal empty", []engine.Engine{quickjs, browser}, false, "", []string{"QuickJS", "Browser"}},
+		{"normal http", []engine.Engine{quickjs, browser}, false, "http", []string{"QuickJS"}},
+		{"normal browser", []engine.Engine{quickjs, browser}, false, "browser", []string{"Browser"}},
+		{"normal lightpanda", []engine.Engine{quickjs, browser}, false, "lightpanda", []string{"Browser"}},
+		{"normal unknown", []engine.Engine{quickjs, browser}, false, "unknown", []string{"QuickJS", "Browser"}},
+		{"forceBrowser http", []engine.Engine{quickjs, browser}, true, "http", []string{"Browser"}},
+		{"forceBrowser browser", []engine.Engine{quickjs, browser}, true, "browser", []string{"Browser"}},
+		{"forceBrowser auto", []engine.Engine{quickjs, browser}, true, "auto", []string{"Browser"}},
+		{"empty http", []engine.Engine{}, false, "http", []string{}},
+		{"empty browser", []engine.Engine{}, false, "browser", []string{}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &Client{
+				engines: tt.engines,
+				opts:    options{forceBrowser: tt.forceBrowser},
+			}
+			got := c.enginesByRuntime(tt.runtime)
+			gotNames := make([]string, len(got))
+			for i, e := range got {
+				gotNames[i] = e.Name()
+			}
+			if !slices.Equal(gotNames, tt.want) {
+				t.Errorf("enginesByRuntime(%q) = %v, want %v", tt.runtime, gotNames, tt.want)
+			}
+		})
 	}
 }
 

@@ -17,7 +17,7 @@ type mockEngine struct {
 
 func (m *mockEngine) Name() string { return m.name }
 func (m *mockEngine) Close() error { return nil }
-func (m *mockEngine) Run(_ context.Context, _ *script.Script, _ map[string]string) (any, error) {
+func (m *mockEngine) Run(_ context.Context, _ *script.Script, _ map[string]string, _ RunOpts) (any, error) {
 	return m.result, m.err
 }
 
@@ -27,7 +27,7 @@ func TestRunScript_FirstEngineSucceeds(t *testing.T) {
 		&mockEngine{name: "slow", result: map[string]any{"ok": true}},
 	}
 
-	result, err := RunScript(context.Background(), engines, &script.Script{}, nil)
+	result, err := RunScript(context.Background(), engines, &script.Script{}, nil, RunOpts{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -43,7 +43,7 @@ func TestRunScript_FallbackToSecond(t *testing.T) {
 		&mockEngine{name: "slow", result: map[string]any{"fallback": true}},
 	}
 
-	result, err := RunScript(context.Background(), engines, &script.Script{}, nil)
+	result, err := RunScript(context.Background(), engines, &script.Script{}, nil, RunOpts{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -59,7 +59,7 @@ func TestRunScript_AllFail(t *testing.T) {
 		&mockEngine{name: "e2", err: fmt.Errorf("fail2")},
 	}
 
-	_, err := RunScript(context.Background(), engines, &script.Script{}, nil)
+	_, err := RunScript(context.Background(), engines, &script.Script{}, nil, RunOpts{})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

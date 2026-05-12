@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 /**
- * Parse bb-sites scripts and POST them to the tap web API batch endpoint.
+ * Parse site scripts and POST them to the tap web API batch endpoint.
+ * Accepts one or more directories; later directories override earlier ones
+ * when script names collide (matching the CLI registry priority).
  *
- * Usage: node sync-bb-sites.mjs <bb-sites-dir>
+ * Usage: node sync-bb-sites.mjs <dir> [<dir> ...]
  *
  * Env:
  *   TAP_SCRIPTS_SECRET - shared secret for X-Tap-Secret header
@@ -10,12 +12,12 @@
  */
 
 import { readdir, readFile } from "node:fs/promises"
-import { join, basename, dirname } from "node:path"
+import { join } from "node:path"
 import { createHash } from "node:crypto"
 
-const sitesDir = process.argv[2]
-if (!sitesDir) {
-  console.error("Usage: node sync-bb-sites.mjs <bb-sites-dir>")
+const sitesDirs = process.argv.slice(2)
+if (sitesDirs.length === 0) {
+  console.error("Usage: node sync-bb-sites.mjs <dir> [<dir> ...]")
   process.exit(1)
 }
 
@@ -42,19 +44,23 @@ function parseMeta(content) {
 }
 
 /**
- * Discover all .js files under sitesDir organized as site/action.js.
+ * Discover all .js files under dir organized as site/action.js.
  */
-async function discoverScripts() {
+async function discoverScripts(dir) {
   const scripts = []
-  const entries = await readdir(sitesDir, { withFileTypes: true })
+  let entries
+  try {
+    entries = await readdir(dir, { withFileTypes: true })
+  } catch {
+    return scripts
+  }
 
   for (const entry of entries) {
     if (!entry.isDirectory()) continue
     const site = entry.name
-    // Skip hidden dirs and common non-script dirs
     if (site.startsWith(".") || site === "node_modules") continue
 
-    const siteDir = join(sitesDir, site)
+    const siteDir = join(dir, site)
     const files = await readdir(siteDir)
 
     for (const file of files) {
@@ -68,7 +74,6 @@ async function discoverScripts() {
       }
 
       const hash = createHash("sha256").update(content).digest("hex")
-      const action = basename(file, ".js")
 
       scripts.push({
         name: meta.name,
@@ -89,13 +94,21 @@ async function discoverScripts() {
 }
 
 async function main() {
-  const scripts = await discoverScripts()
+  const byName = new Map()
+  for (const dir of sitesDirs) {
+    const found = await discoverScripts(dir)
+    for (const s of found) {
+      byName.set(s.name, s)
+    }
+    console.log(`${dir}: ${found.length} scripts`)
+  }
+  const scripts = [...byName.values()]
   if (scripts.length === 0) {
     console.error("No scripts found")
     process.exit(1)
   }
 
-  console.log(`Found ${scripts.length} scripts, posting to ${apiUrl}`)
+  console.log(`Total: ${scripts.length} scripts, posting to ${apiUrl}`)
 
   const resp = await fetch(apiUrl, {
     method: "POST",
