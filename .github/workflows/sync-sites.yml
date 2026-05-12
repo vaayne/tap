@@ -17,15 +17,15 @@ jobs:
 
       - uses: actions/checkout@v4
         with:
-          repository: vaayne/bb-sites
+          repository: epiral/bb-sites
           path: bb-sites
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "24"
 
       - name: Build payload and sync
         env:
           TAP_SCRIPTS_SECRET: ${{ secrets.TAP_SCRIPTS_SECRET }}
           TAP_API_URL: https://tap.vaayne.com/api/batch
-        run: node .github/scripts/sync-bb-sites.mjs bb-sites
+        run: node .github/scripts/sync-bb-sites.mjs bb-sites sites
