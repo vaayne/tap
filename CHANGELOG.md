@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.7] - 2026-05-12
+
+### Added
+
+- **WeChat article script** (`weixin/article`) — fetches WeChat MP articles via HTTP using WeChat Mobile User-Agent, no browser required; extracts title, author, content, images, and metadata
+
+### Fixed
+
+- **QuickJS fetch race condition** — the goroutine resolving a fetch promise was calling back into the wazero WASM module while `QJS_Eval` still held it, causing memory corruption and 100% CPU spin on large responses (e.g. 3 MB pages); fetch now runs synchronously within the WASM host callback
+
 ## [0.4.6] - 2026-05-12
 
 ### Added
