@@ -3,7 +3,7 @@ import { verifySecret } from "@/lib/auth"
 import { batchUpdate } from "@/lib/db"
 import type { BatchScript } from "@/lib/types"
 
-const MAX_PAYLOAD_BYTES = 500 * 1024 // 500 KB
+const MAX_PAYLOAD_BYTES = 2 * 1024 * 1024 // 2 MB
 
 export const Route = createFileRoute("/api/batch")({
   server: {
@@ -21,7 +21,7 @@ export const Route = createFileRoute("/api/batch")({
         const text = await request.text()
         if (text.length > MAX_PAYLOAD_BYTES) {
           return Response.json(
-            { error: "Payload too large (max 500KB)" },
+            { error: "Payload too large (max 2MB)" },
             { status: 413 },
           )
         }
