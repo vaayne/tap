@@ -49,16 +49,16 @@
     "jsdom": "^27.0.0",
     "tsx": "^4.21.0",
     "typescript": "^5.7.2",
-    "vite": "npm:@voidzero-dev/vite-plus-core@latest",
-    "vite-plus": "latest",
-    "vitest": "npm:@voidzero-dev/vite-plus-test@latest",
+    "vite": "npm:@voidzero-dev/vite-plus-core@^0.1.21",
+    "vite-plus": "^0.1.21",
+    "vitest": "npm:@voidzero-dev/vite-plus-test@^0.1.21",
     "wrangler": "^4.79.0"
   },
   "packageManager": "pnpm@10.33.0",
   "pnpm": {
     "overrides": {
-      "vite": "npm:@voidzero-dev/vite-plus-core@latest",
-      "vitest": "npm:@voidzero-dev/vite-plus-test@latest"
+      "vite": "npm:@voidzero-dev/vite-plus-core@^0.1.21",
+      "vitest": "npm:@voidzero-dev/vite-plus-test@^0.1.21"
     }
   }
 }
