@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.8] - 2026-05-18
+
+### Added
+
+- **FxEmbed Twitter scripts** — added full FxTwitter API coverage for posts, threads, conversations, profiles, search, trends, and typeahead
+- **Twitter article Markdown output** — `twitter/fxembed-status` can return long-form X articles as Markdown with `format=markdown -f raw`
+
+### Changed
+
+- Prefer FxEmbed scripts first for X/Twitter content in the embedded `tap-web` skill
+- Raw output now prints string results directly instead of JSON-escaping them
+
 ## [0.4.7] - 2026-05-12
 
 ### Added
