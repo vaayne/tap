@@ -59,6 +59,10 @@ func printResult(cmd *cli.Command, result any) error {
 	format := cmd.String("format")
 	switch format {
 	case formatRaw:
+		if s, ok := result.(string); ok {
+			fmt.Println(s)
+			return nil
+		}
 		out, err := json.Marshal(result)
 		if err != nil {
 			return fmt.Errorf("marshal result: %w", err)
