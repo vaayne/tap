@@ -45,8 +45,9 @@ Start simple and escalate only when needed:
 
 Decision flow:
 1. Check for a site script first: `tap site list` / `tap site search <query>`
-2. If you just need readable content: `tap fetch <url>`
-3. If you need interaction/auth/network: `tap browser ...`
+2. For X/Twitter content, try FxEmbed scripts first (`twitter/fxembed-status`, `twitter/fxembed-search`, `twitter/fxembed-profile-*`) before browser or fetch. For long-form X articles, use `tap site twitter/fxembed-status id=<tweet-id> format=markdown -f raw`.
+3. If you just need readable content: `tap fetch <url>`
+4. If you need interaction/auth/network: `tap browser ...`
 
 ## Quick reference
 
