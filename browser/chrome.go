@@ -1,6 +1,8 @@
 package browser
 
 import (
+	"errors"
+	"os"
 	"os/exec"
 	"strings"
 )
@@ -12,7 +14,6 @@ type ChromeInfo struct {
 }
 
 // DetectChrome finds a Chrome/Chromium installation and returns its path and version.
-// It reuses the same discovery logic as the browser launcher (findChrome).
 // Returns nil if no Chrome is found.
 func DetectChrome() *ChromeInfo {
 	path, err := findChrome()
@@ -31,11 +32,24 @@ func DetectChrome() *ChromeInfo {
 }
 
 func parseVersion(output string) string {
-	// "Google Chrome 125.0.6422.141" → "125.0.6422.141"
 	output = strings.TrimSpace(output)
 	parts := strings.Fields(output)
 	if len(parts) == 0 {
 		return ""
 	}
 	return parts[len(parts)-1]
+}
+
+func findChrome() (string, error) {
+	for _, name := range chromeLookPathNames() {
+		if p, err := exec.LookPath(name); err == nil {
+			return p, nil
+		}
+	}
+	for _, p := range chromeFallbackPaths() {
+		if _, err := os.Stat(p); err == nil {
+			return p, nil
+		}
+	}
+	return "", errors.New("chrome binary not found: install Google Chrome or Chromium")
 }
