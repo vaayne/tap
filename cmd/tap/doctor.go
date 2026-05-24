@@ -18,7 +18,7 @@ func doctorCmd() *cli.Command {
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:  "install",
-				Usage: "Install or update Lightpanda to the latest nightly build",
+				Usage: "Install or update browser dependencies",
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
@@ -55,6 +55,28 @@ func runDoctor(ctx context.Context, cmd *cli.Command) error {
 		fmt.Printf("  %s\n", dim(color, "Install Chrome or use --lightpanda as an alternative"))
 	}
 
+	// --- agent-browser ---
+	agentInstall := browser.NewAgentBrowserInstall("")
+	if install {
+		action := "Installing"
+		if agentInstall.Installed() {
+			action = "Updating"
+		}
+		fmt.Printf("  %s agent-browser... ", action)
+		if err := agentInstall.Update(ctx); err != nil {
+			return fmt.Errorf("install agent-browser: %w", err)
+		}
+		fmt.Println("done")
+		fmt.Printf("%s agent-browser installed\n", ok)
+	}
+	if path, err := browser.ResolveAgentBrowserPath(); err == nil {
+		fmt.Printf("%s agent-browser available\n", ok)
+		fmt.Printf("  %s\n", dim(color, path))
+	} else {
+		fmt.Printf("%s agent-browser not installed\n", warn)
+		fmt.Printf("  %s Run %s to download it\n", dim(color, "→"), bold(color, "tap doctor --install"))
+	}
+
 	// --- Lightpanda (macOS/Linux only) ---
 	if runtime.GOOS == "windows" {
 		fmt.Printf("%s Lightpanda not available on Windows\n", dim(color, "-"))
@@ -74,7 +96,6 @@ func runDoctor(ctx context.Context, cmd *cli.Command) error {
 		}
 		fmt.Println("done")
 		fmt.Printf("%s Lightpanda installed\n", ok)
-		return nil
 	}
 
 	if lp.Installed() {
