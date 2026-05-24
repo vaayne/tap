@@ -2,6 +2,10 @@ version: 2
 
 project_name: tap
 
+before:
+  hooks:
+    - scripts/prepare-agent-browser.sh
+
 builds:
   - main: ./cmd/tap
     binary: tap

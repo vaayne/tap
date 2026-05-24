@@ -1,5 +1,6 @@
 # Binary
-bin/
+/bin/
+/browser/bin/agent-browser-*
 cdp
 
 # Go
