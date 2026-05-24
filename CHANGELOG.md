@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Replaced browser backend with agent-browser** — removed ~4,000 lines of hand-rolled chromedp/CDP code and switched to [agent-browser](https://github.com/vercel-labs/agent-browser) as the sole browser backend. This provides ~138 commands via a standalone native binary (9–11 MB, zero runtime dependencies) and immediate feature parity.
+- **Removed chromedp dependency** — `go.mod` no longer depends on `chromedp/chromedp`, `chromedp/cdproto`, or `chromedp/sysutil`.
+
+### Added
+
+- **New browser pass-through commands** — `tap browser set` (viewport, device, geo, offline, headers, credentials, media), `tap browser storage` (local/session), `tap browser state` (save/load/list/show/clear), `tap browser auth` (save/login/list/show/delete), `tap browser get` (text/html/value/attr/title/url/count/box/styles), `tap browser vitals`, `tap browser diff` (snapshot/screenshot/url).
+
 ## [0.4.8] - 2026-05-18
 
 ### Added

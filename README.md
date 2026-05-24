@@ -20,7 +20,7 @@ Upgrade later with:
 tap upgrade
 ```
 
-Browser features use Chrome by default. Check dependencies with `tap doctor`.
+Browser features use agent-browser. Install with `tap doctor --install`.
 
 ## Quick start
 
@@ -54,7 +54,7 @@ tap fetch -b https://github.com/notifications
 
 ### Reuse your existing Chrome
 
-Chrome must already expose DevTools.
+agent-browser manages Chrome automatically. To attach to an existing Chrome with DevTools enabled:
 
 ```bash
 tap attach chrome
@@ -70,7 +70,7 @@ You can also attach explicitly:
 
 ```bash
 tap attach chrome --browser-url http://127.0.0.1:9222
-tap attach chrome --port-file ~/Library/Application\ Support/Google/Chrome/DevToolsActivePort
+tap attach chrome --browser-url http://127.0.0.1:9222
 ```
 
 ### Browser workflow
@@ -152,9 +152,9 @@ These show up on the relevant commands instead of only in global help:
 | `--wait-selector` | Wait for a CSS selector |
 | `--wait-js` | Wait for a JS expression |
 | `--timeout` | Set execution timeout |
-| `--browser-url` | One-shot DevTools override |
+| `--browser-url` | One-shot agent-browser/DevTools connection override |
 | `--profile-dir` | One-shot profile override |
-| `--lightpanda`, `--lp` | Use Lightpanda instead of Chrome |
+| `--lightpanda`, `--lp` | Compatibility alias for fast headless browser mode |
 
 Compatibility aliases still work:
 - `--ws-url` -> `--browser-url`
@@ -171,16 +171,18 @@ tap browser snapshot
 tap browser forms
 tap browser cookies ...
 tap browser network ...
+tap browser set ...
+tap browser storage ...
+tap browser state ...
+tap browser auth ...
+tap browser get ...
+tap browser vitals
+tap browser diff ...
 ```
 
-## Lightpanda
+## Browser backend
 
-| Backend | Platforms | Best for |
-| --- | --- | --- |
-| Chrome | macOS, Linux, Windows | Full browser automation, auth, network interception |
-| Lightpanda | macOS, Linux | Fast headless rendering without auth-heavy flows |
-
-Install or update Lightpanda with:
+Tap uses agent-browser as the single browser backend. It manages Chrome for full browser automation, auth, screenshots, and network workflows. Install or update the backend with:
 
 ```bash
 tap doctor --install

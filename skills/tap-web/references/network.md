@@ -1,6 +1,6 @@
 # Network Capture & Interception
 
-Capture, inspect, and intercept network requests on the current browser tab via CDP.
+Capture, inspect, and intercept network requests on the current browser tab via agent-browser.
 
 - **Network domain**: `wait`, `log`, `body`
 - **Fetch domain**: `intercept`, `clear`
@@ -32,7 +32,7 @@ tap browser network log --resource-type XHR,Fetch --timeout 15s
 
 - Always set `--timeout` on `log`, or it will run until interrupted.
 - Prefer `network wait --body` over scraping DOM when the site has clean JSON APIs.
-- Network interception requires Chrome/CDP; Lightpanda does not support these domains.
+- Network interception runs through agent-browser against managed or attached Chrome sessions.
 - Commands operate on the resolved current tab. Hidden `--session` / `--tab` overrides still exist for advanced use, but they are not part of the common UX.
 
 ## Example: capture SPA data

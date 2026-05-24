@@ -53,6 +53,13 @@ tap browser keypress <key>
 tap browser dialog
 tap browser forms
 tap browser cookies get|set|clear
+tap browser set viewport|device|geo|offline|headers|credentials|media [args...]
+tap browser storage local|session [args...]
+tap browser state save|load|list|show|clear [args...]
+tap browser auth save|login|list|show|delete [args...]
+tap browser get text|html|value|attr|title|url|count|box|styles [args...]
+tap browser vitals [args...]
+tap browser diff snapshot|screenshot|url [args...]
 ```
 
 ## Common workflows

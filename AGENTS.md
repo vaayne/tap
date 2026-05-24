@@ -2,11 +2,11 @@
 
 ## Project
 
-Go CLI and library for running JS scripts against websites (QuickJS + Chrome CDP fallback) and extracting clean content from URLs via go-defuddle.
+Go CLI and library for running JS scripts against websites (QuickJS + agent-browser fallback) and extracting clean content from URLs via go-defuddle.
 
 ## Stack
 
-Go 1.26+, urfave/cli v3, QuickJS (fastschema/qjs), chromedp, go-defuddle, mise.
+Go 1.26+, urfave/cli v3, QuickJS (fastschema/qjs), agent-browser, go-defuddle, mise.
 
 ## Commands
 
@@ -35,8 +35,8 @@ Emoji-prefixed Conventional Commits: `✨ feat:`, `🐛 fix:`, `♻️ refactor:
 
 ```
 tap.go / options.go   → Client API + functional options
-transport/            → Shared HTTP + CDP browser layer
-browser/              → Persistent sessions, tabs, network interception
+transport/            → Shared HTTP + agent-browser bridge
+browser/              → agent-browser adapter, binary install, pass-through types
 engine/               → QuickJS + browser fallback
 fetch/                → URL → clean content (go-defuddle)
 cmd/tap/              → CLI (site, fetch, sync, browser)

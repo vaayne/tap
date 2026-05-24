@@ -1,12 +1,12 @@
 # Browser Automation
 
-Tap now exposes a task-first browser UX for common workflows while keeping the older session/tab/proxy commands for advanced use.
+Tap uses agent-browser as its browser backend — a standalone native binary that provides ~138 commands with zero runtime dependencies.
 
 ## Common workflows
 
 ### Reuse your existing Chrome
 
-Chrome must already expose a DevTools endpoint.
+Chrome must already expose a DevTools endpoint, or use the managed agent-browser backend.
 
 ```bash
 tap attach chrome
@@ -76,7 +76,7 @@ Or launch and attach in one step:
 tap attach electron --launch /Applications/MyApp.app/Contents/MacOS/MyApp
 ```
 
-`--port` must be a **browser CDP port**, not a generic Node inspector port.
+`--port` must be a **browser DevTools port**, not a generic Node inspector port.
 
 ## Status commands
 

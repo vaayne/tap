@@ -8,7 +8,7 @@ description: >
   Supports structured site scripts, readable page extraction, and browser automation
   for tabs, screenshots, forms, cookies, JavaScript evaluation, and network capture.
   Use for web lookup, page reading, content extraction, browser interaction,
-  authenticated sessions, request interception, or CDP-connected desktop apps.
+  authenticated sessions, request interception, or agent-browser-connected desktop apps.
 ---
 
 # tap-web
@@ -105,6 +105,13 @@ tap browser network wait --url-pattern "*/api/*" --body
 tap browser network log --resource-type XHR,Fetch --timeout 30s
 tap browser network intercept --block --url-pattern "*.ads.*"
 tap browser network clear
+tap browser set viewport 1280 720
+tap browser storage local get key
+tap browser state save name
+tap browser auth list
+tap browser get url
+tap browser vitals
+tap browser diff screenshot before.png after.png
 ```
 
 ## Browser-backed flags
@@ -117,7 +124,7 @@ tap browser network clear
 | `--wait-selector <sel>` | Wait for a specific element |
 | `--wait-js <expr>` | Wait for a JS condition |
 | `--timeout <dur>` | Limit execution time |
-| `--browser-url <url>` | One-shot DevTools override |
+| `--browser-url <url>` | One-shot agent-browser/DevTools connection override |
 | `--profile-dir <path>` | One-shot profile override |
 | `--lp`, `--lightpanda` | Fast JS rendering without Chrome auth flows |
 
@@ -136,7 +143,7 @@ tap browser open https://example.com/login --show
 
 Then reuse that same browser context with `tap site -b`, `tap fetch -b`, and later `tap browser ...` commands.
 
-`tap attach chrome` owns an internal proxy daemon for the attached browser. If that attached state goes stale, normal commands fail explicitly and should be repaired with `tap attach chrome`, not by switching contexts implicitly.
+`tap attach chrome` asks agent-browser to connect to the attached browser. If that attached state goes stale, repair it with `tap attach chrome` or reset it with `tap attach clear`.
 
 ## Context resolution
 
