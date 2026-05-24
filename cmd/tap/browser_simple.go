@@ -11,8 +11,6 @@ import (
 	"github.com/vaayne/tap/browser"
 )
 
-// browserSimpleCmd returns commands that provide the simplified browser UX
-// These are aliases or wrappers around existing browser session/tab commands
 func browserOpenCmd() *cli.Command {
 	return &cli.Command{
 		Name:      "open",
@@ -68,114 +66,46 @@ func runBrowserOpen(ctx context.Context, cmd *cli.Command) error {
 	}
 	url := cmd.Args().First()
 
-	mgr, err := newBrowserManager(cmd)
+	ab, err := newAgentBrowser(cmd)
 	if err != nil {
 		return err
 	}
 
-	sessionName := cmd.String("session")
-
-	// Resolve the active context first. Only auto-create a managed local default
-	// when no persisted context exists at all.
-	session, err := mgr.GetSession(ctx, sessionName)
-	if err != nil {
-		if sessionName != "" {
-			return err
-		}
-		opts := browser.SessionOptions{Headless: !cmd.Bool("show")}
-		if err := mgr.CreateSession(ctx, browser.DefaultSessionName, browser.ModeLocal, opts); err != nil {
-			return fmt.Errorf("create session: %w", err)
-		}
-		if err := mgr.SetDefaultContext(ctx, browser.DefaultSessionName, browser.DefaultContextManaged); err != nil {
-			return fmt.Errorf("set default context: %w", err)
-		}
-		session, err = mgr.GetSession(ctx, browser.DefaultSessionName)
+	if cmd.Bool("new-tab") {
+		_, _, err := ab.Exec(ctx, "tab", "new", url)
 		if err != nil {
-			return err
+			return fmt.Errorf("open new tab: %w", err)
 		}
-	}
-	sessionName = session.Name
-
-	// Determine if we need a new tab
-	createNewTab := cmd.Bool("new-tab")
-	var targetTab string
-
-	if !createNewTab && session.SelectedTab != "" {
-		// Check if selected tab is live
-		if tab, ok := session.Tabs[session.SelectedTab]; ok && tab.Status == browser.TabStatusLive {
-			targetTab = session.SelectedTab
+	} else {
+		if err := ab.Open(ctx, url, browser.OpenOpts{Headed: cmd.Bool("show")}); err != nil {
+			return fmt.Errorf("open: %w", err)
 		}
 	}
 
-	if targetTab == "" {
-		// Need to create a new tab
-		targetTab = generateNextTabName(session)
-		if err := mgr.CreateTab(ctx, sessionName, targetTab, "about:blank"); err != nil {
-			return fmt.Errorf("create tab: %w", err)
-		}
-		// Select it
-		if err := mgr.SelectTab(ctx, sessionName, targetTab); err != nil {
-			return err
-		}
-	}
-
-	// Navigate the tab
-	if err := mgr.Navigate(ctx, sessionName, targetTab, url); err != nil {
-		return fmt.Errorf("navigate: %w", err)
-	}
-
-	// Handle wait flags
 	if d := cmd.Duration("wait"); d > 0 {
-		// Simple sleep - actual implementation would need proper wait
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-time.After(d):
 		}
 	}
-
-	// Handle wait-selector if provided (simplified for Phase 1)
 	if sel := cmd.String("wait-selector"); sel != "" {
-		// TODO: Implement proper wait using Evaluate with polling
-		// For now, just do a fixed delay as a placeholder
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(2 * time.Second):
+		_, _, err := ab.Exec(ctx, "wait", sel)
+		if err != nil {
+			return fmt.Errorf("wait selector: %w", err)
 		}
 	}
 
 	c := true
 	fmt.Fprintf(os.Stderr, "%s Opened %s\n", green(c, "✓"), url)
-	if targetTab != session.SelectedTab || createNewTab {
-		fmt.Fprintf(os.Stderr, "  Tab: %s\n", targetTab)
-	}
-
 	return nil
 }
 
-func generateNextTabName(session *browser.SessionRecord) string {
-	// Find highest tab-N number
-	maxNum := 0
-	for name := range session.Tabs {
-		var num int
-		if _, err := fmt.Sscanf(name, "tab-%d", &num); err == nil {
-			if num > maxNum {
-				maxNum = num
-			}
-		}
-	}
-	return fmt.Sprintf("tab-%d", maxNum+1)
-}
-
-// browserTabsCmd is a user-friendly alias for "browser tab list"
 func browserTabsCmd() *cli.Command {
 	return &cli.Command{
 		Name:  "tabs",
 		Usage: "List browser tabs",
 		Description: `Show all tabs in the current browser context.
-
-This is a simplified view of tracked tabs with stable IDs.
 
 Examples:
   tap browser tabs
@@ -198,92 +128,48 @@ Examples:
 }
 
 func runBrowserTabs(ctx context.Context, cmd *cli.Command) error {
-	mgr, err := newBrowserManager(cmd)
+	ab, err := newAgentBrowser(cmd)
+	if err != nil {
+		return err
+	}
+	out, _, err := ab.Exec(ctx, "tab", "--json")
 	if err != nil {
 		return err
 	}
 
-	sessionName := cmd.String("session")
-	list, err := mgr.ListTabs(ctx, sessionName)
-	if err != nil {
-		return err
+	var envelope browser.AgentBrowserEnvelope[map[string]any]
+	if err := json.Unmarshal(out, &envelope); err != nil {
+		return fmt.Errorf("parse tabs: %w", err)
+	}
+	if !envelope.Success {
+		return fmt.Errorf("tabs: %s", envelope.Error)
 	}
 
 	if cmd.Bool("json") {
-		return printTabsJSON(list)
+		pretty, _ := json.MarshalIndent(envelope.Data, "", "  ")
+		fmt.Println(string(pretty))
+		return nil
 	}
 
-	return printTabsHuman(list)
-}
-
-func printTabsHuman(list *browser.TabList) error {
-	if len(list.Tabs) == 0 {
+	data := envelope.Data
+	tabs, _ := data["tabs"].([]any)
+	if len(tabs) == 0 {
 		fmt.Println("No tabs found.")
-		fmt.Println("Run: tap browser open <url>")
 		return nil
 	}
 
 	c := true
-	fmt.Printf("%s %d tabs\n\n", bold(c, "Tabs:"), len(list.Tabs))
-
-	fmt.Printf("%-10s %-20s %-40s %-8s %s\n", "ID", "TITLE", "URL", "CURRENT", "STATUS")
-	fmt.Println("------------------------------------------------------------------------------------------")
-
-	for _, tab := range list.Tabs {
-		current := ""
-		if tab.Name == list.SelectedTab {
-			current = green(c, "yes")
+	fmt.Printf("%s %d tabs\n\n", bold(c, "Tabs:"), len(tabs))
+	for _, t := range tabs {
+		if m, ok := t.(map[string]any); ok {
+			id, _ := m["id"].(string)
+			url, _ := m["url"].(string)
+			fmt.Printf("  %-6s %s\n", id, url)
 		}
-
-		status := string(tab.Status)
-		switch tab.Status {
-		case browser.TabStatusLive:
-			status = green(c, status)
-		case browser.TabStatusStale:
-			status = yellow(c, status)
-		}
-
-		title := "-"
-		url := tab.URL
-		if len(url) > 38 {
-			url = url[:35] + "..."
-		}
-
-		fmt.Printf("%-10s %-20s %-40s %-8s %s\n", tab.Name, title, url, current, status)
 	}
-
-	if list.SelectedTab == "" {
-		fmt.Println()
-		fmt.Println("No current tab selected. Run: tap browser open <url>")
-	}
-
 	return nil
 }
 
-func printTabsJSON(list *browser.TabList) error {
-	result := map[string]any{
-		"selectedTab": list.SelectedTab,
-		"count":       len(list.Tabs),
-	}
-
-	tabs := make([]map[string]any, 0, len(list.Tabs))
-	for _, tab := range list.Tabs {
-		tabs = append(tabs, map[string]any{
-			"id":     tab.Name,
-			"title":  "",
-			"status": tab.Status,
-			"url":    tab.URL,
-			"target": tab.TargetID,
-		})
-	}
-	result["tabs"] = tabs
-
-	out, _ := json.MarshalIndent(result, "", "  ")
-	fmt.Println(string(out))
-	return nil
-}
-
-// browserSwitchCmd is a user-friendly alias for "browser tab select"
 func browserSwitchCmd() *cli.Command {
 	return &cli.Command{
 		Name:      "switch",
@@ -292,8 +178,8 @@ func browserSwitchCmd() *cli.Command {
 		Description: `Set the current working tab.
 
 Examples:
-  tap browser switch tab-2
-  tap browser switch tab-1`,
+  tap browser switch t2
+  tap browser switch t1`,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "session",
@@ -309,38 +195,34 @@ Examples:
 
 func runBrowserSwitch(ctx context.Context, cmd *cli.Command) error {
 	if cmd.Args().Len() == 0 {
-		return fmt.Errorf("tab ID required (e.g., tab-1, tab-2)")
+		return fmt.Errorf("tab ID required (e.g., t1, t2)")
 	}
-	tabName := cmd.Args().First()
+	tabID := cmd.Args().First()
 
-	mgr, err := newBrowserManager(cmd)
+	ab, err := newAgentBrowser(cmd)
 	if err != nil {
 		return err
 	}
 
-	sessionName := cmd.String("session")
-	if err := mgr.SelectTab(ctx, sessionName, tabName); err != nil {
+	_, _, err = ab.Exec(ctx, "tab", tabID)
+	if err != nil {
 		return fmt.Errorf("switch tab: %w", err)
 	}
 
 	c := true
-	fmt.Fprintf(os.Stderr, "%s Switched to %s\n", green(c, "✓"), tabName)
+	fmt.Fprintf(os.Stderr, "%s Switched to %s\n", green(c, "✓"), tabID)
 	return nil
 }
 
-// browserCloseTabCmd is a user-friendly alias for "browser tab close"
 func browserCloseTabCmd() *cli.Command {
 	return &cli.Command{
 		Name:      "close-tab",
 		Usage:     "Close a browser tab",
-		ArgsUsage: "[tab-id]",
-		Description: `Close a tab. If no tab ID is given, closes the current tab.
-
-After closing, the next live tab becomes current.
+		ArgsUsage: "<tab-id>",
+		Description: `Close a specific tab.
 
 Examples:
-  tap browser close-tab        # Close current tab
-  tap browser close-tab tab-2  # Close specific tab`,
+  tap browser close-tab t2`,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "session",
@@ -355,37 +237,26 @@ Examples:
 }
 
 func runBrowserCloseTab(ctx context.Context, cmd *cli.Command) error {
-	tabName := cmd.Args().First() // Empty means current/resolved tab
+	if cmd.Args().Len() == 0 {
+		return fmt.Errorf("tab ID required")
+	}
+	tabID := cmd.Args().First()
 
-	mgr, err := newBrowserManager(cmd)
+	ab, err := newAgentBrowser(cmd)
 	if err != nil {
 		return err
 	}
 
-	sessionName := cmd.String("session")
-
-	// If no tab specified, resolve current
-	if tabName == "" {
-		session, err := mgr.GetSession(ctx, sessionName)
-		if err != nil {
-			return err
-		}
-		tabName = session.SelectedTab
-		if tabName == "" {
-			return fmt.Errorf("no current tab to close")
-		}
-	}
-
-	if err := mgr.CloseTab(ctx, sessionName, tabName); err != nil {
+	_, _, err = ab.Exec(ctx, "tab", "close", tabID)
+	if err != nil {
 		return fmt.Errorf("close tab: %w", err)
 	}
 
 	c := true
-	fmt.Fprintf(os.Stderr, "%s Closed %s\n", green(c, "✓"), tabName)
+	fmt.Fprintf(os.Stderr, "%s Closed %s\n", green(c, "✓"), tabID)
 	return nil
 }
 
-// browserStatusCmd is a user-friendly alias for "browser session info"
 func browserStatusCmd() *cli.Command {
 	return &cli.Command{
 		Name:  "status",
@@ -414,31 +285,54 @@ Examples:
 }
 
 func runBrowserStatus(ctx context.Context, cmd *cli.Command) error {
-	mgr, err := newBrowserManager(cmd)
+	ab, err := newAgentBrowser(cmd)
 	if err != nil {
 		return err
 	}
 
-	sessionName := cmd.String("session")
-	defaultContext, _ := mgr.DefaultContext(ctx)
-	session, err := mgr.GetSession(ctx, sessionName)
-	if err != nil {
-		if cmd.Bool("json") {
-			return printStatusJSON(defaultContext, nil, nil, "no_session")
-		}
-		fmt.Println("No browser session active.")
-		fmt.Println("Run: tap browser open <url>")
-		return nil
-	}
+	sessionOut, _, _ := ab.Exec(ctx, "session", "--json")
+	tabOut, _, _ := ab.Exec(ctx, "tab", "--json")
+	urlOut, _, _ := ab.Exec(ctx, "get", "url", "--json")
 
-	var currentTab *browser.TabRecord
-	if session.SelectedTab != "" {
-		currentTab = session.Tabs[session.SelectedTab]
+	var sessionEnv browser.AgentBrowserEnvelope[map[string]any]
+	_ = json.Unmarshal(sessionOut, &sessionEnv)
+
+	var tabEnv browser.AgentBrowserEnvelope[map[string]any]
+	_ = json.Unmarshal(tabOut, &tabEnv)
+
+	var urlEnv browser.AgentBrowserEnvelope[string]
+	_ = json.Unmarshal(urlOut, &urlEnv)
+
+	result := map[string]any{
+		"session": sessionEnv.Data,
+		"tabs":    tabEnv.Data,
+		"url":     urlEnv.Data,
+	}
+	if isAttachedMode() {
+		result["attached"] = true
 	}
 
 	if cmd.Bool("json") {
-		return printStatusJSON(defaultContext, session, currentTab, "")
+		out, _ := json.MarshalIndent(result, "", "  ")
+		fmt.Println(string(out))
+		return nil
 	}
 
-	return printStatusHuman(defaultContext, session, currentTab)
+	c := true
+	if name, ok := sessionEnv.Data["name"].(string); ok && name != "" {
+		fmt.Printf("%s %s\n", bold(c, "Session:"), name)
+	} else if sessionEnv.Success {
+		fmt.Printf("%s %v\n", bold(c, "Session:"), sessionEnv.Data)
+	}
+	if urlEnv.Success && urlEnv.Data != "" {
+		fmt.Printf("%s %s\n", bold(c, "URL:"), urlEnv.Data)
+	}
+	if tabs, ok := tabEnv.Data["tabs"].([]any); ok {
+		fmt.Printf("%s %d\n", bold(c, "Tabs:"), len(tabs))
+	}
+	if isAttachedMode() {
+		fmt.Printf("%s attached mode\n", bold(c, "Mode:"))
+	}
+
+	return nil
 }

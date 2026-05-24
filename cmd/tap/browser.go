@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/urfave/cli/v3"
 	"github.com/vaayne/tap/browser"
@@ -33,7 +35,7 @@ Default behavior:
 			&cli.StringFlag{
 				Name:    "state-root",
 				Usage:   "Durable state directory for browser sessions and tabs",
-				Sources: cli.EnvVars(browser.EnvStateRoot),
+				Sources: cli.EnvVars("TAP_BROWSER_STATE_ROOT"),
 			},
 		},
 		Commands: []*cli.Command{
@@ -67,32 +69,33 @@ Default behavior:
 	}
 }
 
-func newBrowserManager(cmd *cli.Command) (*browser.Manager, error) {
-	root := browserStateRoot(cmd)
-	store, err := browser.NewStore(root)
+func newAgentBrowser(cmd *cli.Command) (*browser.AgentBrowser, error) {
+	ab, err := browser.NewAgentBrowser("")
 	if err != nil {
-		return nil, fmt.Errorf("init browser store: %w", err)
+		return nil, fmt.Errorf("agent-browser: %w", err)
 	}
-	return browser.NewManager(store), nil
+	if name := cmd.String("session"); name != "" {
+		ab.SessionName = name
+	}
+	if isAttachedMode() {
+		ab.Attached = true
+		ab.SessionName = ""
+	}
+	return ab, nil
 }
 
 func browserActionFlags(includeOutput bool) []cli.Flag {
 	flags := []cli.Flag{
 		&cli.StringFlag{
 			Name:   "session",
-			Usage:  "Advanced session override",
-			Hidden: true,
-		},
-		&cli.StringFlag{
-			Name:   "tab",
-			Usage:  "Advanced tab override",
+			Usage:  "Session name (maps to --session-name)",
 			Hidden: true,
 		},
 	}
 	if includeOutput {
 		flags = append(flags, &cli.StringFlag{
 			Name:  "output",
-			Usage: "Write the screenshot to this file; defaults to a generated path when omitted",
+			Usage: "Write output to this file; defaults to a generated path when omitted",
 		})
 	}
 	return flags
@@ -103,14 +106,23 @@ func withCategory(cat string, cmd *cli.Command) *cli.Command {
 	return cmd
 }
 
-func browserStateRoot(cmd *cli.Command) string {
-	root := cmd.String("state-root")
-	if root != "" {
-		return root
-	}
-	defaultRoot, err := browser.DefaultStateRoot()
-	if err != nil {
-		return ""
-	}
-	return defaultRoot
+func attachedFlagPath() string {
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".cache", "tap", "browser", "attached")
+}
+
+func isAttachedMode() bool {
+	_, err := os.Stat(attachedFlagPath())
+	return err == nil
+}
+
+func setAttachedMode() error {
+	p := attachedFlagPath()
+	_ = os.MkdirAll(filepath.Dir(p), 0o755)
+	return os.WriteFile(p, []byte{}, 0o644)
+}
+
+func clearAttachedMode() error {
+	_ = os.Remove(attachedFlagPath())
+	return nil
 }

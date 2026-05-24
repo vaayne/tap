@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -16,11 +15,7 @@ import (
 func browserNetworkCmd() *cli.Command {
 	return &cli.Command{
 		Name:  "network",
-		Usage: "Capture and intercept network requests in a tracked browser tab",
-		Description: `Network observation and interception for tracked browser tabs.
-
-Uses the CDP Network domain for passive capture (wait, log, body) and
-the Fetch domain for active interception (intercept, clear).`,
+		Usage: "Capture and intercept network requests",
 		Commands: []*cli.Command{
 			browserNetworkWaitCmd(),
 			browserNetworkBodyCmd(),
@@ -38,24 +33,16 @@ func browserNetworkWaitCmd() *cli.Command {
 		Flags: append(browserActionFlags(false),
 			&cli.StringFlag{
 				Name:  "url-pattern",
-				Usage: "Glob pattern to match request URLs (* matches any chars including /)",
+				Usage: "Glob pattern to match request URLs",
 			},
 			&cli.StringFlag{
 				Name:  "method",
-				Usage: "HTTP method(s) to match, comma-separated (e.g. GET,POST)",
-			},
-			&cli.StringFlag{
-				Name:  "resource-type",
-				Usage: "Resource type(s) to match, comma-separated (e.g. XHR,Fetch,Document)",
+				Usage: "HTTP method(s) to match, comma-separated",
 			},
 			&cli.DurationFlag{
 				Name:  "timeout",
 				Usage: "Maximum time to wait for a matching request",
 				Value: 30 * time.Second,
-			},
-			&cli.BoolFlag{
-				Name:  "body",
-				Usage: "Include the response body in the output",
 			},
 			&cli.StringFlag{
 				Name:    "format",
@@ -64,42 +51,33 @@ func browserNetworkWaitCmd() *cli.Command {
 				Value:   formatPretty,
 			},
 		),
-		Description: `Block until a network request matching the given filters completes,
-then print the captured request/response entry.
-
-The --url-pattern flag uses glob syntax where * matches any characters
-including path separators. For example:
-  */api/*         matches https://example.com/api/v1/users
-  *.ads.*         matches https://tracker.ads.example.com/pixel
-
-Examples:
-  tap browser network wait --url-pattern "*/api/search*"
-  tap browser network wait --url-pattern "*/graphql" --method POST --body
-  tap browser network wait --resource-type XHR,Fetch --timeout 10s`,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			configureLogging(cmd)
-
-			filter := buildNetworkFilter(cmd)
-			timeout := cmd.Duration("timeout")
-			includeBody := cmd.Bool("body")
-
-			mgr, err := newBrowserManager(cmd)
+			ab, err := newAgentBrowser(cmd)
 			if err != nil {
 				return err
 			}
-
-			sessionName := cmd.String("session")
-			tabName := cmd.String("tab")
-
-			waitCtx, cancel := context.WithTimeout(ctx, timeout)
+			args := []string{"network", "wait", "--json"}
+			if p := cmd.String("url-pattern"); p != "" {
+				args = append(args, "--url-pattern", p)
+			}
+			if m := cmd.String("method"); m != "" {
+				args = append(args, "--method", m)
+			}
+			waitCtx, cancel := context.WithTimeout(ctx, cmd.Duration("timeout"))
 			defer cancel()
-
-			entry, err := mgr.NetworkWait(waitCtx, sessionName, tabName, filter, includeBody)
+			out, _, err := ab.Exec(waitCtx, args...)
 			if err != nil {
 				return err
 			}
-
-			return printResult(cmd, entry)
+			var envelope browser.AgentBrowserEnvelope[map[string]any]
+			if err := json.Unmarshal(out, &envelope); err != nil {
+				return fmt.Errorf("parse network wait: %w", err)
+			}
+			if !envelope.Success {
+				return fmt.Errorf("network wait: %s", envelope.Error)
+			}
+			return printResult(cmd, envelope.Data)
 		},
 	}
 }
@@ -117,75 +95,35 @@ func browserNetworkBodyCmd() *cli.Command {
 				Value:   formatRaw,
 			},
 		),
-		Description: `Fetch and print the response body for a network request identified
-by its request ID (from 'tap browser network wait' or 'tap browser network log' output).
-
-Examples:
-  tap browser network body "12345.67"
-  tap browser network body "12345.67" --format json`,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			configureLogging(cmd)
-
 			requestID := cmd.Args().First()
 			if requestID == "" {
 				return fmt.Errorf("request ID required")
 			}
-
-			mgr, err := newBrowserManager(cmd)
+			ab, err := newAgentBrowser(cmd)
 			if err != nil {
 				return err
 			}
-
-			sessionName := cmd.String("session")
-			tabName := cmd.String("tab")
-
-			body, err := mgr.NetworkGetBody(ctx, sessionName, tabName, requestID)
+			out, _, err := ab.Exec(ctx, "network", "body", requestID, "--json")
 			if err != nil {
 				return err
 			}
-
 			format := cmd.String("format")
-			switch format {
-			case formatJSON:
-				// Output as base64-encoded JSON string.
-				encoded := base64.StdEncoding.EncodeToString(body)
-				fmt.Printf("%q\n", encoded)
-			default: // raw
-				_, _ = os.Stdout.Write(body)
+			if format == formatJSON {
+				fmt.Println(string(out))
+			} else {
+				var envelope browser.AgentBrowserEnvelope[map[string]any]
+				_ = json.Unmarshal(out, &envelope)
+				if data, ok := envelope.Data["body"].(string); ok {
+					_, _ = os.Stdout.Write([]byte(data))
+				} else {
+					_, _ = os.Stdout.Write(out)
+				}
 			}
 			return nil
 		},
 	}
-}
-
-// buildNetworkFilter constructs a NetworkFilter from CLI flags.
-func buildNetworkFilter(cmd *cli.Command) browser.NetworkFilter {
-	var filter browser.NetworkFilter
-
-	if p := cmd.String("url-pattern"); p != "" {
-		filter.URLPattern = p
-	}
-	if m := cmd.String("method"); m != "" {
-		filter.Methods = splitCSV(m)
-	}
-	if rt := cmd.String("resource-type"); rt != "" {
-		filter.ResourceTypes = splitCSV(rt)
-	}
-
-	return filter
-}
-
-// splitCSV splits a comma-separated string into trimmed non-empty parts.
-func splitCSV(s string) []string {
-	parts := strings.Split(s, ",")
-	var out []string
-	for _, p := range parts {
-		p = strings.TrimSpace(p)
-		if p != "" {
-			out = append(out, p)
-		}
-	}
-	return out
 }
 
 func browserNetworkLogCmd() *cli.Command {
@@ -201,55 +139,39 @@ func browserNetworkLogCmd() *cli.Command {
 				Name:  "method",
 				Usage: "HTTP method(s) to match, comma-separated",
 			},
-			&cli.StringFlag{
-				Name:  "resource-type",
-				Usage: "Resource type(s) to match, comma-separated",
-			},
 			&cli.DurationFlag{
 				Name:  "timeout",
 				Usage: "Maximum duration to capture (0 = until interrupted)",
 				Value: 0,
 			},
 		),
-		Description: `Enable the Network domain and stream completed request/response entries
-as newline-delimited JSON (NDJSON) to stdout.
-
-Runs until --timeout expires or the process is interrupted (Ctrl-C).
-
-Examples:
-  tap browser network log
-  tap browser network log --url-pattern "*/api/*" --timeout 30s
-  tap browser network log --resource-type XHR,Fetch`,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			configureLogging(cmd)
-
-			filter := buildNetworkFilter(cmd)
-
-			mgr, err := newBrowserManager(cmd)
+			ab, err := newAgentBrowser(cmd)
 			if err != nil {
 				return err
 			}
-
-			sessionName := cmd.String("session")
-			tabName := cmd.String("tab")
-
+			args := []string{"network", "log"}
+			if p := cmd.String("url-pattern"); p != "" {
+				args = append(args, "--url-pattern", p)
+			}
+			if m := cmd.String("method"); m != "" {
+				args = append(args, "--method", m)
+			}
 			logCtx := ctx
 			var logCancel context.CancelFunc
 			if timeout := cmd.Duration("timeout"); timeout > 0 {
 				logCtx, logCancel = context.WithTimeout(ctx, timeout)
 				defer logCancel()
 			}
-
-			ch, cancel, err := mgr.NetworkLog(logCtx, sessionName, tabName, filter)
+			out, _, err := ab.Exec(logCtx, args...)
 			if err != nil {
 				return err
 			}
-			defer cancel()
-
-			enc := json.NewEncoder(os.Stdout)
-			for entry := range ch {
-				if err := enc.Encode(entry); err != nil {
-					return fmt.Errorf("write entry: %w", err)
+			lines := strings.Split(string(out), "\n")
+			for _, line := range lines {
+				if line = strings.TrimSpace(line); line != "" {
+					fmt.Println(line)
 				}
 			}
 			return nil
@@ -260,7 +182,7 @@ Examples:
 func browserNetworkInterceptCmd() *cli.Command {
 	return &cli.Command{
 		Name:  "intercept",
-		Usage: "Set request interception rules (block, mock, or modify headers)",
+		Usage: "Set request interception rules",
 		Flags: append(browserActionFlags(false),
 			&cli.StringFlag{
 				Name:  "url-pattern",
@@ -270,25 +192,17 @@ func browserNetworkInterceptCmd() *cli.Command {
 				Name:  "method",
 				Usage: "HTTP method(s) to match, comma-separated",
 			},
-			&cli.StringFlag{
-				Name:  "resource-type",
-				Usage: "Resource type(s) to match, comma-separated",
-			},
 			&cli.BoolFlag{
 				Name:  "block",
-				Usage: "Block matching requests (mutually exclusive with --respond)",
-			},
-			&cli.StringSliceFlag{
-				Name:  "header",
-				Usage: `Add/override request header (repeatable, format "Key: Value")`,
+				Usage: "Block matching requests",
 			},
 			&cli.StringFlag{
 				Name:  "respond",
-				Usage: "Mock response body (mutually exclusive with --block)",
+				Usage: "Mock response body",
 			},
 			&cli.IntFlag{
 				Name:  "status",
-				Usage: "Mock response HTTP status code (required with --respond)",
+				Usage: "Mock response HTTP status code",
 				Value: 200,
 			},
 			&cli.StringFlag{
@@ -297,80 +211,30 @@ func browserNetworkInterceptCmd() *cli.Command {
 				Value: "application/json",
 			},
 		),
-		Description: `Set Fetch domain interception rules on a tracked tab.
-
-Rules are replace-all: each call replaces any previously set rules.
-Pass a single rule per invocation. Use 'tap browser network clear' to
-remove all rules.
-
-Examples:
-  # Block ad requests
-  tap browser network intercept --block --url-pattern "*.ads.*"
-
-  # Mock an API response
-  tap browser network intercept --url-pattern "*/api/user" \\
-    --respond '{"name":"test"}' --status 200
-
-  # Add auth header to API requests
-  tap browser network intercept --url-pattern "*/api/*" \\
-    --header "Authorization: Bearer tok_abc123"`,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			configureLogging(cmd)
-
-			filter := buildNetworkFilter(cmd)
-			block := cmd.Bool("block")
-			respondBody := cmd.String("respond")
-
-			if block && respondBody != "" {
-				return fmt.Errorf("--block and --respond are mutually exclusive")
-			}
-
-			rule := browser.InterceptRule{
-				Filter: filter,
-				Block:  block,
-			}
-
-			if respondBody != "" {
-				rule.MockBody = respondBody
-				rule.MockStatus = cmd.Int("status")
-				rule.MockHeaders = map[string]string{
-					"Content-Type": cmd.String("content-type"),
-				}
-			}
-
-			// Parse --header flags.
-			for _, h := range cmd.StringSlice("header") {
-				parts := strings.SplitN(h, ":", 2)
-				if len(parts) != 2 {
-					return fmt.Errorf("invalid header format %q (expected \"Key: Value\")", h)
-				}
-				if rule.AddHeaders == nil {
-					rule.AddHeaders = make(map[string]string)
-				}
-				rule.AddHeaders[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
-			}
-
-			mgr, err := newBrowserManager(cmd)
+			ab, err := newAgentBrowser(cmd)
 			if err != nil {
 				return err
 			}
-
-			sessionName := cmd.String("session")
-			tabName := cmd.String("tab")
-
-			if err := mgr.NetworkIntercept(ctx, sessionName, tabName, []browser.InterceptRule{rule}); err != nil {
+			args := []string{"network", "intercept"}
+			if p := cmd.String("url-pattern"); p != "" {
+				args = append(args, "--url-pattern", p)
+			}
+			if m := cmd.String("method"); m != "" {
+				args = append(args, "--method", m)
+			}
+			if cmd.Bool("block") {
+				args = append(args, "--block")
+			}
+			if body := cmd.String("respond"); body != "" {
+				args = append(args, "--respond", body, "--status", fmt.Sprintf("%d", cmd.Int("status")), "--content-type", cmd.String("content-type"))
+			}
+			_, _, err = ab.Exec(ctx, args...)
+			if err != nil {
 				return err
 			}
-
-			if block {
-				fmt.Fprintln(os.Stderr, "Blocking matching requests")
-			} else if respondBody != "" {
-				fmt.Fprintf(os.Stderr, "Mocking matching requests with status %d\n", rule.MockStatus)
-			} else if len(rule.AddHeaders) > 0 {
-				fmt.Fprintln(os.Stderr, "Adding headers to matching requests")
-			}
-
-			// Keep the process alive so the interception goroutine stays active.
+			fmt.Fprintln(os.Stderr, "Interception rules set")
 			<-ctx.Done()
 			return nil
 		},
@@ -380,24 +244,16 @@ Examples:
 func browserNetworkClearCmd() *cli.Command {
 	return &cli.Command{
 		Name:  "clear",
-		Usage: "Remove all Fetch domain interception rules",
+		Usage: "Remove all network interception rules",
 		Flags: browserActionFlags(false),
-		Description: `Disable the Fetch domain and remove all interception rules
-from the resolved tracked tab.
-
-This does not affect passive Network domain capture (log/wait).`,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			configureLogging(cmd)
-
-			mgr, err := newBrowserManager(cmd)
+			ab, err := newAgentBrowser(cmd)
 			if err != nil {
 				return err
 			}
-
-			sessionName := cmd.String("session")
-			tabName := cmd.String("tab")
-
-			if err := mgr.NetworkClearIntercept(ctx, sessionName, tabName); err != nil {
+			_, _, err = ab.Exec(ctx, "network", "clear")
+			if err != nil {
 				return err
 			}
 			fmt.Fprintln(os.Stderr, "Interception rules cleared")

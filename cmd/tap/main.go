@@ -5,12 +5,10 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
 
 	"github.com/joho/godotenv"
 	"github.com/urfave/cli/v3"
 	"github.com/vaayne/tap"
-	"github.com/vaayne/tap/browser"
 	"github.com/vaayne/tap/transport"
 )
 
@@ -68,7 +66,6 @@ Use 'tap <command> --help' for details on any command.`,
 			doctorCmd(),
 			upgradeCmd(),
 			skillCmd(),
-			internalCmd(),
 		},
 	}
 }
@@ -235,59 +232,7 @@ func resolveBrowserClientOptions(ctx context.Context, cmd *cli.Command, forceMan
 		return append(opts, tap.WithProfileDir(dir)), nil
 	}
 
-	mgr, err := newBrowserManager(cmd)
-	if err != nil {
-		return nil, err
-	}
-	defaultContext, err := mgr.DefaultContext(ctx)
-	if err != nil {
-		return nil, err
-	}
-	store, err := newBrowserStore(cmd)
-	if err != nil {
-		return nil, err
-	}
-	state, err := store.Load()
-	if err != nil {
-		return nil, err
-	}
-	if defaultContext != nil && defaultContext.Kind == browser.DefaultContextAttached {
-		if state.ProxyDaemon == nil {
-			return nil, fmt.Errorf("attached Chrome is stale: proxy daemon metadata is missing (run 'tap attach chrome')")
-		}
-		health := browser.CheckProxyDaemon(ctx, state.ProxyDaemon)
-		if err := persistProxyDaemonHealth(store, state.ProxyDaemon, health); err == nil && !health.Healthy {
-			defaultContext.Reason = health.Reason
-			defaultContext.Stale = true
-		}
-		if !health.Healthy {
-			return nil, fmt.Errorf("attached Chrome is stale: %s (run 'tap attach chrome')", health.Reason)
-		}
-	}
-	if defaultContext != nil && defaultContext.Stale {
-		return nil, fmt.Errorf("default browser context %q is stale: %s (run 'tap attach chrome')", defaultContext.SessionName, defaultContext.Reason)
-	}
-
-	session, err := mgr.GetSession(ctx, "")
-	if err == nil {
-		switch {
-		case session.Remote != nil && session.Remote.WSURL != "":
-			return append(opts, tap.WithWSURL(session.Remote.WSURL)), nil
-		case session.Local != nil && session.Local.ProfileDir != "":
-			return append(opts, tap.WithProfileDir(session.Local.ProfileDir)), nil
-		}
-	}
-	if defaultContext != nil {
-		return nil, fmt.Errorf("resolve default browser context %q: %w", defaultContext.SessionName, err)
-	}
-	if forceManagedDefault {
-		return append(opts, tap.WithProfileDir(defaultManagedProfileDir(cmd))), nil
-	}
 	return opts, nil
-}
-
-func defaultManagedProfileDir(cmd *cli.Command) string {
-	return filepath.Join(browserStateRoot(cmd), "profiles", browser.DefaultSessionName)
 }
 
 func firstString(cmd *cli.Command, names ...string) string {

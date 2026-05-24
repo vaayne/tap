@@ -5,11 +5,11 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"time"
 
-	"github.com/chromedp/cdproto/runtime"
-	"github.com/chromedp/chromedp"
 	"github.com/urfave/cli/v3"
+	"github.com/vaayne/tap/browser"
 	"github.com/vaayne/tap/transport"
 )
 
@@ -70,38 +70,27 @@ func delayPause(d time.Duration) transport.PauseFunc {
 
 func waitForSelector(selector string) transport.PauseFunc {
 	return func(ctx context.Context) error {
-		if err := chromedp.Run(ctx, chromedp.WaitVisible(selector, chromedp.ByQuery)); err != nil {
-			return fmt.Errorf("wait for selector %q: %w", selector, err)
+		path, err := browser.ResolveAgentBrowserPath()
+		if err != nil {
+			return err
 		}
-		return nil
+		cmd := exec.CommandContext(ctx, path, "wait", selector, "--session-name", "default", "--json")
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		return cmd.Run()
 	}
 }
 
 func waitForJS(expr string) transport.PauseFunc {
-	wrapped := fmt.Sprintf(`(async () => Boolean(await (%s)))()`, expr)
-
 	return func(ctx context.Context) error {
-		ticker := time.NewTicker(200 * time.Millisecond)
-		defer ticker.Stop()
-
-		for {
-			var ready bool
-			err := chromedp.Run(ctx, chromedp.Evaluate(wrapped, &ready, func(p *runtime.EvaluateParams) *runtime.EvaluateParams {
-				return p.WithReturnByValue(true).WithAwaitPromise(true)
-			}))
-			if err == nil && ready {
-				return nil
-			}
-
-			select {
-			case <-ticker.C:
-			case <-ctx.Done():
-				if err != nil {
-					return fmt.Errorf("wait for js %q: %w", expr, err)
-				}
-				return ctx.Err()
-			}
+		path, err := browser.ResolveAgentBrowserPath()
+		if err != nil {
+			return err
 		}
+		cmd := exec.CommandContext(ctx, path, "wait", "--fn", expr, "--session-name", "default", "--json")
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		return cmd.Run()
 	}
 }
 

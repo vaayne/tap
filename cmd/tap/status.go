@@ -16,9 +16,6 @@ func statusCmd() *cli.Command {
 		Description: `Display the current default browser context, authentication state,
 and active tab information.
 
-This command helps you understand which browser context and tab
-will be used by subsequent tap commands.
-
 Examples:
   tap status              Show human-readable status
   tap status --json       Show machine-readable status`,
@@ -36,162 +33,70 @@ Examples:
 }
 
 func runStatus(ctx context.Context, cmd *cli.Command) error {
-	mgr, err := newBrowserManager(cmd)
+	ab, err := browser.NewAgentBrowser("")
 	if err != nil {
 		return err
 	}
-
-	defaultContext, _ := mgr.DefaultContext(ctx)
-
-	// Get default session info
-	session, err := mgr.GetSession(ctx, "")
-	if err != nil {
-		// No default session - show empty state
-		if cmd.Bool("json") {
-			return printStatusJSON(defaultContext, nil, nil, "no_default_session")
-		}
-		return printStatusEmpty()
+	if isAttachedMode() {
+		ab.Attached = true
+		ab.SessionName = ""
 	}
 
-	// Get current tab
-	var currentTab *browser.TabRecord
-	if session.SelectedTab != "" {
-		if tab, ok := session.Tabs[session.SelectedTab]; ok {
-			currentTab = tab
-		}
+	sessionOut, _, _ := ab.Exec(ctx, "session", "--json")
+	tabOut, _, _ := ab.Exec(ctx, "tab", "--json")
+	urlOut, _, _ := ab.Exec(ctx, "get", "url", "--json")
+
+	var sessionEnv browser.AgentBrowserEnvelope[map[string]any]
+	_ = json.Unmarshal(sessionOut, &sessionEnv)
+
+	var tabEnv browser.AgentBrowserEnvelope[map[string]any]
+	_ = json.Unmarshal(tabOut, &tabEnv)
+
+	var urlEnv browser.AgentBrowserEnvelope[string]
+	_ = json.Unmarshal(urlOut, &urlEnv)
+
+	result := map[string]any{
+		"session": sessionEnv.Data,
+		"tabs":    tabEnv.Data,
+		"url":     urlEnv.Data,
+	}
+	if isAttachedMode() {
+		result["attached"] = true
 	}
 
 	if cmd.Bool("json") {
-		return printStatusJSON(defaultContext, session, currentTab, "")
+		out, _ := json.MarshalIndent(result, "", "  ")
+		fmt.Println(string(out))
+		return nil
 	}
 
-	return printStatusHuman(defaultContext, session, currentTab)
+	return printStatusHuman(result)
 }
 
-func printStatusEmpty() error {
-	c := true // assume color for now
-	fmt.Println("No active browser context.")
-	fmt.Println()
-	fmt.Printf("%s\n", bold(c, "Quick start:"))
-	fmt.Println("  tap attach chrome         Attach to your existing Chrome")
-	fmt.Println("  tap browser open <url>    Open a page in managed browser")
-	return nil
-}
-
-func printStatusHuman(defaultContext *browser.DefaultContextRecord, session *browser.SessionRecord, currentTab *browser.TabRecord) error {
+func printStatusHuman(result map[string]any) error {
 	c := true
 
-	// Context type
-	contextType := "Managed local browser"
-	if defaultContext != nil {
-		fmt.Printf("%s %s (%s)\n", bold(c, "Default context:"), defaultContext.SessionName, defaultContext.Kind)
-		if defaultContext.Stale {
-			fmt.Printf("%s %s\n", bold(c, "Context state:"), yellow(c, "stale"))
-			if defaultContext.Reason != "" {
-				fmt.Printf("%s %s\n", bold(c, "Reason:"), defaultContext.Reason)
-			}
+	if attached, ok := result["attached"].(bool); ok && attached {
+		fmt.Printf("%s Attached mode\n", bold(c, "Context:"))
+	}
+
+	if session, ok := result["session"].(map[string]any); ok {
+		if name, ok := session["name"].(string); ok && name != "" {
+			fmt.Printf("%s %s\n", bold(c, "Session:"), name)
 		}
 	}
-	if session.Remote != nil {
-		contextType = "Attached remote browser"
+	if url, ok := result["url"].(string); ok && url != "" {
+		fmt.Printf("%s %s\n", bold(c, "URL:"), url)
 	}
 
-	fmt.Printf("%s %s\n", bold(c, "Browser context:"), contextType)
-	fmt.Printf("%s %s\n", bold(c, "Session:"), session.Name)
-
-	if session.Process != nil && session.Process.DebugURL != "" {
-		fmt.Printf("%s %s\n", bold(c, "Debug URL:"), session.Process.DebugURL)
-	} else if session.Remote != nil {
-		fmt.Printf("%s %s\n", bold(c, "Remote URL:"), session.Remote.WSURL)
-	}
-
-	// Tab info
-	fmt.Println()
-	if currentTab != nil {
-		fmt.Printf("%s %s\n", bold(c, "Current tab:"), currentTab.Name)
-		fmt.Printf("%s %s\n", bold(c, "Status:"), string(currentTab.Status))
-		if currentTab.URL != "" {
-			fmt.Printf("%s %s\n", bold(c, "URL:"), currentTab.URL)
+	if tabs, ok := result["tabs"].(map[string]any); ok {
+		if list, ok := tabs["tabs"].([]any); ok && len(list) > 0 {
+			fmt.Printf("%s %d tabs\n", bold(c, "Tabs:"), len(list))
 		}
 	} else {
 		fmt.Println("No current tab selected.")
 		fmt.Println("Run: tap browser open <url>")
 	}
 
-	// Tab count
-	liveCount := 0
-	for _, tab := range session.Tabs {
-		if tab.Status == browser.TabStatusLive {
-			liveCount++
-		}
-	}
-	if len(session.Tabs) > 0 {
-		fmt.Println()
-		fmt.Printf("%s %d total (%d live)\n", bold(c, "Tabs:"), len(session.Tabs), liveCount)
-	}
-
-	return nil
-}
-
-func printStatusJSON(defaultContext *browser.DefaultContextRecord, session *browser.SessionRecord, currentTab *browser.TabRecord, errorState string) error {
-	result := map[string]any{
-		"error": errorState,
-	}
-
-	if defaultContext != nil {
-		result["defaultContext"] = map[string]any{
-			"sessionName": defaultContext.SessionName,
-			"kind":        defaultContext.Kind,
-			"stale":       defaultContext.Stale,
-			"reason":      defaultContext.Reason,
-			"updatedAt":   defaultContext.UpdatedAt,
-		}
-	}
-
-	if session != nil {
-		result["session"] = map[string]any{
-			"name":      session.Name,
-			"mode":      session.Mode,
-			"createdAt": session.CreatedAt,
-		}
-
-		if session.Process != nil {
-			result["process"] = map[string]any{
-				"pid":      session.Process.PID,
-				"debugURL": session.Process.DebugURL,
-			}
-		}
-
-		if session.Remote != nil {
-			result["remote"] = map[string]any{
-				"wsURL": session.Remote.WSURL,
-			}
-		}
-
-		tabs := make([]map[string]any, 0, len(session.Tabs))
-		for name, tab := range session.Tabs {
-			tabInfo := map[string]any{
-				"name":   name,
-				"status": tab.Status,
-				"url":    tab.URL,
-			}
-			tabs = append(tabs, tabInfo)
-		}
-		result["tabs"] = tabs
-
-		if currentTab != nil {
-			result["currentTab"] = map[string]any{
-				"name":   currentTab.Name,
-				"status": currentTab.Status,
-				"url":    currentTab.URL,
-			}
-		}
-	}
-
-	out, err := json.MarshalIndent(result, "", "  ")
-	if err != nil {
-		return fmt.Errorf("marshal status: %w", err)
-	}
-	fmt.Println(string(out))
 	return nil
 }
