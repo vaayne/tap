@@ -1,6 +1,10 @@
 package browser
 
-import "testing"
+import (
+	"context"
+	"os"
+	"testing"
+)
 
 func TestAgentBrowserPlatform(t *testing.T) {
 	tests := []struct {
@@ -25,22 +29,24 @@ func TestAgentBrowserPlatform(t *testing.T) {
 	}
 }
 
-func TestAgentBrowserDownloadURL(t *testing.T) {
-	got, err := agentBrowserDownloadURL("darwin", "arm64", "0.27.0")
+func TestAgentBrowserExtract(t *testing.T) {
+	dir := t.TempDir()
+	install := NewAgentBrowserInstall(dir)
+	if err := install.Update(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	fi, err := os.Stat(install.binPath())
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "https://github.com/vercel-labs/agent-browser/releases/download/v0.27.0/agent-browser-darwin-arm64"
-	if got != want {
-		t.Fatalf("download URL = %q, want %q", got, want)
+	if fi.Size() == 0 {
+		t.Fatal("extracted binary is empty")
 	}
-
-	got, err = agentBrowserDownloadURL("windows", "amd64", "0.27.0")
+	meta, err := install.ReadMeta()
 	if err != nil {
 		t.Fatal(err)
 	}
-	want = "https://github.com/vercel-labs/agent-browser/releases/download/v0.27.0/agent-browser-win32-x64.exe"
-	if got != want {
-		t.Fatalf("download URL = %q, want %q", got, want)
+	if meta == nil || meta.Source != "embedded" || meta.Version != AgentBrowserVersion {
+		t.Fatalf("meta = %#v", meta)
 	}
 }

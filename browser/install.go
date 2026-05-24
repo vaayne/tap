@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,8 +15,6 @@ import (
 const (
 	AgentBrowserVersion = "0.27.0"
 	EnvAgentBrowser     = "TAP_AGENT_BROWSER"
-
-	agentBrowserReleaseURL = "https://github.com/vercel-labs/agent-browser/releases/download"
 )
 
 type AgentBrowserInstall struct {
@@ -27,9 +23,9 @@ type AgentBrowserInstall struct {
 }
 
 type AgentBrowserMeta struct {
-	DownloadedAt time.Time `json:"downloaded_at"`
-	URL          string    `json:"url"`
-	Version      string    `json:"version"`
+	InstalledAt time.Time `json:"installed_at"`
+	Source      string    `json:"source"`
+	Version     string    `json:"version"`
 }
 
 func NewAgentBrowserInstall(binDir string) *AgentBrowserInstall {
@@ -44,14 +40,14 @@ func ResolveAgentBrowserPath() (string, error) {
 	if path := os.Getenv(EnvAgentBrowser); path != "" {
 		return path, nil
 	}
+	install := NewAgentBrowserInstall("")
+	if err := install.EnsureInstalled(context.Background()); err == nil {
+		return install.binPath(), nil
+	}
 	if path, err := exec.LookPath("agent-browser"); err == nil {
 		return path, nil
 	}
-	install := NewAgentBrowserInstall("")
-	if install.Installed() {
-		return install.binPath(), nil
-	}
-	return "", errors.New("agent-browser not found: run tap doctor --install or set TAP_AGENT_BROWSER")
+	return "", errors.New("agent-browser embedded binary is unavailable for this platform; set TAP_AGENT_BROWSER")
 }
 
 func (a *AgentBrowserInstall) Installed() bool {
@@ -60,14 +56,14 @@ func (a *AgentBrowserInstall) Installed() bool {
 }
 
 func (a *AgentBrowserInstall) Update(ctx context.Context) error {
-	return a.download(ctx)
+	return a.extract(ctx)
 }
 
 func (a *AgentBrowserInstall) EnsureInstalled(ctx context.Context) error {
 	if a.Installed() {
 		return nil
 	}
-	return a.download(ctx)
+	return a.extract(ctx)
 }
 
 func (a *AgentBrowserInstall) ReadMeta() (*AgentBrowserMeta, error) {
@@ -97,10 +93,14 @@ func (a *AgentBrowserInstall) metaPath() string {
 	return a.binPath() + ".meta.json"
 }
 
-func (a *AgentBrowserInstall) download(ctx context.Context) error {
-	url, err := agentBrowserDownloadURL(runtime.GOOS, runtime.GOARCH, a.version)
-	if err != nil {
-		return err
+func (a *AgentBrowserInstall) extract(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+	if len(embeddedAgentBrowser) == 0 {
+		return fmt.Errorf("embedded agent-browser is unavailable for %s/%s", runtime.GOOS, runtime.GOARCH)
 	}
 	if err := os.MkdirAll(a.binDir, 0o755); err != nil {
 		return fmt.Errorf("create dir: %w", err)
@@ -108,60 +108,24 @@ func (a *AgentBrowserInstall) download(ctx context.Context) error {
 
 	bin := a.binPath()
 	tmp := bin + ".tmp"
-	f, err := os.OpenFile(tmp, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o755)
-	if err != nil {
-		return fmt.Errorf("open file: %w", err)
-	}
-	defer func() {
-		_ = f.Close()
+	if err := os.WriteFile(tmp, embeddedAgentBrowser, 0o755); err != nil {
 		_ = os.Remove(tmp)
-	}()
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return fmt.Errorf("create request: %w", err)
-	}
-	client := &http.Client{}
-	defer client.CloseIdleConnections()
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("download: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("download failed: HTTP %d", resp.StatusCode)
-	}
-	if _, err := io.Copy(f, resp.Body); err != nil {
-		return fmt.Errorf("write binary: %w", err)
-	}
-	if err := f.Close(); err != nil {
-		return fmt.Errorf("close file: %w", err)
+		return fmt.Errorf("write embedded binary: %w", err)
 	}
 	if err := os.Rename(tmp, bin); err != nil {
+		_ = os.Remove(tmp)
 		return fmt.Errorf("rename binary: %w", err)
 	}
-	return a.writeMeta(url)
+	return a.writeMeta("embedded")
 }
 
-func (a *AgentBrowserInstall) writeMeta(url string) error {
-	meta := AgentBrowserMeta{DownloadedAt: time.Now().UTC(), URL: url, Version: a.version}
+func (a *AgentBrowserInstall) writeMeta(source string) error {
+	meta := AgentBrowserMeta{InstalledAt: time.Now().UTC(), Source: source, Version: a.version}
 	data, err := json.MarshalIndent(meta, "", "  ")
 	if err != nil {
 		return err
 	}
 	return os.WriteFile(a.metaPath(), data, 0o644)
-}
-
-func agentBrowserDownloadURL(goos, goarch, version string) (string, error) {
-	platform, err := agentBrowserPlatform(goos, goarch)
-	if err != nil {
-		return "", err
-	}
-	asset := "agent-browser-" + platform
-	if goos == "windows" {
-		asset += ".exe"
-	}
-	return fmt.Sprintf("%s/v%s/%s", agentBrowserReleaseURL, version, asset), nil
 }
 
 func agentBrowserPlatform(goos, goarch string) (string, error) {

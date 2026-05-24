@@ -1,12 +1,12 @@
 # Browser Automation
 
-Tap uses agent-browser as its browser backend — a standalone native binary that provides ~138 commands with zero runtime dependencies.
+Tap uses the embedded embedded agent-browser backend — a standalone native binary that provides ~138 commands with zero runtime dependencies.
 
 ## Common workflows
 
 ### Reuse your existing Chrome
 
-Chrome must already expose a DevTools endpoint, or use the managed agent-browser backend.
+Chrome must already expose a DevTools endpoint, or use the managed embedded agent-browser backend.
 
 ```bash
 tap attach chrome
@@ -49,7 +49,7 @@ Auth state lives in the resolved browser context:
 tap browser open https://news.ycombinator.com
 tap browser open https://github.com --new-tab
 tap browser tabs
-tap browser switch tab-2
+tap browser switch t2
 tap browser screenshot --output github.png
 tap browser status
 ```
@@ -57,7 +57,7 @@ tap browser status
 Default behavior:
 - `tap browser open <url>` navigates the current tab
 - `--new-tab` creates another tracked tab
-- `tap browser tabs` shows stable tab IDs like `tab-1`, `tab-2`
+- `tap browser tabs` shows stable tab IDs like `t1`, `t2`
 - `tap browser switch <tab-id>` switches by exact ID
 - `tap browser close-tab` closes the current tab
 

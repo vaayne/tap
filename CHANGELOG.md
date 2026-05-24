@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
-- **Replaced browser backend with agent-browser** — removed ~4,000 lines of hand-rolled chromedp/CDP code and switched to [agent-browser](https://github.com/vercel-labs/agent-browser) as the sole browser backend. This provides ~138 commands via a standalone native binary (9–11 MB, zero runtime dependencies) and immediate feature parity.
+- **Replaced browser backend with embedded agent-browser** — removed ~4,000 lines of hand-rolled chromedp/CDP code and switched to [agent-browser](https://github.com/vercel-labs/agent-browser) as the sole browser backend. Tap embeds the native agent-browser binary for supported release platforms and lets agent-browser manage Chrome/browser installation.
 - **Removed chromedp dependency** — `go.mod` no longer depends on `chromedp/chromedp`, `chromedp/cdproto`, or `chromedp/sysutil`.
 
 ### Added

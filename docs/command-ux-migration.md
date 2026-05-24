@@ -52,7 +52,7 @@ tap site -b github/notifications
 tap browser open https://news.ycombinator.com
 tap browser open https://github.com --new-tab
 tap browser tabs
-tap browser switch tab-2
+tap browser switch t2
 ```
 
 ## Browser-related flags
@@ -67,4 +67,3 @@ Use these on `site`, `fetch`, and relevant `browser` commands:
 - `--timeout`
 - `--browser-url`
 - `--profile-dir`
-- `--lightpanda`

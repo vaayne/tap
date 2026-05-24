@@ -20,14 +20,13 @@ navigation, scripts, and boilerplate via go-defuddle.
 Examples:
   tap fetch https://example.com/article          Clean Markdown output
   tap fetch --json https://example.com/article   Full metadata as JSON
-  tap fetch -b https://example.com               Use browser for JS-rendered pages
-  tap fetch --lp https://example.com             Use Lightpanda (fast headless, no auth)`,
+  tap fetch -b https://example.com               Use browser for JS-rendered pages`,
 		Flags: append([]cli.Flag{
 			&cli.BoolFlag{
 				Name:  "json",
 				Usage: "Output as JSON with full metadata",
 			},
-		}, browserClientFlags(true)...),
+		}, browserClientFlags()...),
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			configureLogging(cmd)
 			if cmd.Args().Len() == 0 {

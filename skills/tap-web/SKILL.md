@@ -125,7 +125,6 @@ tap browser diff screenshot before.png after.png
 | `--timeout <dur>` | Limit execution time |
 | `--browser-url <url>` | One-shot agent-browser/DevTools connection override |
 | `--profile-dir <path>` | One-shot profile override |
-| `--lp`, `--lightpanda` | Fast JS rendering without Chrome auth flows |
 
 Compatibility aliases exist, but prefer the names above.
 

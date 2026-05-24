@@ -9,7 +9,6 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/urfave/cli/v3"
 	"github.com/vaayne/tap"
-	"github.com/vaayne/tap/transport"
 )
 
 var version = "dev"
@@ -105,13 +104,6 @@ func globalFlags() []cli.Flag {
 			Hidden:  true,
 		},
 		&cli.BoolFlag{
-			Name:    "lightpanda",
-			Aliases: []string{"lp"},
-			Usage:   "Use Lightpanda instead of Chrome (advanced)",
-			Sources: cli.EnvVars("TAP_LIGHTPANDA"),
-			Hidden:  true,
-		},
-		&cli.BoolFlag{
 			Name:   "pause",
 			Usage:  "Pause after navigation for manual interaction (advanced)",
 			Hidden: true,
@@ -202,10 +194,6 @@ func newClient(ctx context.Context, cmd *cli.Command) (*tap.Client, error) {
 		return nil, err
 	}
 
-	if cmd.Bool("lightpanda") {
-		opts = append(opts, tap.WithBrowserType(transport.BrowserLightpanda))
-		opts = append(opts, tap.WithForceBrowser(true))
-	}
 	if cmd.Bool("browser") || hasPauseMode(cmd) {
 		opts = append(opts, tap.WithForceBrowser(true))
 	}
@@ -244,7 +232,7 @@ func firstString(cmd *cli.Command, names ...string) string {
 	return ""
 }
 
-func browserClientFlags(includeLightpanda bool) []cli.Flag {
+func browserClientFlags() []cli.Flag {
 	flags := []cli.Flag{
 		&cli.BoolFlag{
 			Name:    "browser",
@@ -283,13 +271,6 @@ func browserClientFlags(includeLightpanda bool) []cli.Flag {
 			Name:  "profile-dir",
 			Usage: "One-shot browser profile override",
 		},
-	}
-	if includeLightpanda {
-		flags = append(flags, &cli.BoolFlag{
-			Name:    "lightpanda",
-			Aliases: []string{"lp"},
-			Usage:   "Use Lightpanda instead of Chrome (implies --browser)",
-		})
 	}
 	return flags
 }

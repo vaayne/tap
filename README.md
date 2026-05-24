@@ -20,7 +20,7 @@ Upgrade later with:
 tap upgrade
 ```
 
-Browser features use agent-browser. Install with `tap doctor --install`.
+Browser features use the embedded agent-browser backend. Run `tap doctor --install` to let agent-browser install browser dependencies.
 
 ## Quick start
 
@@ -70,7 +70,6 @@ You can also attach explicitly:
 
 ```bash
 tap attach chrome --browser-url http://127.0.0.1:9222
-tap attach chrome --browser-url http://127.0.0.1:9222
 ```
 
 ### Browser workflow
@@ -79,7 +78,7 @@ tap attach chrome --browser-url http://127.0.0.1:9222
 tap browser open https://news.ycombinator.com
 tap browser open https://github.com --new-tab
 tap browser tabs
-tap browser switch tab-2
+tap browser switch t2
 tap browser screenshot --output github.png
 tap browser status
 ```
@@ -154,7 +153,6 @@ These show up on the relevant commands instead of only in global help:
 | `--timeout` | Set execution timeout |
 | `--browser-url` | One-shot agent-browser/DevTools connection override |
 | `--profile-dir` | One-shot profile override |
-| `--lightpanda`, `--lp` | Compatibility alias for fast headless browser mode |
 
 Compatibility aliases still work:
 - `--ws-url` -> `--browser-url`
@@ -182,7 +180,7 @@ tap browser diff ...
 
 ## Browser backend
 
-Tap uses agent-browser as the single browser backend. It manages Chrome for full browser automation, auth, screenshots, and network workflows. Install or update the backend with:
+Tap embeds agent-browser as the single browser backend. It manages browser installation for full automation, auth, screenshots, and network workflows. Install browser dependencies with:
 
 ```bash
 tap doctor --install

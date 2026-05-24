@@ -4,7 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"runtime"
+	"os"
+	"os/exec"
 	"time"
 
 	"github.com/urfave/cli/v3"
@@ -18,7 +19,7 @@ func doctorCmd() *cli.Command {
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:  "install",
-				Usage: "Install or update browser dependencies",
+				Usage: "Extract embedded agent-browser and let it install browser dependencies",
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
@@ -28,107 +29,61 @@ func doctorCmd() *cli.Command {
 }
 
 func runDoctor(ctx context.Context, cmd *cli.Command) error {
-	// Suppress library log output in doctor; we print our own messages.
 	log.SetOutput(nopWriter{})
 
 	color := useColor(cmd)
 	install := cmd.Bool("install")
 
 	ok := checkMark(color)
-	fail := failMark(color)
 	warn := warnMark(color)
 
-	// --- tap version ---
 	fmt.Printf("%s tap %s\n", ok, bold(color, version))
 
-	// --- Chrome ---
-	chrome := browser.DetectChrome()
-	if chrome != nil {
-		v := chrome.Version
-		if v == "" {
-			v = "unknown version"
-		}
-		fmt.Printf("%s Chrome %s\n", ok, v)
-		fmt.Printf("  %s\n", dim(color, chrome.Path))
-	} else {
-		fmt.Printf("%s Chrome not found\n", fail)
-		fmt.Printf("  %s\n", dim(color, "Install Chrome or use --lightpanda as an alternative"))
-	}
-
-	// --- agent-browser ---
 	agentInstall := browser.NewAgentBrowserInstall("")
 	if install {
-		action := "Installing"
+		action := "Extracting"
 		if agentInstall.Installed() {
-			action = "Updating"
+			action = "Refreshing"
 		}
-		fmt.Printf("  %s agent-browser... ", action)
+		fmt.Printf("  %s embedded agent-browser... ", action)
 		if err := agentInstall.Update(ctx); err != nil {
-			return fmt.Errorf("install agent-browser: %w", err)
+			return fmt.Errorf("extract agent-browser: %w", err)
 		}
 		fmt.Println("done")
-		fmt.Printf("%s agent-browser installed\n", ok)
+
+		path, err := browser.ResolveAgentBrowserPath()
+		if err != nil {
+			return err
+		}
+		fmt.Printf("  Running agent-browser install...\n")
+		installCmd := exec.CommandContext(ctx, path, "install")
+		installCmd.Stdout = os.Stdout
+		installCmd.Stderr = os.Stderr
+		if err := installCmd.Run(); err != nil {
+			return fmt.Errorf("agent-browser install: %w", err)
+		}
 	}
+
 	if path, err := browser.ResolveAgentBrowserPath(); err == nil {
-		fmt.Printf("%s agent-browser available\n", ok)
+		fmt.Printf("%s agent-browser embedded (%s)\n", ok, browser.AgentBrowserVersion)
 		fmt.Printf("  %s\n", dim(color, path))
-	} else {
-		fmt.Printf("%s agent-browser not installed\n", warn)
-		fmt.Printf("  %s Run %s to download it\n", dim(color, "→"), bold(color, "tap doctor --install"))
-	}
-
-	// --- Lightpanda (macOS/Linux only) ---
-	if runtime.GOOS == "windows" {
-		fmt.Printf("%s Lightpanda not available on Windows\n", dim(color, "-"))
-		return nil
-	}
-
-	lp := browser.NewLightpanda("", "")
-
-	if install {
-		action := "Installing"
-		if lp.Installed() {
-			action = "Updating"
-		}
-		fmt.Printf("  %s Lightpanda... ", action)
-		if err := lp.Update(ctx); err != nil {
-			return fmt.Errorf("install lightpanda: %w", err)
-		}
-		fmt.Println("done")
-		fmt.Printf("%s Lightpanda installed\n", ok)
-	}
-
-	if lp.Installed() {
-		meta, _ := lp.ReadMeta()
-		if meta != nil {
-			age := time.Since(meta.DownloadedAt)
-			ageStr := formatAge(age)
-			fmt.Printf("%s Lightpanda installed (%s ago)\n", ok, ageStr)
-			fmt.Printf("  %s\n", dim(color, "Downloaded: "+meta.DownloadedAt.Format(time.RFC3339)))
-			if age > 7*24*time.Hour {
-				fmt.Printf("  %s Run %s to get the latest nightly\n", warn, bold(color, "tap doctor --install"))
-			}
-		} else {
-			fmt.Printf("%s Lightpanda installed (unknown age)\n", warn)
-			fmt.Printf("  %s Run %s to get the latest nightly\n", warn, bold(color, "tap doctor --install"))
+		if meta, _ := agentInstall.ReadMeta(); meta != nil {
+			age := time.Since(meta.InstalledAt)
+			fmt.Printf("  %s\n", dim(color, "Extracted: "+meta.InstalledAt.Format(time.RFC3339)+" ("+formatAge(age)+" ago)"))
 		}
 	} else {
-		fmt.Printf("%s Lightpanda not installed\n", warn)
-		fmt.Printf("  %s Run %s to download it\n", dim(color, "→"), bold(color, "tap doctor --install"))
+		fmt.Printf("%s agent-browser unavailable\n", warn)
+		fmt.Printf("  %s\n", dim(color, err.Error()))
 	}
+
+	fmt.Printf("%s Chrome managed by agent-browser\n", ok)
+	fmt.Printf("  %s\n", dim(color, "Run tap doctor --install to let agent-browser install browser dependencies"))
 
 	return nil
 }
 
 func checkMark(color bool) string {
 	return green(color, "✓")
-}
-
-func failMark(color bool) string {
-	if !color {
-		return "✗"
-	}
-	return "\033[31m✗\033[0m"
 }
 
 func warnMark(color bool) string {

@@ -97,7 +97,7 @@ tap browser open https://github.com
 tap browser open https://news.ycombinator.com
 tap browser open https://github.com --new-tab
 tap browser tabs
-tap browser switch tab-2
+tap browser switch t2
 tap browser screenshot --output github.png
 ```
 
@@ -127,7 +127,7 @@ Tab resolution is:
 ## Notes
 
 - `tap browser open <url>` navigates the current tab by default.
-- `--new-tab` creates a fresh tracked tab with the next stable ID (`tab-1`, `tab-2`, ...).
+- `--new-tab` creates a fresh tab with the next stable agent-browser ID (`t1`, `t2`, ...).
 - `tap browser tabs` is the common tab-management entrypoint.
 - `tap browser status --json` and `tap browser tabs --json` are the machine-readable contracts.
 - `tap browser snapshot` captures a semantic tree and assigns stable refs like `@e1` for interactive nodes.

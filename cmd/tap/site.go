@@ -40,7 +40,7 @@ Examples:
 				Usage:   "Output format: json, pretty (default), raw",
 				Value:   formatPretty,
 			},
-		}, browserClientFlags(true)...),
+		}, browserClientFlags()...),
 		Commands: []*cli.Command{
 			siteRunCmd(),
 			siteListCmd(),
@@ -68,7 +68,7 @@ func siteRunCmd() *cli.Command {
 				Usage:   "Output format: json, pretty (default), raw",
 				Value:   formatPretty,
 			},
-		}, browserClientFlags(true)...),
+		}, browserClientFlags()...),
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			configureLogging(cmd)
 			return runSiteScript(ctx, cmd, cmd.Args().Slice())
