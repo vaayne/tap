@@ -50,7 +50,6 @@ tap browser scroll [selector]
 tap browser select <selector|@eN> <value>
 tap browser wait <selector>
 tap browser keypress <key>
-tap browser dialog
 tap browser forms
 tap browser cookies get|set|clear
 tap browser set viewport|device|geo|offline|headers|credentials|media [args...]

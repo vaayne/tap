@@ -30,7 +30,7 @@ Last updated: 2026-04-07
 
 ## Working endpoints
 - `GET /api/v1/data?q=foo`
-- Best extraction: `tap browser network wait --url-pattern "*/api/v1/*" --body`
+- Best extraction: `tap browser network requests --filter "api/v1"`
 
 ## Broken
 - `GET /old/api` returns 403 since 2026-04-01

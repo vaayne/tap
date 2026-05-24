@@ -18,10 +18,10 @@ Open the target site in the default browser context, then capture its API calls.
 tap browser open https://www.example.com --show
 
 # Trigger the page action you want to inspect, then:
-tap browser network log --resource-type XHR,Fetch --timeout 15s
+tap browser network requests --filter api
 
 # Or wait for one specific request and capture its body
-tap browser network wait --url-pattern "*/api/*" --body --timeout 30s
+tap browser network requests --filter "*/api/*" --timeout 30s
 ```
 
 Focus on:

@@ -108,6 +108,10 @@ func (a *AgentBrowser) Eval(ctx context.Context, js string) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	var envelope AgentBrowserEnvelope[map[string]any]
+	if err := json.Unmarshal(out, &envelope); err == nil && envelope.Success {
+		return envelope.Data["result"], nil
+	}
 	var value any
 	if err := json.Unmarshal(out, &value); err != nil {
 		return nil, fmt.Errorf("parse eval JSON: %w: %s", err, stderr)

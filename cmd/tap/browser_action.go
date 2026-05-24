@@ -301,22 +301,26 @@ func browserFormsCmd() *cli.Command {
 			if err != nil {
 				return err
 			}
-			out, _, err := ab.Exec(ctx, "forms", "--json")
+			value, err := ab.Eval(ctx, `Array.from(document.querySelectorAll('input, textarea, select, button')).map((el, i) => ({
+				index: i,
+				tag: el.tagName.toLowerCase(),
+				type: el.getAttribute('type') || '',
+				name: el.getAttribute('name') || '',
+				id: el.id || '',
+				placeholder: el.getAttribute('placeholder') || '',
+				value: el.value || '',
+				text: el.textContent?.trim() || '',
+				selector: el.id ? '#' + CSS.escape(el.id) : el.name ? el.tagName.toLowerCase() + '[name="' + CSS.escape(el.name) + '"]' : el.tagName.toLowerCase() + ':nth-of-type(' + (i + 1) + ')'
+			}))`)
 			if err != nil {
 				return err
 			}
-			var envelope browser.AgentBrowserEnvelope[[]any]
-			if err := json.Unmarshal(out, &envelope); err != nil {
-				return fmt.Errorf("parse forms: %w", err)
-			}
-			if !envelope.Success {
-				return fmt.Errorf("forms: %s", envelope.Error)
-			}
-			if len(envelope.Data) == 0 {
+			items, _ := value.([]any)
+			if len(items) == 0 {
 				fmt.Fprintln(os.Stderr, "No fillable form elements found.")
 				return nil
 			}
-			return printResult(cmd, envelope.Data)
+			return printResult(cmd, items)
 		},
 	}
 }
@@ -382,55 +386,11 @@ func browserKeypressCmd() *cli.Command {
 			if err != nil {
 				return err
 			}
-			_, _, err = ab.Exec(ctx, "keypress", key)
+			_, _, err = ab.Exec(ctx, "press", key)
 			if err != nil {
 				return err
 			}
 			fmt.Fprintf(os.Stderr, "Sent key: %s\n", key)
-			return nil
-		},
-	}
-}
-
-func browserDialogCmd() *cli.Command {
-	return &cli.Command{
-		Name:  "dialog",
-		Usage: "Accept or dismiss a JavaScript dialog",
-		Flags: append(browserActionFlags(false),
-			&cli.BoolFlag{
-				Name:  "accept",
-				Usage: "Accept the dialog (default: true)",
-				Value: true,
-			},
-			&cli.StringFlag{
-				Name:  "text",
-				Usage: "Text to enter for prompt dialogs",
-			},
-		),
-		Action: func(ctx context.Context, cmd *cli.Command) error {
-			configureLogging(cmd)
-			ab, err := newAgentBrowser(cmd)
-			if err != nil {
-				return err
-			}
-			args := []string{"dialog"}
-			if cmd.Bool("accept") {
-				args = append(args, "--accept")
-			} else {
-				args = append(args, "--dismiss")
-			}
-			if text := cmd.String("text"); text != "" {
-				args = append(args, "--text", text)
-			}
-			_, _, err = ab.Exec(ctx, args...)
-			if err != nil {
-				return err
-			}
-			if cmd.Bool("accept") {
-				fmt.Fprintln(os.Stderr, "Dialog accepted")
-			} else {
-				fmt.Fprintln(os.Stderr, "Dialog dismissed")
-			}
 			return nil
 		},
 	}
@@ -468,18 +428,19 @@ func browserCookiesGetCmd() *cli.Command {
 			if err != nil {
 				return err
 			}
-			var envelope browser.AgentBrowserEnvelope[[]any]
+			var envelope browser.AgentBrowserEnvelope[map[string]any]
 			if err := json.Unmarshal(out, &envelope); err != nil {
 				return fmt.Errorf("parse cookies: %w", err)
 			}
 			if !envelope.Success {
 				return fmt.Errorf("cookies: %s", envelope.Error)
 			}
-			if len(envelope.Data) == 0 {
+			cookies, _ := envelope.Data["cookies"].([]any)
+			if len(cookies) == 0 {
 				fmt.Fprintln(os.Stderr, "No cookies found.")
 				return nil
 			}
-			return printResult(cmd, envelope.Data)
+			return printResult(cmd, cookies)
 		},
 	}
 }

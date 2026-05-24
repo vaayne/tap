@@ -300,13 +300,17 @@ func runBrowserStatus(ctx context.Context, cmd *cli.Command) error {
 	var tabEnv browser.AgentBrowserEnvelope[map[string]any]
 	_ = json.Unmarshal(tabOut, &tabEnv)
 
-	var urlEnv browser.AgentBrowserEnvelope[string]
+	var urlEnv browser.AgentBrowserEnvelope[map[string]any]
 	_ = json.Unmarshal(urlOut, &urlEnv)
+	url, _ := urlEnv.Data["url"].(string)
+	if url == "" {
+		url, _ = urlEnv.Data["result"].(string)
+	}
 
 	result := map[string]any{
 		"session": sessionEnv.Data,
 		"tabs":    tabEnv.Data,
-		"url":     urlEnv.Data,
+		"url":     url,
 	}
 	if isAttachedMode() {
 		result["attached"] = true
@@ -324,8 +328,8 @@ func runBrowserStatus(ctx context.Context, cmd *cli.Command) error {
 	} else if sessionEnv.Success {
 		fmt.Printf("%s %v\n", bold(c, "Session:"), sessionEnv.Data)
 	}
-	if urlEnv.Success && urlEnv.Data != "" {
-		fmt.Printf("%s %s\n", bold(c, "URL:"), urlEnv.Data)
+	if urlEnv.Success && url != "" {
+		fmt.Printf("%s %s\n", bold(c, "URL:"), url)
 	}
 	if tabs, ok := tabEnv.Data["tabs"].([]any); ok {
 		fmt.Printf("%s %d\n", bold(c, "Tabs:"), len(tabs))

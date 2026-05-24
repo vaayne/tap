@@ -61,7 +61,6 @@ Default behavior:
 			withCategory("Interaction", browserSelectCmd()),
 			withCategory("Interaction", browserWaitCmd()),
 			withCategory("Interaction", browserKeypressCmd()),
-			withCategory("Interaction", browserDialogCmd()),
 			withCategory("State", browserFormsCmd()),
 			withCategory("State", browserCookiesCmd()),
 			withCategory("Network", browserNetworkCmd()),

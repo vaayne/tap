@@ -96,15 +96,14 @@ tap browser scroll [selector]
 tap browser select <selector|@eN> <value>
 tap browser wait <selector>
 tap browser keypress <key>
-tap browser dialog
 
 # Page state / network
 tap browser forms
 tap browser cookies get|set|clear
-tap browser network wait --url-pattern "*/api/*" --body
-tap browser network log --resource-type XHR,Fetch --timeout 30s
-tap browser network intercept --block --url-pattern "*.ads.*"
-tap browser network clear
+tap browser network requests --filter "*/api/*"
+tap browser network requests --filter api
+tap browser network route "*.ads.*" --abort
+tap browser network unroute
 tap browser set viewport 1280 720
 tap browser storage local get key
 tap browser state save name
@@ -179,7 +178,7 @@ Never dump full HTML unless there is no cheaper path.
 Preferred order:
 1. Site script
 2. `tap fetch`
-3. `tap browser network wait --body`
+3. `tap browser network requests --filter api`
 4. `tap browser snapshot` for semantic interactive discovery
 5. `tap browser text`
 6. targeted `tap browser evaluate`

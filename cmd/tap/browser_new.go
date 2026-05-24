@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/urfave/cli/v3"
 )
@@ -10,17 +11,23 @@ import (
 // passthroughCmd creates a simple command that forwards arguments to agent-browser.
 func passthroughCmd(name, usage string, prefixArgs ...string) *cli.Command {
 	return &cli.Command{
-		Name:      name,
-		Usage:     usage,
-		ArgsUsage: "[args...]",
+		Name:            name,
+		Usage:           usage,
+		ArgsUsage:       "[args...]",
+		SkipFlagParsing: true,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			configureLogging(cmd)
 			ab, err := newAgentBrowser(cmd)
 			if err != nil {
 				return err
 			}
+			rawArgs, sessionName := extractPassthroughSession(cmd.Args().Slice())
+			if sessionName != "" {
+				ab.SessionName = sessionName
+				ab.Attached = false
+			}
 			execArgs := append([]string{}, prefixArgs...)
-			execArgs = append(execArgs, cmd.Args().Slice()...)
+			execArgs = append(execArgs, rawArgs...)
 			out, _, err := ab.Exec(ctx, execArgs...)
 			if err != nil {
 				return err
@@ -31,6 +38,27 @@ func passthroughCmd(name, usage string, prefixArgs ...string) *cli.Command {
 			return nil
 		},
 	}
+}
+
+func extractPassthroughSession(args []string) ([]string, string) {
+	out := make([]string, 0, len(args))
+	var session string
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if arg == "--session" {
+			if i+1 < len(args) {
+				session = args[i+1]
+				i++
+			}
+			continue
+		}
+		if strings.HasPrefix(arg, "--session=") {
+			session = strings.TrimPrefix(arg, "--session=")
+			continue
+		}
+		out = append(out, arg)
+	}
+	return out, session
 }
 
 func browserSetCmd() *cli.Command {
