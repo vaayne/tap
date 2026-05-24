@@ -25,6 +25,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/vaayne/tap/browser"
 	"github.com/vaayne/tap/engine"
 	"github.com/vaayne/tap/fetch"
 	"github.com/vaayne/tap/script"
@@ -58,6 +59,13 @@ func New(ctx context.Context, optFns ...Option) (*Client, error) {
 		}
 	}
 
+	ab, err := browser.NewAgentBrowser("")
+	if err != nil {
+		return nil, fmt.Errorf("agent-browser: %w", err)
+	}
+	ab.ProfileDir = opts.profileDir
+	ab.Headed = !opts.headless
+
 	tp, err := transport.New(ctx, transport.Config{
 		WSURL:      opts.wsURL,
 		ProfileDir: opts.profileDir,
@@ -77,12 +85,12 @@ func New(ctx context.Context, optFns ...Option) (*Client, error) {
 	var engines []engine.Engine
 	if opts.forceBrowser {
 		engines = []engine.Engine{
-			engine.NewBrowser(tp, opts.pauseFn),
+			engine.NewBrowser(ab, opts.pauseFn),
 		}
 	} else {
 		engines = []engine.Engine{
 			engine.NewQuickJS(tp),
-			engine.NewBrowser(tp, opts.pauseFn),
+			engine.NewBrowser(ab, opts.pauseFn),
 		}
 	}
 

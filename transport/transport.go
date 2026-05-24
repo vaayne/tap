@@ -1,5 +1,5 @@
 // Package transport provides a shared network layer for fetching web content.
-// It supports two levels: direct HTTP and browser-based (CDP).
+// It supports two levels: direct HTTP and browser-based (agent-browser).
 package transport
 
 import (
@@ -8,22 +8,20 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
 
-	"github.com/chromedp/cdproto/network"
-	"github.com/chromedp/cdproto/page"
-	"github.com/chromedp/cdproto/runtime"
-	"github.com/chromedp/chromedp"
 	"github.com/vaayne/tap/browser"
 )
 
 // BrowserType identifies which browser backend to use.
+// Deprecated: agent-browser is the only backend.
 type BrowserType string
 
 const (
 	// BrowserChrome uses the system Chrome/Chromium (default).
+	// Deprecated: agent-browser manages Chrome internally.
 	BrowserChrome BrowserType = "chrome"
 	// BrowserLightpanda uses the Lightpanda headless browser.
+	// Deprecated: not supported with agent-browser.
 	BrowserLightpanda BrowserType = "lightpanda"
 )
 
@@ -36,51 +34,30 @@ type Config struct {
 	// Headless controls whether Chrome runs in headless mode (default: true).
 	Headless bool
 	// Browser selects the browser backend (default: "chrome").
+	// Deprecated: ignored; agent-browser is always used.
 	Browser BrowserType
 }
 
 // Transport provides shared HTTP and browser-based network access.
 type Transport struct {
-	config     Config
-	http       *http.Client
-	lightpanda *browser.Lightpanda
-
-	// lpAllocCtx is a shared CDP allocator context for Lightpanda.
-	// Created once at startup, reused for each browser context.
-	lpAllocCtx    context.Context
-	lpAllocCancel context.CancelFunc
+	config       Config
+	http         *http.Client
+	agentBrowser *browser.AgentBrowser
 }
 
 // New creates a new Transport with the given config.
-// If the Lightpanda browser backend is selected, it downloads (if needed)
-// and starts the Lightpanda server eagerly so errors surface immediately.
 func New(ctx context.Context, config Config) (*Transport, error) {
-	if config.WSURL != "" {
-		resolvedURL, err := browser.ResolveDebugURL(ctx, config.WSURL)
-		if err != nil {
-			return nil, fmt.Errorf("resolve debug endpoint: %w", err)
-		}
-		config.WSURL = resolvedURL
+	ab, err := browser.NewAgentBrowser("")
+	if err != nil {
+		return nil, fmt.Errorf("agent-browser: %w", err)
 	}
+	ab.ProfileDir = config.ProfileDir
+	ab.Headed = !config.Headless
 
 	t := &Transport{
-		config: config,
-		http:   newHTTPClient(),
-	}
-
-	if config.Browser == BrowserLightpanda && config.WSURL == "" {
-		lp := browser.NewLightpanda("", "")
-		if err := lp.Start(ctx); err != nil {
-			return nil, fmt.Errorf("start lightpanda: %w", err)
-		}
-		t.lightpanda = lp
-
-		// Create a shared allocator for the Lightpanda lifetime.
-		allocCtx, allocCancel := chromedp.NewRemoteAllocator(
-			context.Background(), lp.WSURL(), chromedp.NoModifyURL,
-		)
-		t.lpAllocCtx = allocCtx
-		t.lpAllocCancel = allocCancel
+		config:       config,
+		http:         newHTTPClient(),
+		agentBrowser: ab,
 	}
 
 	return t, nil
@@ -88,13 +65,12 @@ func New(ctx context.Context, config Config) (*Transport, error) {
 
 // Close releases resources held by the transport.
 func (t *Transport) Close() error {
-	if t.lpAllocCancel != nil {
-		t.lpAllocCancel()
-	}
-	if t.lightpanda != nil {
-		t.lightpanda.Stop()
-	}
 	return nil
+}
+
+// AgentBrowser returns the underlying agent-browser adapter.
+func (t *Transport) AgentBrowser() *browser.AgentBrowser {
+	return t.agentBrowser
 }
 
 // GetHTML fetches a URL via direct HTTP and returns the response body as a string.
@@ -143,29 +119,18 @@ func (t *Transport) BrowseHTML(ctx context.Context, url string) (string, error) 
 
 // BrowseHTMLWithPause is like BrowseHTML but calls pauseFn after navigation.
 func (t *Transport) BrowseHTMLWithPause(ctx context.Context, url string, pauseFn PauseFunc) (string, error) {
-	bctx, cancel := t.newBrowserContext(ctx)
-	defer cancel()
-
-	if err := chromedp.Run(bctx,
-		chromedp.Navigate(url),
-		chromedp.WaitReady("body"),
-	); err != nil {
+	if err := t.agentBrowser.Open(ctx, url, browser.OpenOpts{}); err != nil {
 		return "", fmt.Errorf("browse html: %w", err)
 	}
-
 	if pauseFn != nil {
-		if err := pauseFn(bctx); err != nil {
+		if err := pauseFn(ctx); err != nil {
 			return "", fmt.Errorf("pause: %w", err)
 		}
 	}
-
-	var html string
-	if err := chromedp.Run(bctx,
-		chromedp.OuterHTML("html", &html),
-	); err != nil {
+	html, err := t.agentBrowser.GetHTML(ctx)
+	if err != nil {
 		return "", fmt.Errorf("browse html: %w", err)
 	}
-
 	return html, nil
 }
 
@@ -176,57 +141,42 @@ func (t *Transport) BrowseEval(ctx context.Context, url string, js string, heade
 
 // BrowseEvalWithPause is like BrowseEval but calls pauseFn after navigation.
 func (t *Transport) BrowseEvalWithPause(ctx context.Context, url string, js string, pauseFn PauseFunc, headers map[string]string) (any, error) {
-	bctx, cancel := t.newBrowserContext(ctx)
-	defer cancel()
-
-	// Preserve the native fetch before page scripts can override it.
-	// Some sites (e.g. GitHub) replace window.fetch with a custom
-	// implementation that blocks cross-origin requests.
 	preserveNativeFetch := `window.__nativeFetch = window.fetch.bind(window);`
 
-	// Wrap the user script so that `fetch` resolves to the preserved native version.
+	tmpfile, err := os.CreateTemp("", "tap-init-*.js")
+	if err != nil {
+		return nil, fmt.Errorf("browse eval: %w", err)
+	}
+	defer func() { _ = os.Remove(tmpfile.Name()) }()
+	if _, err := tmpfile.WriteString(preserveNativeFetch); err != nil {
+		_ = tmpfile.Close()
+		return nil, fmt.Errorf("browse eval: %w", err)
+	}
+	if err := tmpfile.Close(); err != nil {
+		return nil, fmt.Errorf("browse eval: %w", err)
+	}
+
 	wrappedJS := fmt.Sprintf(
 		`(function(){ const fetch = window.__nativeFetch || window.fetch; return %s; })()`,
 		js,
 	)
 
-	actions := []chromedp.Action{
-		chromedp.ActionFunc(func(ctx context.Context) error {
-			_, err := page.AddScriptToEvaluateOnNewDocument(preserveNativeFetch).Do(ctx)
-			return err
-		}),
-	}
+	openOpts := browser.OpenOpts{InitScript: tmpfile.Name()}
 	if len(headers) > 0 {
-		nh := make(network.Headers, len(headers))
-		for k, v := range headers {
-			nh[k] = v
-		}
-		actions = append(actions, network.SetExtraHTTPHeaders(nh))
+		openOpts.Headers = headers
 	}
-	actions = append(actions,
-		chromedp.Navigate(url),
-		chromedp.WaitReady("body"),
-	)
-
-	if err := chromedp.Run(bctx, actions...); err != nil {
+	if err := t.agentBrowser.Open(ctx, url, openOpts); err != nil {
 		return nil, fmt.Errorf("browse eval: %w", err)
 	}
-
 	if pauseFn != nil {
-		if err := pauseFn(bctx); err != nil {
+		if err := pauseFn(ctx); err != nil {
 			return nil, fmt.Errorf("pause: %w", err)
 		}
 	}
-
-	var result any
-	if err := chromedp.Run(bctx,
-		chromedp.Evaluate(wrappedJS, &result, func(p *runtime.EvaluateParams) *runtime.EvaluateParams {
-			return p.WithReturnByValue(true).WithAwaitPromise(true)
-		}),
-	); err != nil {
+	result, err := t.agentBrowser.Eval(ctx, wrappedJS)
+	if err != nil {
 		return nil, fmt.Errorf("browse eval: %w", err)
 	}
-
 	return result, nil
 }
 
@@ -235,76 +185,13 @@ func (t *Transport) BrowseEvalWithPause(ctx context.Context, url string, js stri
 // with a site (login, solve CAPTCHAs) while cookies are persisted in the
 // Chrome profile directory.
 func (t *Transport) BrowseInteractive(ctx context.Context, url string, pauseFn PauseFunc) error {
-	bctx, cancel := t.newBrowserContext(ctx)
-	defer cancel()
-
-	if err := chromedp.Run(bctx,
-		chromedp.Navigate(url),
-		chromedp.WaitReady("body"),
-	); err != nil {
+	if err := t.agentBrowser.Open(ctx, url, browser.OpenOpts{Headed: true}); err != nil {
 		return fmt.Errorf("browse interactive: %w", err)
 	}
-
 	if pauseFn != nil {
-		if err := pauseFn(bctx); err != nil {
+		if err := pauseFn(ctx); err != nil {
 			return fmt.Errorf("pause: %w", err)
 		}
 	}
-
 	return nil
-}
-
-func (t *Transport) newBrowserContext(parent context.Context) (context.Context, context.CancelFunc) {
-	// Remote CDP endpoint (explicit --ws-url or resolved from an HTTP DevTools base URL).
-	if t.config.WSURL != "" {
-		ctx, cancel1 := chromedp.NewRemoteAllocator(parent, t.config.WSURL, chromedp.NoModifyURL)
-		ctx, cancel2 := chromedp.NewContext(ctx)
-		return ctx, func() { cancel2(); cancel1() }
-	}
-
-	// Lightpanda browser backend.
-	if t.config.Browser == BrowserLightpanda {
-		return t.newLightpandaContext(parent)
-	}
-
-	// Default: local Chrome.
-	opts := append(
-		chromedp.DefaultExecAllocatorOptions[:],
-		chromedp.Flag("headless", t.config.Headless),
-		chromedp.Flag("disable-gpu", true),
-		chromedp.Flag("no-first-run", true),
-		chromedp.Flag("no-default-browser-check", true),
-		chromedp.Flag("disable-web-security", true),
-	)
-
-	profileDir := t.config.ProfileDir
-	if profileDir == "" {
-		profileDir = defaultProfileDir()
-	}
-	opts = append(opts, chromedp.UserDataDir(profileDir))
-
-	ctx, cancel1 := chromedp.NewExecAllocator(parent, opts...)
-	ctx, cancel2 := chromedp.NewContext(ctx)
-	return ctx, func() { cancel2(); cancel1() }
-}
-
-func (t *Transport) newLightpandaContext(parent context.Context) (context.Context, context.CancelFunc) {
-	ctx, cancel1 := chromedp.NewContext(t.lpAllocCtx)
-
-	// Respect the caller's context deadline/cancellation.
-	ctx, cancel2 := context.WithCancel(ctx)
-	go func() {
-		select {
-		case <-parent.Done():
-			cancel2()
-		case <-ctx.Done():
-		}
-	}()
-
-	return ctx, func() { cancel2(); cancel1() }
-}
-
-func defaultProfileDir() string {
-	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".cache", "tap", "chrome-profile-"+os.Getenv("USER"))
 }

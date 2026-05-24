@@ -9,6 +9,7 @@ import (
 	"log"
 
 	defuddle "github.com/vaayne/go-defuddle"
+	"github.com/vaayne/tap/browser"
 	"github.com/vaayne/tap/transport"
 )
 
@@ -104,7 +105,19 @@ func (f *Fetcher) Fetch(ctx context.Context, url string, opts *Options) (*Result
 }
 
 func (f *Fetcher) fetchViaBrowser(ctx context.Context, url string, opts *Options, defOpts *defuddle.Options) (*Result, error) {
-	html, err := f.transport.BrowseHTMLWithPause(ctx, url, opts.PauseFunc)
+	ab := f.transport.AgentBrowser()
+	if ab == nil {
+		return nil, fmt.Errorf("browser fetch: no agent-browser available")
+	}
+	if err := ab.Open(ctx, url, browser.OpenOpts{}); err != nil {
+		return nil, fmt.Errorf("browser fetch: %w", err)
+	}
+	if opts.PauseFunc != nil {
+		if err := opts.PauseFunc(ctx); err != nil {
+			return nil, fmt.Errorf("pause: %w", err)
+		}
+	}
+	html, err := ab.GetHTML(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("browser fetch: %w", err)
 	}
