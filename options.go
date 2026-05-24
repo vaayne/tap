@@ -82,11 +82,10 @@ func WithPause(fn transport.PauseFunc) Option {
 	}
 }
 
-// WithBrowserType selects the browser backend ("chrome" or "lightpanda").
-// Deprecated: agent-browser is the only backend.
+// WithBrowserType selects the agent-browser engine ("chrome" or "lightpanda").
 func WithBrowserType(bt transport.BrowserType) Option {
 	return func(o *options) {
-		// no-op: agent-browser is always used
+		o.browserType = bt
 	}
 }
 

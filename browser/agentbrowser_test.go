@@ -15,6 +15,16 @@ func TestAgentBrowserCommandArgs(t *testing.T) {
 	}
 }
 
+func TestAgentBrowserCommandArgsIncludesEngine(t *testing.T) {
+	ab := &AgentBrowser{Path: "agent-browser", SessionName: "dev", Engine: "lightpanda"}
+	args := ab.commandArgs("open", "https://example.com")
+	for _, want := range []string{"--engine", "lightpanda"} {
+		if !slices.Contains(args, want) {
+			t.Fatalf("args %v missing %q", args, want)
+		}
+	}
+}
+
 func TestAgentBrowserCommandArgsAttachedSkipsSession(t *testing.T) {
 	ab := &AgentBrowser{Path: "agent-browser", SessionName: "dev", Attached: true}
 	args := ab.commandArgs("get", "url")

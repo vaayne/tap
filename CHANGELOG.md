@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 
 - **New browser pass-through commands** — `tap browser set` (viewport, device, geo, offline, headers, credentials, media), `tap browser storage` (local/session), `tap browser state` (save/load/list/show/clear), `tap browser auth` (save/login/list/show/delete), `tap browser get` (text/html/value/attr/title/url/count/box/styles), `tap browser vitals`, `tap browser diff` (snapshot/screenshot/url).
+- **Global Lightpanda engine flag** — `--lightpanda` / `--lp` selects Lightpanda as the agent-browser engine for browser-backed commands.
 
 ## [0.4.8] - 2026-05-18
 

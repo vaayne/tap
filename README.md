@@ -153,6 +153,7 @@ These show up on the relevant commands instead of only in global help:
 | `--timeout` | Set execution timeout |
 | `--browser-url` | One-shot agent-browser/DevTools connection override |
 | `--profile-dir` | One-shot profile override |
+| `--lightpanda`, `--lp` | Use Lightpanda as the browser engine |
 
 Compatibility aliases still work:
 - `--ws-url` -> `--browser-url`
@@ -180,7 +181,7 @@ tap browser diff ...
 
 ## Browser backend
 
-Tap embeds agent-browser as the single browser backend. It manages browser installation for full automation, auth, screenshots, and network workflows. Install browser dependencies with:
+Tap embeds agent-browser as the single browser backend. Chrome is the default engine; pass `--lightpanda`/`--lp` to use Lightpanda for fast browser-backed rendering. agent-browser manages browser installation for full automation, auth, screenshots, and network workflows. Install browser dependencies with:
 
 ```bash
 tap doctor --install

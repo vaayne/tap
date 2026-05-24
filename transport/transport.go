@@ -33,8 +33,7 @@ type Config struct {
 	ProfileDir string
 	// Headless controls whether Chrome runs in headless mode (default: true).
 	Headless bool
-	// Browser selects the browser backend (default: "chrome").
-	// Deprecated: ignored; agent-browser is always used.
+	// Browser selects the agent-browser engine (default: "chrome").
 	Browser BrowserType
 }
 
@@ -53,6 +52,9 @@ func New(ctx context.Context, config Config) (*Transport, error) {
 	}
 	ab.ProfileDir = config.ProfileDir
 	ab.Headed = !config.Headless
+	if config.Browser == BrowserLightpanda {
+		ab.Engine = "lightpanda"
+	}
 
 	t := &Transport{
 		config:       config,

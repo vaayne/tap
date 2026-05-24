@@ -125,6 +125,7 @@ tap browser diff screenshot before.png after.png
 | `--timeout <dur>` | Limit execution time |
 | `--browser-url <url>` | One-shot agent-browser/DevTools connection override |
 | `--profile-dir <path>` | One-shot profile override |
+| `--lightpanda`, `--lp` | Use Lightpanda as the browser engine |
 
 Compatibility aliases exist, but prefer the names above.
 

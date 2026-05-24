@@ -37,6 +37,11 @@ Default behavior:
 				Usage:   "Durable state directory for browser sessions and tabs",
 				Sources: cli.EnvVars("TAP_BROWSER_STATE_ROOT"),
 			},
+			&cli.BoolFlag{
+				Name:    "lightpanda",
+				Aliases: []string{"lp"},
+				Usage:   "Use Lightpanda as the browser engine",
+			},
 		},
 		Commands: []*cli.Command{
 			withCategory("Common", browserOpenCmd()),
@@ -83,7 +88,13 @@ func newAgentBrowser(cmd *cli.Command) (*browser.AgentBrowser, error) {
 	if name := cmd.String("session"); name != "" {
 		ab.SessionName = name
 	}
+	if cmd.Bool("lightpanda") {
+		ab.Engine = "lightpanda"
+	}
 	if isAttachedMode() {
+		if ab.Engine == "lightpanda" {
+			return nil, fmt.Errorf("--lightpanda cannot be used with an attached Chrome session")
+		}
 		ab.Attached = true
 		ab.SessionName = ""
 	}

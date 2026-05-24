@@ -140,6 +140,7 @@ Common commands expose browser-related flags directly:
 --timeout <duration>   Set execution timeout
 --browser-url <url>    One-shot DevTools override
 --profile-dir <path>   One-shot profile override
+--lightpanda, --lp     Use Lightpanda as the browser engine
 ```
 
 Compatibility aliases remain accepted:

@@ -65,6 +65,9 @@ func New(ctx context.Context, optFns ...Option) (*Client, error) {
 	}
 	ab.ProfileDir = opts.profileDir
 	ab.Headed = !opts.headless
+	if opts.browserType == transport.BrowserLightpanda {
+		ab.Engine = "lightpanda"
+	}
 
 	tp, err := transport.New(ctx, transport.Config{
 		WSURL:      opts.wsURL,

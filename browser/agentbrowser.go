@@ -18,6 +18,7 @@ type AgentBrowser struct {
 	ProfileDir  string
 	Headed      bool
 	Attached    bool
+	Engine      string
 }
 
 type OpenOpts struct {
@@ -75,6 +76,9 @@ func (a *AgentBrowser) commandArgs(args ...string) []string {
 	}
 	if a.Headed && !slices.Contains(out, "--headed") {
 		out = append(out, "--headed")
+	}
+	if a.Engine != "" && !hasFlag(out, "--engine") {
+		out = append(out, "--engine", a.Engine)
 	}
 	return out
 }
