@@ -65,6 +65,13 @@ Default behavior:
 			withCategory("State", browserFormsCmd()),
 			withCategory("State", browserCookiesCmd()),
 			withCategory("Network", browserNetworkCmd()),
+			withCategory("Emulation", browserSetCmd()),
+			withCategory("Storage", browserStorageCmd()),
+			withCategory("State", browserStateCmd()),
+			withCategory("Auth", browserAuthCmd()),
+			withCategory("Info", browserGetCmd()),
+			withCategory("Performance", browserVitalsCmd()),
+			withCategory("Diff", browserDiffCmd()),
 		},
 	}
 }
