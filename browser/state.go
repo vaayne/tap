@@ -104,6 +104,9 @@ type TabRecord struct {
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
 	LastSeenAt time.Time `json:"last_seen_at,omitempty"`
+	// Emulation holds persisted emulation overrides re-applied on every
+	// resolveTarget call. Nil means no overrides are active.
+	Emulation *EmulationSettings `json:"emulation,omitempty"`
 }
 
 // SessionRecord stores one persistent browser session and its tracked tabs.

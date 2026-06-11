@@ -1095,6 +1095,7 @@ func (m *Manager) resolveTarget(ctx context.Context, sessionName string, tabName
 	sessionName = resolved
 	var rt resolvedTarget
 	var mode Mode
+	var emul *EmulationSettings
 	rt.SessionName = sessionName
 	err = m.store.WithSessionLock(sessionName, func() error {
 		state, err := m.store.Load()
@@ -1120,6 +1121,7 @@ func (m *Manager) resolveTarget(ctx context.Context, sessionName string, tabName
 		rt.DebugURL = du
 		rt.TargetID = tab.TargetID
 		rt.TabName = tab.Name
+		emul = tab.Emulation
 		return nil
 	})
 	if err != nil {
@@ -1134,6 +1136,13 @@ func (m *Manager) resolveTarget(ctx context.Context, sessionName string, tabName
 			return resolvedTarget{}, fmt.Errorf("%s: remote session %q is unreachable: %w", op, sessionName, err)
 		}
 		_ = m.markSessionHealthy(sessionName)
+	}
+	// Re-apply persisted emulation settings. CDP overrides are per-session, so
+	// they must be restored on every fresh connection to the target.
+	if !emul.IsEmpty() {
+		if err := ApplyEmulationTarget(ctx, rt.DebugURL, rt.TargetID, emul); err != nil {
+			return resolvedTarget{}, fmt.Errorf("%s: re-apply emulation: %w", op, err)
+		}
 	}
 	return rt, nil
 }
