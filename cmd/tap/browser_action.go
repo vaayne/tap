@@ -806,40 +806,6 @@ For custom dropdown components (React Select, etc.), use 'click' instead.`,
 	}
 }
 
-func browserWaitCmd() *cli.Command {
-	return &cli.Command{
-		Name:      "wait",
-		Usage:     "Wait for an element to become visible",
-		ArgsUsage: "<selector>",
-		Flags: append(browserActionFlags(false),
-			&cli.DurationFlag{
-				Name:  "timeout",
-				Usage: "Max time to wait",
-				Value: 30 * time.Second,
-			},
-		),
-		Description: `Wait until the first element matching the CSS selector becomes visible.
-Uses CDP's built-in visibility polling — more reliable than JS-based polling.`,
-		Action: func(ctx context.Context, cmd *cli.Command) error {
-			configureLogging(cmd)
-			sel := cmd.Args().First()
-			if sel == "" {
-				return fmt.Errorf("CSS selector required")
-			}
-			mgr, err := newBrowserManager(cmd)
-			if err != nil {
-				return err
-			}
-			timeout := cmd.Duration("timeout")
-			if err := mgr.WaitFor(ctx, cmd.String("session"), cmd.String("tab"), sel, timeout); err != nil {
-				return err
-			}
-			fmt.Fprintf(os.Stderr, "Element %s is visible\n", sel)
-			return nil
-		},
-	}
-}
-
 func browserBackCmd() *cli.Command {
 	return &cli.Command{
 		Name:  "back",
