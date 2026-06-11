@@ -89,22 +89,56 @@ tap browser screenshot [--output <path>]
 tap browser pdf [--output <path>]
 tap browser snapshot [--interactive] [-f json]
 tap browser click <selector|@eN>
+tap browser dblclick <selector|@eN>
 tap browser type <selector|@eN> <text>
 tap browser fill <selector|@eN> <value> [<selector|@eN> <value> ...] [--submit <selector|@eN>]
 tap browser hover <selector>
+tap browser focus <selector|@eN>
+tap browser check <selector|@eN>
+tap browser uncheck <selector|@eN>
 tap browser scroll [selector]
+tap browser scrollintoview <selector|@eN>
 tap browser select <selector|@eN> <value>
-tap browser wait <selector>
+tap browser upload <selector> <file> [file...]
+tap browser drag <src-selector> <dst-selector>
+tap browser wait <selector|duration>          # also: --text --url --load --fn --state
 tap browser keypress <key>
+tap browser keydown <key>
+tap browser keyup <key>
+tap browser keyboard type <text>
+tap browser keyboard insert <text>
+tap browser mouse move <x> <y>
+tap browser mouse down|up [left|right|middle]
+tap browser mouse wheel <dy> [dx]
 tap browser dialog
+
+# Queries
+tap browser get text|html|value|attr|title|url|count|box|styles <selector|@eN>
+tap browser is visible|enabled|checked <selector|@eN>
+
+# Semantic locator
+tap browser find role|text|label|placeholder|alt|title|testid <query> <action> [value]
+tap browser find first|last|nth <selector> <action> [value]
 
 # Page state / network
 tap browser forms
 tap browser cookies get|set|clear
+tap browser storage local|session [key|set|clear]
+tap browser state save|load <path>
 tap browser network wait --url-pattern "*/api/*" --body
 tap browser network log --resource-type XHR,Fetch --timeout 30s
 tap browser network intercept --block --url-pattern "*.ads.*"
 tap browser network clear
+
+# Emulation (persisted per tab)
+tap browser set viewport <w> <h> [scale]
+tap browser set device "<name>"
+tap browser set geo <lat> <lng>
+tap browser set offline on|off
+tap browser set headers '<json>'
+tap browser set media dark|light
+tap browser set useragent "<ua>"
+tap browser set clear
 ```
 
 ## Browser-backed flags
