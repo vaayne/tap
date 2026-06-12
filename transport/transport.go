@@ -143,7 +143,10 @@ func (t *Transport) BrowseHTML(ctx context.Context, url string) (string, error) 
 
 // BrowseHTMLWithPause is like BrowseHTML but calls pauseFn after navigation.
 func (t *Transport) BrowseHTMLWithPause(ctx context.Context, url string, pauseFn PauseFunc) (string, error) {
-	bctx, cancel := t.newBrowserContext(ctx)
+	bctx, cancel, err := t.newBrowserContext(ctx)
+	if err != nil {
+		return "", err
+	}
 	defer cancel()
 
 	if err := chromedp.Run(bctx,
@@ -176,7 +179,10 @@ func (t *Transport) BrowseEval(ctx context.Context, url string, js string, heade
 
 // BrowseEvalWithPause is like BrowseEval but calls pauseFn after navigation.
 func (t *Transport) BrowseEvalWithPause(ctx context.Context, url string, js string, pauseFn PauseFunc, headers map[string]string) (any, error) {
-	bctx, cancel := t.newBrowserContext(ctx)
+	bctx, cancel, err := t.newBrowserContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 	defer cancel()
 
 	// Preserve the native fetch before page scripts can override it.
@@ -235,7 +241,10 @@ func (t *Transport) BrowseEvalWithPause(ctx context.Context, url string, js stri
 // with a site (login, solve CAPTCHAs) while cookies are persisted in the
 // Chrome profile directory.
 func (t *Transport) BrowseInteractive(ctx context.Context, url string, pauseFn PauseFunc) error {
-	bctx, cancel := t.newBrowserContext(ctx)
+	bctx, cancel, err := t.newBrowserContext(ctx)
+	if err != nil {
+		return err
+	}
 	defer cancel()
 
 	if err := chromedp.Run(bctx,
@@ -254,17 +263,18 @@ func (t *Transport) BrowseInteractive(ctx context.Context, url string, pauseFn P
 	return nil
 }
 
-func (t *Transport) newBrowserContext(parent context.Context) (context.Context, context.CancelFunc) {
+func (t *Transport) newBrowserContext(parent context.Context) (context.Context, context.CancelFunc, error) {
 	// Remote CDP endpoint (explicit --ws-url or resolved from an HTTP DevTools base URL).
 	if t.config.WSURL != "" {
 		ctx, cancel1 := chromedp.NewRemoteAllocator(parent, t.config.WSURL, chromedp.NoModifyURL)
 		ctx, cancel2 := chromedp.NewContext(ctx)
-		return ctx, func() { cancel2(); cancel1() }
+		return ctx, func() { cancel2(); cancel1() }, nil
 	}
 
 	// Lightpanda browser backend.
 	if t.config.Browser == BrowserLightpanda {
-		return t.newLightpandaContext(parent)
+		ctx, cancel := t.newLightpandaContext(parent)
+		return ctx, cancel, nil
 	}
 
 	// Default: local Chrome.
@@ -283,9 +293,16 @@ func (t *Transport) newBrowserContext(parent context.Context) (context.Context, 
 	}
 	opts = append(opts, chromedp.UserDataDir(profileDir))
 
+	if err := os.MkdirAll(profileDir, 0o755); err != nil {
+		return nil, nil, fmt.Errorf("create browser profile dir: %w", err)
+	}
+	if err := browser.PrepareProfileDir(profileDir); err != nil {
+		return nil, nil, err
+	}
+
 	ctx, cancel1 := chromedp.NewExecAllocator(parent, opts...)
 	ctx, cancel2 := chromedp.NewContext(ctx)
-	return ctx, func() { cancel2(); cancel1() }
+	return ctx, func() { cancel2(); cancel1() }, nil
 }
 
 func (t *Transport) newLightpandaContext(parent context.Context) (context.Context, context.CancelFunc) {

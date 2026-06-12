@@ -57,6 +57,9 @@ func LaunchBrowser(ctx context.Context, config LocalConfig) (*ProcessRecord, err
 	if err := os.MkdirAll(config.ProfileDir, 0o755); err != nil {
 		return nil, fmt.Errorf("create browser profile dir: %w", err)
 	}
+	if err := PrepareProfileDir(config.ProfileDir); err != nil {
+		return nil, err
+	}
 
 	// Build Chrome args.
 	args := []string{
