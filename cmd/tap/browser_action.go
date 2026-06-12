@@ -646,7 +646,7 @@ Examples:
 			configureLogging(cmd)
 			sel := cmd.Args().First()
 			if sel == "" {
-				return fmt.Errorf("CSS selector required")
+				return fmt.Errorf("CSS selector or @eN ref required")
 			}
 			mgr, err := newBrowserManager(cmd)
 			if err != nil {

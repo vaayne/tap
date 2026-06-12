@@ -118,7 +118,8 @@ tap browser is visible|enabled|checked <selector|@eN>
 
 # Semantic locator
 tap browser find role|text|label|placeholder|alt|title|testid <query> <action> [value]
-tap browser find first|last|nth <selector> <action> [value]
+tap browser find first|last <css-selector> <action> [value]
+tap browser find nth <n> <css-selector> <action> [value]
 
 # Page state / network
 tap browser forms

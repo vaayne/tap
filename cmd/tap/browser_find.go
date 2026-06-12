@@ -307,6 +307,9 @@ Examples:
 			if err != nil {
 				return err
 			}
+			if action == browser.FindActionFill || action == browser.FindActionType {
+				return fmt.Errorf("action %q requires a value and is not supported for alt/title locators; use find label or find role instead", action)
+			}
 			loc := browser.FindLocator{Kind: browser.LocatorAlt, Query: query}
 			if err := runFind(ctx, cmd, loc, action, ""); err != nil {
 				return err
@@ -341,6 +344,9 @@ Examples:
 			action, err := parseAction(actionStr)
 			if err != nil {
 				return err
+			}
+			if action == browser.FindActionFill || action == browser.FindActionType {
+				return fmt.Errorf("action %q requires a value and is not supported for alt/title locators; use find label or find role instead", action)
 			}
 			loc := browser.FindLocator{Kind: browser.LocatorTitle, Query: query}
 			if err := runFind(ctx, cmd, loc, action, ""); err != nil {
