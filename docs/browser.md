@@ -1,5 +1,7 @@
 # Browser Automation
 
+> Full auto-generated command reference: [docs/cli.md](cli.md) — regenerate with `mise run docs`.
+
 Tap now exposes a task-first browser UX for common workflows while keeping the older session/tab/proxy commands for advanced use.
 
 ## Common workflows
@@ -195,7 +197,7 @@ tap browser wait --load networkidle          # load | domcontentloaded | network
 tap browser wait --fn "window.__ready"       # poll until JS expression is truthy
 ```
 
-Default `--timeout` is 30 s. `tap browser open` now honours `--wait-selector` by calling `tap browser wait` internally before returning.
+Default `--timeout` is 30 s. When `--wait-selector` is passed to `tap browser open`, the command waits until the specified CSS selector becomes visible before returning (up to 30 s by default).
 
 ### Semantic locator (`find`)
 
@@ -263,18 +265,20 @@ tap browser set clear                      # remove all persisted overrides for 
 
 ## Browser-backed flags
 
-Common commands expose browser-related flags directly:
+`tap fetch` and `tap site` expose browser-related flags directly:
 
 ```bash
 --browser, -b          Use browser execution and reuse the resolved context
 --show                 Run visibly
 --wait <duration>      Wait after navigation
 --wait-selector <css>  Wait for an element
---wait-js <expr>       Wait for a JS expression
+--wait-js <expr>       Wait for a JS expression (tap fetch / tap site only)
 --timeout <duration>   Set execution timeout
 --browser-url <url>    One-shot DevTools override
 --profile-dir <path>   One-shot profile override
 ```
+
+> **Note:** `--wait-js` is available on `tap fetch` and `tap site` only; it is not a flag on `tap browser` commands (use `tap browser wait --fn` for the equivalent).
 
 Compatibility aliases remain accepted:
 - `--ws-url` -> `--browser-url`

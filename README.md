@@ -188,6 +188,7 @@ tap doctor --install
 
 ## Docs
 
+- [docs/cli.md](docs/cli.md) — full auto-generated command reference (`mise run docs` to regenerate)
 - [docs/browser.md](docs/browser.md) — browser UX and reference
 - [docs/network.md](docs/network.md) — network interception reference
 - [web/README.md](web/README.md) — web app docs
