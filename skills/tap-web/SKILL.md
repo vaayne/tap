@@ -2,7 +2,7 @@
 name: tap-web
 metadata:
   author: vaayne/tap
-  version: "v0.4.9"
+  version: "v0.4.10"
 description: >
   Access websites, search the web, and extract clean content using the `tap` CLI.
   Supports structured site scripts, readable page extraction, and browser automation

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.10] - 2026-06-12
+
+### Fixed
+
+- **Stale Chrome singleton locks no longer block launch** — leftover `SingletonLock` files from dead Chrome processes are detected and cleared automatically before launch; a lock held by a live Chrome fails fast with an actionable error instead of raw Chrome stderr
+- **Engine failures are no longer swallowed** — when script execution falls back across engines, the final error lists every attempted engine with its own cause (e.g. the QuickJS error is shown alongside the browser error), and single-engine runs no longer claim "all engines failed"
+
 ## [0.4.9] - 2026-06-12
 
 ### Added
@@ -328,7 +335,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - CI workflows for lint, test, and release
 - GoReleaser configuration for cross-platform builds
 
-[Unreleased]: https://github.com/vaayne/tap/compare/v0.4.9...HEAD
+[Unreleased]: https://github.com/vaayne/tap/compare/v0.4.10...HEAD
+[0.4.10]: https://github.com/vaayne/tap/compare/v0.4.9...v0.4.10
 [0.4.9]: https://github.com/vaayne/tap/compare/v0.4.8...v0.4.9
 [0.4.8]: https://github.com/vaayne/tap/compare/v0.4.7...v0.4.8
 [0.4.7]: https://github.com/vaayne/tap/compare/v0.4.6...v0.4.7
