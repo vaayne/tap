@@ -134,14 +134,14 @@ func runBrowserOpen(ctx context.Context, cmd *cli.Command) error {
 		}
 	}
 
-	// Handle wait-selector if provided (simplified for Phase 1)
+	// Handle wait-selector: wait until selector is visible.
 	if sel := cmd.String("wait-selector"); sel != "" {
-		// TODO: Implement proper wait using Evaluate with polling
-		// For now, just do a fixed delay as a placeholder
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(2 * time.Second):
+		timeout := cmd.Duration("timeout")
+		if timeout <= 0 {
+			timeout = 30 * time.Second
+		}
+		if err := mgr.WaitForElement(ctx, sessionName, targetTab, sel, browser.ElementVisible, timeout); err != nil {
+			return fmt.Errorf("wait-selector: %w", err)
 		}
 	}
 

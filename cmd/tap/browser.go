@@ -20,6 +20,8 @@ Quick start:
   tap browser click "#submit"            Click an element
   tap browser text                       Extract readable page content
   tap browser screenshot                 Capture the current page
+  tap browser snapshot --interactive     Map interactive elements to @eN refs
+  tap browser click @e3                  Act on a ref from the snapshot
 
 For authenticated access:
   tap attach chrome                      Attach your existing Chrome
@@ -51,17 +53,34 @@ Default behavior:
 			withCategory("Page Content", browserEvaluateCmd()),
 			withCategory("Page Content", browserScreenshotCmd()),
 			withCategory("Page Content", browserPDFCmd()),
+			withCategory("Page Content", browserGetCmd()),
+			withCategory("Page Content", browserIsCmd()),
 			withCategory("Interaction", browserClickCmd()),
+			withCategory("Interaction", browserDblclickCmd()),
 			withCategory("Interaction", browserTypeCmd()),
 			withCategory("Interaction", browserFillCmd()),
 			withCategory("Interaction", browserHoverCmd()),
+			withCategory("Interaction", browserFocusCmd()),
+			withCategory("Interaction", browserCheckCmd()),
+			withCategory("Interaction", browserUncheckCmd()),
 			withCategory("Interaction", browserScrollCmd()),
+			withCategory("Interaction", browserScrollIntoViewCmd()),
 			withCategory("Interaction", browserSelectCmd()),
+			withCategory("Interaction", browserFindCmd()),
 			withCategory("Interaction", browserWaitCmd()),
 			withCategory("Interaction", browserKeypressCmd()),
+			withCategory("Interaction", browserKeydownCmd()),
+			withCategory("Interaction", browserKeyupCmd()),
+			withCategory("Interaction", browserKeyboardCmd()),
+			withCategory("Interaction", browserMouseCmd()),
+			withCategory("Interaction", browserDragCmd()),
+			withCategory("Interaction", browserUploadCmd()),
 			withCategory("Interaction", browserDialogCmd()),
 			withCategory("State", browserFormsCmd()),
 			withCategory("State", browserCookiesCmd()),
+			withCategory("State", browserStorageCmd()),
+			withCategory("State", browserStateCmd()),
+			withCategory("Emulation", browserSetCmd()),
 			withCategory("Network", browserNetworkCmd()),
 		},
 	}

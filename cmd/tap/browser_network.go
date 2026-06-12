@@ -303,6 +303,9 @@ Rules are replace-all: each call replaces any previously set rules.
 Pass a single rule per invocation. Use 'tap browser network clear' to
 remove all rules.
 
+This command keeps running to serve interception rules until interrupted
+(Ctrl-C). Scripts should run it in the background.
+
 Examples:
   # Block ad requests
   tap browser network intercept --block --url-pattern "*.ads.*"

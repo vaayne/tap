@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **`tap browser get` / `tap browser is`** — read-only element queries: `text`, `html`, `value`, `attr`, `title`, `url`, `count`, `box` (JSON), `styles` (JSON); boolean state checks `visible`, `enabled`, `checked`; all accept CSS selectors or snapshot refs (`@eN`)
+- **Extra interaction commands** — `dblclick`, `focus`, `check` (idempotent), `uncheck` (idempotent), `scrollintoview`, `upload` (file input), `drag` (mouse move→press→release); low-level `mouse move/down/up/wheel` and `keyboard type/insert`; `keydown`/`keyup` for modifier keys
+- **Enhanced `wait` modes** — plain duration (`2000` ms or `1.5s`), `--text` substring, `--url` glob, `--load load|domcontentloaded|networkidle`, `--fn` JS poll, `--state visible|hidden|attached|detached` for element waits; `tap browser open --wait-selector` now correctly blocks until the element appears
+- **Semantic locator (`find`)** — locate elements by `role`, `text`, `label`, `placeholder`, `alt`, `title`, `testid`, `first`, `last`, `nth` and perform `click/fill/type/hover/focus/check/uncheck/text` actions without needing a CSS selector; `--name` filter for role, `--exact` for text
+- **Web storage (`storage local|session`)** — read/write/clear `localStorage` and `sessionStorage` of the current tab
+- **Auth state save/load (`state save|load`)** — export and import cookies + current-origin localStorage in Playwright `storageState` format (`0600` perms); non-matching origins are skipped with a warning on load
+- **Emulation overrides (`set`)** — persist `viewport`, `device` preset, `geo`, `offline`, `headers`, `media` (color-scheme), and `useragent` per tab; settings are re-applied automatically on every subsequent invocation; `set clear` removes all overrides
+
 ## [0.4.8] - 2026-05-18
 
 ### Added
