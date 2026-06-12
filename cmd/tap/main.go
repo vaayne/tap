@@ -69,6 +69,7 @@ Use 'tap <command> --help' for details on any command.`,
 			upgradeCmd(),
 			skillCmd(),
 			internalCmd(),
+			docsCmd(),
 		},
 	}
 }
