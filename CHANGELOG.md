@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.9] - 2026-06-12
+
 ### Added
 
 - **`tap browser get` / `tap browser is`** — read-only element queries: `text`, `html`, `value`, `attr`, `title`, `url`, `count`, `box` (JSON), `styles` (JSON); boolean state checks `visible`, `enabled`, `checked`; all accept CSS selectors or snapshot refs (`@eN`)
@@ -16,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **Web storage (`storage local|session`)** — read/write/clear `localStorage` and `sessionStorage` of the current tab
 - **Auth state save/load (`state save|load`)** — export and import cookies + current-origin localStorage in Playwright `storageState` format (`0600` perms); non-matching origins are skipped with a warning on load
 - **Emulation overrides (`set`)** — persist `viewport`, `device` preset, `geo`, `offline`, `headers`, `media` (color-scheme), and `useragent` per tab; settings are re-applied automatically on every subsequent invocation; `set clear` removes all overrides
+- **Categorized `tap browser --help` output** — browser subcommands are grouped by task for faster command discovery
+- **Automatic `tap-web` skill refresh after `tap upgrade`** — installed skill files are refreshed when the CLI upgrades
+- **Discoverable `tap docs` command** — documentation generation is now visible from CLI help
+
+### Changed
+
+- Rewrote `tap-web` SKILL.md as a lean decision guide, moving command syntax to `--help` and reference docs
 
 ## [0.4.8] - 2026-05-18
 
@@ -319,7 +328,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - CI workflows for lint, test, and release
 - GoReleaser configuration for cross-platform builds
 
-[Unreleased]: https://github.com/vaayne/tap/compare/v0.4.6...HEAD
+[Unreleased]: https://github.com/vaayne/tap/compare/v0.4.9...HEAD
+[0.4.9]: https://github.com/vaayne/tap/compare/v0.4.8...v0.4.9
+[0.4.8]: https://github.com/vaayne/tap/compare/v0.4.7...v0.4.8
+[0.4.7]: https://github.com/vaayne/tap/compare/v0.4.6...v0.4.7
 [0.4.6]: https://github.com/vaayne/tap/compare/v0.4.5...v0.4.6
 [0.4.5]: https://github.com/vaayne/tap/compare/v0.4.4...v0.4.5
 [0.4.4]: https://github.com/vaayne/tap/compare/v0.4.3...v0.4.4
