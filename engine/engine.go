@@ -4,8 +4,10 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/vaayne/tap/script"
 )
@@ -30,26 +32,64 @@ type Engine interface {
 // RunScript tries each engine in order, returning the first successful result.
 // If a result contains an "error" field (e.g. {"error":"HTTP 400"}), it is
 // treated as a failure and the next engine is tried.
-// If all engines fail, returns the last error.
+// If all engines fail, returns an error that names each attempted engine.
 func RunScript(ctx context.Context, engines []Engine, s *script.Script, args map[string]string, opts RunOpts) (any, error) {
-	var lastErr error
+	failures := make([]engineFailure, 0, len(engines))
 	for _, e := range engines {
 		result, err := e.Run(ctx, s, args, opts)
 		if err != nil {
-			lastErr = err
+			failures = append(failures, engineFailure{name: e.Name(), err: err})
 			log.Printf("%s failed: %v", e.Name(), err)
 			continue
 		}
 
 		if errMsg := extractError(result); errMsg != "" {
-			lastErr = fmt.Errorf("%s returned error response: %s", e.Name(), errMsg)
-			log.Printf("%v, trying next engine", lastErr)
+			err = fmt.Errorf("returned error response: %s", errMsg)
+			failures = append(failures, engineFailure{name: e.Name(), err: err})
+			log.Printf("%s failed: %v, trying next engine", e.Name(), err)
 			continue
 		}
 
 		return result, nil
 	}
-	return nil, fmt.Errorf("all engines failed: %w", lastErr)
+	return nil, engineFailuresError(failures)
+}
+
+// engineFailure records one attempted engine and why it failed.
+type engineFailure struct {
+	name string
+	err  error
+}
+
+func engineFailuresError(failures []engineFailure) error {
+	if len(failures) == 0 {
+		return errors.New("no engines configured")
+	}
+	if len(failures) == 1 {
+		return fmt.Errorf("%s failed: %w", strings.ToLower(failures[0].name), failures[0].err)
+	}
+	return allEnginesFailedError{failures: failures}
+}
+
+type allEnginesFailedError struct {
+	failures []engineFailure
+}
+
+func (e allEnginesFailedError) Error() string {
+	var b strings.Builder
+	b.WriteString("all engines failed:")
+	for _, failure := range e.failures {
+		_, _ = fmt.Fprintf(&b, "\n  %s: %v", strings.ToLower(failure.name), failure.err)
+	}
+	return b.String()
+}
+
+func (e allEnginesFailedError) Unwrap() []error {
+	causes := make([]error, 0, len(e.failures))
+	for _, failure := range e.failures {
+		causes = append(causes, failure.err)
+	}
+	return causes
 }
 
 // extractError checks if a result looks like an error response.

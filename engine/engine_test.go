@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/vaayne/tap/script"
@@ -62,5 +63,29 @@ func TestRunScript_AllFail(t *testing.T) {
 	_, err := RunScript(context.Background(), engines, &script.Script{}, nil, RunOpts{})
 	if err == nil {
 		t.Fatal("expected error, got nil")
+	}
+	msg := err.Error()
+	for _, want := range []string{"all engines failed:", "  e1: fail1", "  e2: fail2"} {
+		if !strings.Contains(msg, want) {
+			t.Fatalf("error = %q, want to contain %q", msg, want)
+		}
+	}
+}
+
+func TestRunScript_OneEngineFailDoesNotClaimAll(t *testing.T) {
+	engines := []Engine{
+		&mockEngine{name: "browser", err: fmt.Errorf("chrome failed")},
+	}
+
+	_, err := RunScript(context.Background(), engines, &script.Script{}, nil, RunOpts{})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	msg := err.Error()
+	if strings.Contains(msg, "all engines failed") {
+		t.Fatalf("error = %q, should not claim all engines failed", msg)
+	}
+	if !strings.Contains(msg, "browser failed: chrome failed") {
+		t.Fatalf("error = %q, want browser failure", msg)
 	}
 }
