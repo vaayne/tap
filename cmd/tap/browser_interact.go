@@ -254,6 +254,12 @@ func browserMouseMoveCmd() *cli.Command {
 		Usage:     "Move the mouse cursor to absolute coordinates",
 		ArgsUsage: "<x> <y>",
 		Flags:     browserActionFlags(false),
+		Description: `Dispatch a mouseMoved event to the given absolute pixel position.
+Coordinates are relative to the viewport top-left corner.
+
+Examples:
+  tap browser mouse move 640 480
+  tap browser mouse move 0 0`,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			configureLogging(cmd)
 			args := cmd.Args().Slice()

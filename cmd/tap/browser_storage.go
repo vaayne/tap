@@ -59,10 +59,11 @@ Usage:
   tap browser %s clear                  Clear all entries`, storeName, cmdName, cmdName, cmdName, cmdName),
 		Commands: []*cli.Command{
 			{
-				Name:      "set",
-				Usage:     fmt.Sprintf("Set a %s entry", storeName),
-				ArgsUsage: "<key> <value>",
-				Flags:     browserActionFlags(false),
+				Name:        "set",
+				Usage:       fmt.Sprintf("Set a %s entry", storeName),
+				ArgsUsage:   "<key> <value>",
+				Flags:       browserActionFlags(false),
+				Description: fmt.Sprintf("Set a key-value pair in %s for the current page's origin.", storeName),
 				Action: func(ctx context.Context, cmd *cli.Command) error {
 					configureLogging(cmd)
 					args := cmd.Args().Slice()
@@ -81,9 +82,10 @@ Usage:
 				},
 			},
 			{
-				Name:  "clear",
-				Usage: fmt.Sprintf("Clear all %s entries", storeName),
-				Flags: browserActionFlags(false),
+				Name:        "clear",
+				Usage:       fmt.Sprintf("Clear all %s entries", storeName),
+				Flags:       browserActionFlags(false),
+				Description: fmt.Sprintf("Remove all entries from %s for the current page's origin.", storeName),
 				Action: func(ctx context.Context, cmd *cli.Command) error {
 					configureLogging(cmd)
 					mgr, err := newBrowserManager(cmd)

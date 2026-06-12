@@ -12,6 +12,24 @@ import (
 	"github.com/chromedp/chromedp"
 )
 
+// HoverTargetByBackendNodeID moves the mouse to the center of the node
+// identified by backendNodeID, dispatching a mouseMoved event.
+func HoverTargetByBackendNodeID(ctx context.Context, debugURL, targetID string, backendNodeID cdp.BackendNodeID) error {
+	return withTarget(ctx, debugURL, targetID, chromedp.ActionFunc(func(ctx context.Context) error {
+		if err := dom.ScrollIntoViewIfNeeded().WithBackendNodeID(backendNodeID).Do(ctx); err != nil {
+			return fmt.Errorf("scroll into view: %w", err)
+		}
+		box, err := dom.GetBoxModel().WithBackendNodeID(backendNodeID).Do(ctx)
+		if err != nil {
+			return fmt.Errorf("get box model: %w", err)
+		}
+		q := box.Content
+		x := (q[0] + q[2] + q[4] + q[6]) / 4
+		y := (q[1] + q[3] + q[5] + q[7]) / 4
+		return input.DispatchMouseEvent(input.MouseMoved, x, y).Do(ctx)
+	}))
+}
+
 // DblClickTarget dispatches a double-click (clickCount=2) on the first
 // visible element matching sel.
 func DblClickTarget(ctx context.Context, debugURL, targetID, sel string) error {

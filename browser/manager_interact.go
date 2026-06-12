@@ -8,6 +8,28 @@ import (
 	"github.com/chromedp/cdproto/input"
 )
 
+// HoverElement moves the mouse to an element by CSS selector or snapshot ref (@eN).
+func (m *Manager) HoverElement(ctx context.Context, sessionName, tabName, arg string) error {
+	rt, err := m.resolveTarget(ctx, sessionName, tabName, "hover")
+	if err != nil {
+		return err
+	}
+	selector, backendNodeID, err := m.resolveElementArg(ctx, rt, arg)
+	if err != nil {
+		return err
+	}
+	if backendNodeID > 0 {
+		if err := HoverTargetByBackendNodeID(ctx, rt.DebugURL, rt.TargetID, backendNodeID); err != nil {
+			return fmt.Errorf("hover: %w", err)
+		}
+		return nil
+	}
+	if err := HoverTarget(ctx, rt.DebugURL, rt.TargetID, selector); err != nil {
+		return fmt.Errorf("hover: %w", err)
+	}
+	return nil
+}
+
 // DblClickElement double-clicks an element by CSS selector or snapshot ref.
 func (m *Manager) DblClickElement(ctx context.Context, sessionName, tabName, arg string) error {
 	rt, err := m.resolveTarget(ctx, sessionName, tabName, "dblclick")

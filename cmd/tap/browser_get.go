@@ -85,7 +85,7 @@ Examples:
 			configureLogging(cmd)
 			sel := cmd.Args().First()
 			if sel == "" {
-				return fmt.Errorf("selector required")
+				return fmt.Errorf("CSS selector or @eN ref required")
 			}
 			mgr, err := newBrowserManager(cmd)
 			if err != nil {
@@ -116,7 +116,7 @@ Examples:
 			configureLogging(cmd)
 			sel := cmd.Args().First()
 			if sel == "" {
-				return fmt.Errorf("selector required")
+				return fmt.Errorf("CSS selector or @eN ref required")
 			}
 			mgr, err := newBrowserManager(cmd)
 			if err != nil {
@@ -148,7 +148,7 @@ Examples:
 			configureLogging(cmd)
 			sel := cmd.Args().First()
 			if sel == "" {
-				return fmt.Errorf("selector required")
+				return fmt.Errorf("CSS selector or @eN ref required")
 			}
 			mgr, err := newBrowserManager(cmd)
 			if err != nil {
@@ -263,7 +263,7 @@ Examples:
 			configureLogging(cmd)
 			sel := cmd.Args().First()
 			if sel == "" {
-				return fmt.Errorf("selector required")
+				return fmt.Errorf("CSS selector required")
 			}
 			mgr, err := newBrowserManager(cmd)
 			if err != nil {
@@ -295,7 +295,7 @@ Examples:
 			configureLogging(cmd)
 			sel := cmd.Args().First()
 			if sel == "" {
-				return fmt.Errorf("selector required")
+				return fmt.Errorf("CSS selector or @eN ref required")
 			}
 			mgr, err := newBrowserManager(cmd)
 			if err != nil {
@@ -328,7 +328,7 @@ Examples:
 			configureLogging(cmd)
 			sel := cmd.Args().First()
 			if sel == "" {
-				return fmt.Errorf("selector required")
+				return fmt.Errorf("CSS selector or @eN ref required")
 			}
 			mgr, err := newBrowserManager(cmd)
 			if err != nil {
@@ -365,7 +365,7 @@ Examples:
 			configureLogging(cmd)
 			sel := cmd.Args().First()
 			if sel == "" {
-				return fmt.Errorf("selector required")
+				return fmt.Errorf("CSS selector or @eN ref required")
 			}
 			mgr, err := newBrowserManager(cmd)
 			if err != nil {
@@ -397,7 +397,7 @@ Examples:
 			configureLogging(cmd)
 			sel := cmd.Args().First()
 			if sel == "" {
-				return fmt.Errorf("selector required")
+				return fmt.Errorf("CSS selector or @eN ref required")
 			}
 			mgr, err := newBrowserManager(cmd)
 			if err != nil {
@@ -429,7 +429,7 @@ Examples:
 			configureLogging(cmd)
 			sel := cmd.Args().First()
 			if sel == "" {
-				return fmt.Errorf("selector required")
+				return fmt.Errorf("CSS selector or @eN ref required")
 			}
 			mgr, err := newBrowserManager(cmd)
 			if err != nil {

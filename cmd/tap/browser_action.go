@@ -127,10 +127,9 @@ Examples:
 
 func browserScreenshotCmd() *cli.Command {
 	return &cli.Command{
-		Name:      "screenshot",
-		Usage:     "Capture a screenshot from a tracked browser tab",
-		ArgsUsage: "",
-		Flags:     browserActionFlags(true),
+		Name:  "screenshot",
+		Usage: "Capture a screenshot from a tracked browser tab",
+		Flags: browserActionFlags(true),
 		Description: `Capture a screenshot from the resolved tracked tab.
 
 When --output is omitted, tap will generate a deterministic file path from the
@@ -246,8 +245,9 @@ Examples:
 
 func browserSnapshotCmd() *cli.Command {
 	return &cli.Command{
-		Name:  "snapshot",
-		Usage: "Capture an AI-friendly semantic page snapshot with stable refs",
+		Name:      "snapshot",
+		Usage:     "Capture an AI-friendly semantic page snapshot with stable refs",
+		ArgsUsage: "[flags]",
 		Flags: append(browserActionFlags(false),
 			&cli.BoolFlag{
 				Name:  "interactive",
@@ -269,11 +269,15 @@ func browserSnapshotCmd() *cli.Command {
 			},
 		),
 		Description: `Capture a compact semantic tree from the current page and assign stable refs
-for interactive elements (e.g. @e1, @e2). Refs can be reused in click/type/fill/select.
+for interactive elements (e.g. @e1, @e2). Refs can be reused in click/type/fill/select/hover.
+
+Use --depth to limit the AX tree depth captured. --selector is reserved for future
+scoped snapshots and has no effect today.
 
 Examples:
   tap browser snapshot
   tap browser snapshot --interactive -f json
+  tap browser snapshot --depth 4
   tap browser click @e3
   tap browser type @e1 "hello"`,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
@@ -302,8 +306,9 @@ Examples:
 
 func browserPDFCmd() *cli.Command {
 	return &cli.Command{
-		Name:  "pdf",
-		Usage: "Save the current page as PDF",
+		Name:      "pdf",
+		Usage:     "Save the current page as PDF",
+		ArgsUsage: "[flags]",
 		Flags: append(browserActionFlags(true),
 			&cli.BoolFlag{
 				Name:  "landscape",
@@ -322,6 +327,8 @@ func browserPDFCmd() *cli.Command {
 		),
 		Description: `Save the current page of the resolved tracked tab as a PDF file.
 
+--background defaults to true (background graphics are printed). Pass
+--background=false to omit them.
 When --output is omitted, tap generates a file name from the session,
 tab name, and timestamp.
 
@@ -355,8 +362,9 @@ Examples:
 
 func browserFormsCmd() *cli.Command {
 	return &cli.Command{
-		Name:  "forms",
-		Usage: "Discover fillable form elements in a tracked browser tab",
+		Name:      "forms",
+		Usage:     "Discover fillable form elements in a tracked browser tab",
+		ArgsUsage: "[flags]",
 		Flags: append(browserActionFlags(false), &cli.StringFlag{
 			Name:    "format",
 			Aliases: []string{"f"},
@@ -455,13 +463,15 @@ func browserKeypressCmd() *cli.Command {
 		Usage:     "Send keyboard events to the page",
 		ArgsUsage: "<key>",
 		Flags:     browserActionFlags(false),
-		Description: `Send key events to the page. Common keys:
+		Description: `Dispatch a single key or modifier combo to the page. One invocation = one key event.
+
+Common keys:
   Enter, Tab, Escape, Backspace, Delete, ArrowUp, ArrowDown, ArrowLeft, ArrowRight,
   Space, Home, End, PageUp, PageDown, F1-F12
 
-For modifier combinations, separate with +: Ctrl+a, Ctrl+c, Ctrl+v, Shift+Tab
+Modifier combos (separated with +): Ctrl+a, Ctrl+c, Ctrl+v, Shift+Tab
 
-Regular text is sent as individual keystrokes.`,
+Use 'keyboard type' to type multi-character text per-character instead.`,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			configureLogging(cmd)
 			key := cmd.Args().First()
@@ -484,8 +494,9 @@ Regular text is sent as individual keystrokes.`,
 
 func browserDialogCmd() *cli.Command {
 	return &cli.Command{
-		Name:  "dialog",
-		Usage: "Accept or dismiss a JavaScript dialog",
+		Name:      "dialog",
+		Usage:     "Accept or dismiss a JavaScript dialog",
+		ArgsUsage: "[flags]",
 		Flags: append(browserActionFlags(false),
 			&cli.BoolFlag{
 				Name:  "accept",
@@ -499,7 +510,15 @@ func browserDialogCmd() *cli.Command {
 		),
 		Description: `Handle a pending JavaScript dialog (alert, confirm, prompt, onbeforeunload).
 
-Unhandled dialogs block all CDP commands. Use this to dismiss them.`,
+--accept defaults to true (dialog is accepted). Pass --accept=false to dismiss.
+For prompt dialogs, supply the response text with --text.
+
+Unhandled dialogs block all CDP commands. Use this to dismiss them.
+
+Examples:
+  tap browser dialog
+  tap browser dialog --accept=false
+  tap browser dialog --text "my answer"`,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			configureLogging(cmd)
 			mgr, err := newBrowserManager(cmd)
@@ -546,6 +565,12 @@ func browserCookiesGetCmd() *cli.Command {
 			Usage:   "Output format: json, pretty (default), raw",
 			Value:   formatPretty,
 		}),
+		Description: `List all cookies visible to the current page via CDP, including httpOnly
+cookies that are inaccessible via document.cookie.
+
+Examples:
+  tap browser cookies get
+  tap browser cookies get -f json`,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			configureLogging(cmd)
 			mgr, err := newBrowserManager(cmd)
@@ -611,6 +636,11 @@ func browserCookiesClearCmd() *cli.Command {
 		Name:  "clear",
 		Usage: "Delete all cookies for the current page",
 		Flags: browserActionFlags(false),
+		Description: `Delete all cookies for the current page's context via CDP.
+Useful for logging out or resetting auth state before a new login flow.
+
+Example:
+  tap browser cookies clear`,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			configureLogging(cmd)
 			mgr, err := newBrowserManager(cmd)
@@ -700,26 +730,27 @@ func browserHoverCmd() *cli.Command {
 	return &cli.Command{
 		Name:      "hover",
 		Usage:     "Move mouse to an element to trigger hover state",
-		ArgsUsage: "<selector>",
+		ArgsUsage: "<selector|@eN>",
 		Flags:     browserActionFlags(false),
 		Description: `Move the mouse to the center of the first visible element matching
-the CSS selector. Dispatches real mouseMoved events that trigger
+the CSS selector or snapshot ref. Dispatches real mouseMoved events that trigger
 CSS :hover states and mouseenter/mouseover listeners.
 
 Examples:
   tap browser hover "nav.menu > li:first-child"
-  tap browser hover ".dropdown-trigger"`,
+  tap browser hover ".dropdown-trigger"
+  tap browser hover @e4`,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			configureLogging(cmd)
 			sel := cmd.Args().First()
 			if sel == "" {
-				return fmt.Errorf("CSS selector required")
+				return fmt.Errorf("CSS selector or @eN ref required")
 			}
 			mgr, err := newBrowserManager(cmd)
 			if err != nil {
 				return err
 			}
-			if err := mgr.Hover(ctx, cmd.String("session"), cmd.String("tab"), sel); err != nil {
+			if err := mgr.HoverElement(ctx, cmd.String("session"), cmd.String("tab"), sel); err != nil {
 				return err
 			}
 			fmt.Fprintf(os.Stderr, "Hovered %s\n", sel)
@@ -743,8 +774,12 @@ func browserScrollCmd() *cli.Command {
 				Usage: "Absolute Y pixel position (when no selector given)",
 			},
 		),
-		Description: `Scroll the element matching the CSS selector into view. If no selector
-is provided, scroll to the absolute pixel position given by --x and --y.
+		Description: `Scroll the element matching the CSS selector into view, or scroll to an
+absolute pixel position via --x/--y. You must supply either a CSS selector
+or at least one of --x/--y.
+
+CSS-only: @eN snapshot refs are not supported here. Use 'scrollintoview' to
+scroll a snapshot ref into the viewport instead.
 
 Use this to trigger lazy-loaded content or scroll-based UI updates.
 

@@ -20,6 +20,8 @@ Quick start:
   tap browser click "#submit"            Click an element
   tap browser text                       Extract readable page content
   tap browser screenshot                 Capture the current page
+  tap browser snapshot --interactive     Map interactive elements to @eN refs
+  tap browser click @e3                  Act on a ref from the snapshot
 
 For authenticated access:
   tap attach chrome                      Attach your existing Chrome
