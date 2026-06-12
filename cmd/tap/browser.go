@@ -9,8 +9,9 @@ import (
 
 func browserCmd() *cli.Command {
 	return &cli.Command{
-		Name:  "browser",
-		Usage: "Browser automation and page interaction",
+		Name:               "browser",
+		Usage:              "Browser automation and page interaction",
+		CustomHelpTemplate: browserHelpTemplate,
 		Description: `Open pages, interact with elements, and extract content from websites.
 
 Quick start:
@@ -39,52 +40,74 @@ Default behavior:
 			},
 		},
 		Commands: []*cli.Command{
-			withCategory("Common", browserOpenCmd()),
-			withCategory("Common", browserTabsCmd()),
-			withCategory("Common", browserSwitchCmd()),
-			withCategory("Common", browserCloseTabCmd()),
-			withCategory("Common", browserStatusCmd()),
-			withCategory("Navigation", browserNavigateCmd()),
-			withCategory("Navigation", browserBackCmd()),
-			withCategory("Navigation", browserForwardCmd()),
-			withCategory("Navigation", browserReloadCmd()),
-			withCategory("Page Content", browserTextCmd()),
-			withCategory("Page Content", browserSnapshotCmd()),
-			withCategory("Page Content", browserEvaluateCmd()),
-			withCategory("Page Content", browserScreenshotCmd()),
-			withCategory("Page Content", browserPDFCmd()),
-			withCategory("Page Content", browserGetCmd()),
-			withCategory("Page Content", browserIsCmd()),
-			withCategory("Interaction", browserClickCmd()),
-			withCategory("Interaction", browserDblclickCmd()),
-			withCategory("Interaction", browserTypeCmd()),
-			withCategory("Interaction", browserFillCmd()),
-			withCategory("Interaction", browserHoverCmd()),
-			withCategory("Interaction", browserFocusCmd()),
-			withCategory("Interaction", browserCheckCmd()),
-			withCategory("Interaction", browserUncheckCmd()),
-			withCategory("Interaction", browserScrollCmd()),
-			withCategory("Interaction", browserScrollIntoViewCmd()),
-			withCategory("Interaction", browserSelectCmd()),
-			withCategory("Interaction", browserFindCmd()),
-			withCategory("Interaction", browserWaitCmd()),
-			withCategory("Interaction", browserKeypressCmd()),
-			withCategory("Interaction", browserKeydownCmd()),
-			withCategory("Interaction", browserKeyupCmd()),
-			withCategory("Interaction", browserKeyboardCmd()),
-			withCategory("Interaction", browserMouseCmd()),
-			withCategory("Interaction", browserDragCmd()),
-			withCategory("Interaction", browserUploadCmd()),
-			withCategory("Interaction", browserDialogCmd()),
-			withCategory("State", browserFormsCmd()),
-			withCategory("State", browserCookiesCmd()),
-			withCategory("State", browserStorageCmd()),
-			withCategory("State", browserStateCmd()),
+			withCategory("Tabs", browserOpenCmd()),
+			withCategory("Tabs", browserTabsCmd()),
+			withCategory("Tabs", browserSwitchCmd()),
+			withCategory("Tabs", browserCloseTabCmd()),
+			withCategory("Tabs", browserStatusCmd()),
+			withCategory("Page actions", browserNavigateCmd()),
+			withCategory("Page actions", browserBackCmd()),
+			withCategory("Page actions", browserForwardCmd()),
+			withCategory("Page actions", browserReloadCmd()),
+			withCategory("Queries", browserTextCmd()),
+			withCategory("Queries", browserSnapshotCmd()),
+			withCategory("Queries", browserEvaluateCmd()),
+			withCategory("Queries", browserScreenshotCmd()),
+			withCategory("Queries", browserPDFCmd()),
+			withCategory("Queries", browserGetCmd()),
+			withCategory("Queries", browserIsCmd()),
+			withCategory("Page actions", browserClickCmd()),
+			withCategory("Page actions", browserDblclickCmd()),
+			withCategory("Page actions", browserTypeCmd()),
+			withCategory("Page actions", browserFillCmd()),
+			withCategory("Page actions", browserHoverCmd()),
+			withCategory("Page actions", browserFocusCmd()),
+			withCategory("Page actions", browserCheckCmd()),
+			withCategory("Page actions", browserUncheckCmd()),
+			withCategory("Page actions", browserScrollCmd()),
+			withCategory("Page actions", browserScrollIntoViewCmd()),
+			withCategory("Page actions", browserSelectCmd()),
+			withCategory("Find", browserFindCmd()),
+			withCategory("Page actions", browserWaitCmd()),
+			withCategory("Page actions", browserKeypressCmd()),
+			withCategory("Page actions", browserKeydownCmd()),
+			withCategory("Page actions", browserKeyupCmd()),
+			withCategory("Page actions", browserKeyboardCmd()),
+			withCategory("Page actions", browserMouseCmd()),
+			withCategory("Page actions", browserDragCmd()),
+			withCategory("Page actions", browserUploadCmd()),
+			withCategory("Page actions", browserDialogCmd()),
+			withCategory("Storage & state", browserFormsCmd()),
+			withCategory("Storage & state", browserCookiesCmd()),
+			withCategory("Storage & state", browserStorageCmd()),
+			withCategory("Storage & state", browserStateCmd()),
 			withCategory("Emulation", browserSetCmd()),
 			withCategory("Network", browserNetworkCmd()),
 		},
 	}
 }
+
+const browserHelpTemplate = `NAME:
+   {{template "helpNameTemplate" .}}
+
+USAGE:
+   {{if .UsageText}}{{wrap .UsageText 3}}{{else}}{{.FullName}}{{if .VisibleCommands}} [command [command options]]{{end}}{{if .ArgsUsage}} {{.ArgsUsage}}{{else}}{{if .Arguments}} [arguments...]{{end}}{{end}}{{end}}{{if .Category}}
+
+CATEGORY:
+   {{.Category}}{{end}}{{if .Description}}
+
+DESCRIPTION:
+   {{template "descriptionTemplate" .}}{{end}}{{if .VisibleCommands}}
+
+COMMANDS:{{range .VisibleCategories}}{{if .Name}}
+
+   {{.Name}}:{{range .VisibleCommands}}
+     {{join .Names ", "}}{{"\t"}}{{.Usage}}{{end}}{{end}}{{end}}{{end}}{{if .VisibleFlagCategories}}
+
+OPTIONS:{{template "visibleFlagCategoryTemplate" .}}{{else if .VisibleFlags}}
+
+OPTIONS:{{template "visibleFlagTemplate" .}}{{end}}
+`
 
 func newBrowserManager(cmd *cli.Command) (*browser.Manager, error) {
 	root := browserStateRoot(cmd)

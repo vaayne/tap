@@ -18,6 +18,7 @@ var version = "dev"
 
 func main() {
 	_ = godotenv.Load()
+	configureHelpTemplates()
 
 	app := newApp()
 
@@ -34,6 +35,17 @@ func main() {
 		}
 		fmt.Fprintf(os.Stderr, "Error: %s\n", err)
 		os.Exit(1)
+	}
+}
+
+func configureHelpTemplates() {
+	cli.ShowSubcommandHelp = func(cmd *cli.Command) error {
+		tmpl := cli.SubcommandHelpTemplate
+		if cmd.CustomHelpTemplate != "" {
+			tmpl = cmd.CustomHelpTemplate
+		}
+		cli.HelpPrinter(cmd.Root().Writer, tmpl, cmd)
+		return nil
 	}
 }
 
