@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -137,8 +138,27 @@ func runUpgrade(ctx context.Context, force bool) error {
 	}
 
 	fmt.Printf("Upgraded tap: %s -> %s\n", current, latest)
-	fmt.Println("Run 'tap skill install' to update your local skill installation.")
+	if err := reinstallSkillAfterUpgrade(ctx, exe); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: could not update installed tap-web skill: %v\n", err)
+	}
 	return nil
+}
+
+func reinstallSkillAfterUpgrade(ctx context.Context, binaryPath string) error {
+	skillDir := os.Getenv("TAP_SKILL_DIR")
+	if skillDir == "" {
+		skillDir = defaultSkillDir()
+	}
+	if installed, _ := isSkillInstalled(skillDir); !installed {
+		return nil
+	}
+
+	fmt.Println("Updating installed tap-web skill from upgraded binary...")
+	cmd := exec.CommandContext(ctx, binaryPath, "skill", "install")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Env = os.Environ()
+	return cmd.Run()
 }
 
 func extractTapBinary(r io.Reader) ([]byte, error) {
