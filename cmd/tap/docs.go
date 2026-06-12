@@ -17,9 +17,8 @@ var homeDir = func() string {
 
 func docsCmd() *cli.Command {
 	return &cli.Command{
-		Name:   "docs",
-		Usage:  "Print the full command reference as Markdown",
-		Hidden: true,
+		Name:  "docs",
+		Usage: "Print the full command reference as Markdown",
 		Action: func(_ context.Context, cmd *cli.Command) error {
 			fmt.Print(renderDocs(newApp()))
 			return nil

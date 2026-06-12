@@ -1907,3 +1907,7 @@ It is embedded in the tap binary and can be installed to the skills directory.
 | `--force` | Reinstall even if already up to date |  |  |
 | `--path, --dir` | Custom installation directory (default: ~/.config/tap/skills/tap-web/) |  | TAP_SKILL_DIR |
 
+## tap docs
+
+**Usage:** Print the full command reference as Markdown
+
