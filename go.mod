@@ -11,8 +11,8 @@ require (
 	github.com/refraction-networking/utls v1.8.2
 	github.com/urfave/cli/v3 v3.8.0
 	github.com/vaayne/go-defuddle v0.1.2
-	golang.org/x/net v0.47.0
-	golang.org/x/sys v0.42.0
+	golang.org/x/net v0.55.0
+	golang.org/x/sys v0.45.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -27,6 +27,6 @@ require (
 	github.com/gobwas/ws v1.4.0 // indirect
 	github.com/klauspost/compress v1.17.4 // indirect
 	github.com/tetratelabs/wazero v1.9.0 // indirect
-	golang.org/x/crypto v0.45.0 // indirect
-	golang.org/x/text v0.31.0 // indirect
+	golang.org/x/crypto v0.51.0 // indirect
+	golang.org/x/text v0.37.0 // indirect
 )
