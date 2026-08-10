@@ -1,5 +1,6 @@
 # Binary
 bin/
+/dist/
 cdp
 
 # Go

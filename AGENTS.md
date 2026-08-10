@@ -63,7 +63,11 @@ Run `go test ./... -timeout 60s -race` before pushing. CI: lint + test on ubuntu
 3. Update skill version: edit `skills/tap-web/SKILL.md` metadata.version to match the new release version.
 4. Commit: `📝 docs: update CHANGELOG for vx.y.z`.
 5. Tag and push: `git tag vx.y.z && git push origin main --tags`.
-6. GoReleaser publishes automatically.
+6. GoReleaser publishes thin archives; the release workflow then adds pinned
+   agent-browser full bundles and `full-checksums.txt` automatically.
+
+When bumping agent-browser, update the version and every checksum in
+`deps/agent-browser.sh`; follow `deps/README.md` for the release rehearsal.
 
 ## Documentation
 

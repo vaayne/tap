@@ -76,6 +76,53 @@ printf '%s' '{"success":true,"data":{},"error":null}'
 	}
 }
 
+func TestPathPrefersBundledSibling(t *testing.T) {
+	dir := t.TempDir()
+	name := "agent-browser"
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
+	bin := filepath.Join(dir, name)
+	if err := os.WriteFile(bin, []byte("fixture"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(EnvBinary, "")
+	client := New("")
+	client.siblingDir = dir
+	path, err := client.Path()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if path != bin {
+		t.Fatalf("path = %q, want sibling %q", path, bin)
+	}
+}
+
+func TestPathExplicitOverrideBeatsBundledSibling(t *testing.T) {
+	dir := t.TempDir()
+	name := "agent-browser"
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
+	sibling := filepath.Join(dir, name)
+	if err := os.WriteFile(sibling, []byte("fixture"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	override := filepath.Join(t.TempDir(), name)
+	if err := os.WriteFile(override, []byte("fixture"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	client := New(override)
+	client.siblingDir = dir
+	path, err := client.Path()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if path != override {
+		t.Fatalf("path = %q, want explicit override %q", path, override)
+	}
+}
+
 func TestOpenAndEvalStagesHeadersThroughBatchStdin(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("shell fixture is Unix-only")

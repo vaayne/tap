@@ -9,29 +9,32 @@ sessions, profiles, tabs, CDP, interaction, and network tooling.
 
 ## Install
 
-Install the matching native agent-browser binary from
-[GitHub Releases](https://github.com/vercel-labs/agent-browser/releases/latest),
-then install Chrome:
-
-```bash
-install -m 0755 agent-browser-<platform>-<arch> ~/.local/bin/agent-browser
-agent-browser install
-```
-
-Release assets include `darwin-arm64`, `darwin-x64`, `linux-arm64`,
-`linux-x64`, musl Linux variants, and `win32-x64.exe`. Homebrew and npm remain
-fallbacks:
-
-```bash
-brew install agent-browser       # macOS
-# or: npm install -g agent-browser
-```
-
-Then install Tap:
+The default installer bootstraps Tap, a pinned native agent-browser binary, and
+its Chrome runtime:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/vaayne/tap/main/scripts/install.sh | sh
-# or
+```
+
+Every downloaded binary is pinned and SHA-256 verified. Existing
+`agent-browser` installations are preserved. Installer options:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/vaayne/tap/main/scripts/install.sh | sh -s -- --full
+curl -fsSL https://raw.githubusercontent.com/vaayne/tap/main/scripts/install.sh | sh -s -- --skip-chrome
+curl -fsSL https://raw.githubusercontent.com/vaayne/tap/main/scripts/install.sh | sh -s -- --without-agent-browser
+```
+
+Full archives are published for macOS, glibc/musl Linux, and Windows x64. They
+contain both CLIs and the agent-browser license for offline transfer; use an
+existing Chrome installation or run `agent-browser install` when online.
+Tap resolves the runtime in this order: `TAP_AGENT_BROWSER`, a sibling binary
+from a full bundle, then `agent-browser` on `PATH`.
+
+Manual Tap-only installation remains available, but requires an independently
+installed agent-browser:
+
+```bash
 go install github.com/vaayne/tap/cmd/tap@latest
 ```
 

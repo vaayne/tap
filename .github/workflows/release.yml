@@ -26,3 +26,9 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build full offline bundles
+        run: scripts/build-full-bundles.sh "${GITHUB_REF_NAME#v}" dist dist/full
+      - name: Upload full offline bundles
+        run: gh release upload "$GITHUB_REF_NAME" dist/full/* --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

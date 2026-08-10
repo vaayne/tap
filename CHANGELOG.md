@@ -13,6 +13,9 @@
   extract the active tab.
 - Installation guidance now prefers agent-browser's native GitHub Release
   binary; Homebrew and npm remain fallback installation methods.
+- The default installer now bootstraps a pinned, checksummed agent-browser
+  binary and Chrome runtime. Releases also publish optional full offline
+  bundles containing both Tap and agent-browser.
 
 ### Removed
 
