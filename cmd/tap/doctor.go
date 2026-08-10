@@ -12,6 +12,9 @@ func doctorCmd() *cli.Command {
 	return &cli.Command{
 		Name:  "doctor",
 		Usage: "Check Tap and its agent-browser runtime dependency",
+		Description: `Checks the resolved agent-browser executable and its Chrome runtime.
+When agent-browser is missing, rerun Tap's default installer to bootstrap it.
+--fix delegates runtime repair to an executable that is already installed.`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:  "fix",
@@ -32,8 +35,8 @@ func runDoctor(ctx context.Context, cmd *cli.Command) error {
 	path, err := client.Path()
 	if err != nil {
 		fmt.Printf("%s agent-browser not found\n", fail)
-		fmt.Printf("  %s\n", dim(color, "Install native binary: https://github.com/vercel-labs/agent-browser/releases/latest"))
-		fmt.Printf("  %s\n", dim(color, "Then run: agent-browser install"))
+		fmt.Printf("  %s\n", dim(color, "Bootstrap: curl -fsSL https://raw.githubusercontent.com/vaayne/tap/main/scripts/install.sh | sh"))
+		fmt.Printf("  %s\n", dim(color, "Manual: https://github.com/vercel-labs/agent-browser/releases/latest"))
 		return err
 	}
 	version, err := client.Version(ctx)
