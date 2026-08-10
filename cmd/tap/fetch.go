@@ -31,7 +31,7 @@ Examples:
 			configureLogging(cmd)
 			url := cmd.Args().First()
 
-			client, err := newClient(ctx, cmd)
+			client, err := newRuntimeClient(ctx, cmd)
 			if err != nil {
 				return err
 			}

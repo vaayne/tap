@@ -139,6 +139,20 @@ func newClient(ctx context.Context, cmd *cli.Command) (*tap.Client, error) {
 	return tap.New(ctx, opts...)
 }
 
+// newRuntimeClient skips site discovery and synchronization for commands that
+// only need agent-browser. Fetch must remain usable when the registry is
+// offline or absent.
+func newRuntimeClient(ctx context.Context, cmd *cli.Command) (*tap.Client, error) {
+	var opts []tap.Option
+	if binary := cmd.String("agent-browser"); binary != "" {
+		opts = append(opts, tap.WithAgentBrowserBinary(binary))
+	}
+	if timeout := cmd.Duration("timeout"); timeout > 0 {
+		opts = append(opts, tap.WithTimeout(timeout))
+	}
+	return tap.New(ctx, opts...)
+}
+
 func configureLogging(cmd *cli.Command) {
 	if cmd.Bool("quiet") || !cmd.Bool("verbose") {
 		log.SetOutput(nopWriter{})
