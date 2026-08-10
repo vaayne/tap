@@ -12,6 +12,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -25,7 +27,9 @@ const (
 // AGENT_BROWSER_SESSION and every other agent-browser setting are inherited
 // from the process environment unchanged.
 type Client struct {
-	Binary string
+	Binary     string
+	explicit   bool
+	siblingDir string
 }
 
 type envelope struct {
@@ -47,17 +51,32 @@ type batchResult struct {
 // New creates a thin client. Binary lookup remains lazy so registry-only
 // commands such as `tap site list` work even before agent-browser is installed.
 func New(binary string) *Client {
+	explicit := binary != ""
 	if binary == "" {
 		binary = os.Getenv(EnvBinary)
+		explicit = binary != ""
 	}
 	if binary == "" {
 		binary = DefaultBinary
 	}
-	return &Client{Binary: binary}
+	var siblingDir string
+	if executable, err := os.Executable(); err == nil {
+		siblingDir = filepath.Dir(executable)
+	}
+	return &Client{Binary: binary, explicit: explicit, siblingDir: siblingDir}
 }
 
 // Path resolves the configured executable without installing or downloading it.
 func (c *Client) Path() (string, error) {
+	if !c.explicit && c.siblingDir != "" {
+		name := DefaultBinary
+		if runtime.GOOS == "windows" {
+			name += ".exe"
+		}
+		if path, err := exec.LookPath(filepath.Join(c.siblingDir, name)); err == nil {
+			return path, nil
+		}
+	}
 	path, err := exec.LookPath(c.Binary)
 	if err != nil {
 		return "", fmt.Errorf("agent-browser not found; install its native binary from https://github.com/vercel-labs/agent-browser/releases/latest, then run 'agent-browser install': %w", err)

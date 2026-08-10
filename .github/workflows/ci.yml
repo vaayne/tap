@@ -41,3 +41,7 @@ jobs:
         run: go test ./... -timeout 60s -race
       - name: Build
         run: go build ./...
+      - name: Validate release scripts
+        run: |
+          sh -n scripts/install.sh scripts/install_test.sh scripts/build-full-bundles.sh deps/agent-browser.sh
+          scripts/install_test.sh
