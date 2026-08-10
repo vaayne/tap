@@ -32,7 +32,8 @@ func runDoctor(ctx context.Context, cmd *cli.Command) error {
 	path, err := client.Path()
 	if err != nil {
 		fmt.Printf("%s agent-browser not found\n", fail)
-		fmt.Printf("  %s\n", dim(color, "Install: npm install -g agent-browser && agent-browser install"))
+		fmt.Printf("  %s\n", dim(color, "Install native binary: https://github.com/vercel-labs/agent-browser/releases/latest"))
+		fmt.Printf("  %s\n", dim(color, "Then run: agent-browser install"))
 		return err
 	}
 	version, err := client.Version(ctx)

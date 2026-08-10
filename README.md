@@ -9,11 +9,22 @@ sessions, profiles, tabs, CDP, interaction, and network tooling.
 
 ## Install
 
-Install agent-browser first:
+Install the matching native agent-browser binary from
+[GitHub Releases](https://github.com/vercel-labs/agent-browser/releases/latest),
+then install Chrome:
 
 ```bash
-npm install -g agent-browser
+install -m 0755 agent-browser-<platform>-<arch> ~/.local/bin/agent-browser
 agent-browser install
+```
+
+Release assets include `darwin-arm64`, `darwin-x64`, `linux-arm64`,
+`linux-x64`, musl Linux variants, and `win32-x64.exe`. Homebrew and npm remain
+fallbacks:
+
+```bash
+brew install agent-browser       # macOS
+# or: npm install -g agent-browser
 ```
 
 Then install Tap:

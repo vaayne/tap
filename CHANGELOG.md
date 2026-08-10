@@ -11,6 +11,8 @@
   `name`, `runtime`, or `env`.
 - `tap fetch` now runs embedded Defuddle in agent-browser and accepts no URL to
   extract the active tab.
+- Installation guidance now prefers agent-browser's native GitHub Release
+  binary; Homebrew and npm remain fallback installation methods.
 
 ### Removed
 

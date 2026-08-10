@@ -77,8 +77,27 @@ echo "Installed tap ${VERSION} to ${INSTALL_DIR}/tap"
 if ! command -v agent-browser >/dev/null 2>&1; then
   echo ""
   echo "Tap requires agent-browser:"
-  echo "  npm install -g agent-browser"
-  echo "  agent-browser install"
+  case "${OS}/${ARCH}" in
+    darwin/arm64) AB_ASSET="agent-browser-darwin-arm64" ;;
+    darwin/amd64) AB_ASSET="agent-browser-darwin-x64" ;;
+    linux/arm64) AB_ASSET="agent-browser-linux-arm64" ;;
+    linux/amd64) AB_ASSET="agent-browser-linux-x64" ;;
+    windows/amd64) AB_ASSET="agent-browser-win32-x64.exe" ;;
+    *) AB_ASSET="" ;;
+  esac
+  if [ -n "$AB_ASSET" ]; then
+    AB_TARGET="${INSTALL_DIR}/agent-browser"
+    if [ "$OS" = "windows" ]; then
+      AB_TARGET="${AB_TARGET}.exe"
+    fi
+    echo "  curl -fsSL https://github.com/vercel-labs/agent-browser/releases/latest/download/${AB_ASSET} -o ${AB_TARGET}"
+    echo "  chmod +x ${AB_TARGET}"
+    echo "  ${AB_TARGET} install"
+  else
+    echo "  https://github.com/vercel-labs/agent-browser/releases/latest"
+  fi
+  echo ""
+  echo "Fallback: npm install -g agent-browser && agent-browser install"
 fi
 
 # Check if install dir is in PATH
