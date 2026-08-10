@@ -1,18 +1,30 @@
 /* @meta
 {
-  "name": "twitter/fxembed-search",
   "description": "Search X / Twitter posts via FxEmbed",
   "domain": "api.fxtwitter.com",
   "args": {
-    "q": {"required": true, "description": "Search query"},
-    "feed": {"required": false, "description": "Search tab: latest, top, or media"},
-    "count": {"required": false, "description": "Page size"},
-    "cursor": {"required": false, "description": "Pagination cursor"},
-    "lang": {"required": false, "description": "Target language for inline translations, e.g. en, es, zh-cn"}
+    "q": {
+      "required": true,
+      "description": "Search query"
+    },
+    "feed": {
+      "required": false,
+      "description": "Search tab: latest, top, or media"
+    },
+    "count": {
+      "required": false,
+      "description": "Page size"
+    },
+    "cursor": {
+      "required": false,
+      "description": "Pagination cursor"
+    },
+    "lang": {
+      "required": false,
+      "description": "Target language for inline translations, e.g. en, es, zh-cn"
+    }
   },
-  "runtime": "http",
-  "readOnly": true,
-  "example": "tap site twitter/fxembed-search q=puppies feed=latest count=30"
+  "readOnly": true
 }
 */
 

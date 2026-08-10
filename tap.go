@@ -1,102 +1,54 @@
-// Package tap provides a unified API for interacting with web pages.
-//
-// Tap can run site scripts (with QuickJS → Browser fallback) and fetch
-// clean content from URLs via go-defuddle. Both share a common transport
-// layer for HTTP and browser-based network access.
-//
-// Basic usage:
-//
-//	client, err := tap.New(ctx, tap.WithSitesDir("./sites"))
-//	if err != nil {
-//	    log.Fatal(err)
-//	}
-//	defer client.Close()
-//
-//	// Run a site script
-//	result, err := client.RunScript(ctx, "v2ex/hot", nil)
-//
-//	// Fetch clean content
-//	content, err := client.Fetch(ctx, "https://example.com", nil)
+// Package tap provides reusable site programs and content extraction powered
+// by agent-browser.
 package tap
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
 
-	"github.com/vaayne/tap/engine"
+	"github.com/vaayne/tap/agentbrowser"
 	"github.com/vaayne/tap/fetch"
 	"github.com/vaayne/tap/script"
 	"github.com/vaayne/tap/sites"
-	"github.com/vaayne/tap/transport"
 )
 
 // Client is the main entry point for the tap library.
 type Client struct {
-	registry  *script.Registry
-	engines   []engine.Engine
-	fetcher   *fetch.Fetcher
-	transport *transport.Transport
-	opts      options
+	registry *script.Registry
+	browser  *agentbrowser.Client
+	fetcher  *fetch.Fetcher
+	opts     options
 }
 
-// New creates a new Client with the given options.
-// The context is used for any startup work (e.g. downloading a browser binary).
-func New(ctx context.Context, optFns ...Option) (*Client, error) {
+// New creates a Client. It performs no browser startup or installation work.
+func New(_ context.Context, optFns ...Option) (*Client, error) {
 	opts := defaultOptions()
 	for _, fn := range optFns {
 		fn(&opts)
 	}
 
-	var reg *script.Registry
+	var registry *script.Registry
 	if opts.sitesDir != "" {
 		var err error
-		reg, err = DefaultRegistry(opts.sitesDir, opts.localOverrideDir)
+		registry, err = DefaultRegistry(opts.sitesDir, opts.localOverrideDir)
 		if err != nil {
 			return nil, fmt.Errorf("load scripts: %w", err)
 		}
 	}
-
-	tp, err := transport.New(ctx, transport.Config{
-		WSURL:      opts.wsURL,
-		ProfileDir: opts.profileDir,
-		Headless:   opts.headless,
-		Browser:    opts.browserType,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("new transport: %w", err)
-	}
-
-	fetcher, err := fetch.New(tp)
-	if err != nil {
-		_ = tp.Close()
-		return nil, fmt.Errorf("new fetcher: %w", err)
-	}
-
-	var engines []engine.Engine
-	if opts.forceBrowser {
-		engines = []engine.Engine{
-			engine.NewBrowser(tp, opts.pauseFn),
-		}
-	} else {
-		engines = []engine.Engine{
-			engine.NewQuickJS(tp),
-			engine.NewBrowser(tp, opts.pauseFn),
-		}
-	}
-
+	browser := agentbrowser.New(opts.agentBrowser)
 	return &Client{
-		registry:  reg,
-		engines:   engines,
-		fetcher:   fetcher,
-		transport: tp,
-		opts:      opts,
+		registry: registry,
+		browser:  browser,
+		fetcher:  fetch.New(browser),
+		opts:     opts,
 	}, nil
 }
 
-// DefaultRegistry creates the standard tap registry with cache, built-in,
-// and override sources in the correct priority order.
+// DefaultRegistry creates the standard registry with cache, built-in, and
+// override sources in increasing priority order.
 func DefaultRegistry(cacheDir, overrideDir string) (*script.Registry, error) {
 	return script.NewRegistry(
 		script.Source{Path: cacheDir, Type: script.ScriptSourceCache},
@@ -105,106 +57,55 @@ func DefaultRegistry(cacheDir, overrideDir string) (*script.Registry, error) {
 	)
 }
 
-// Close releases all resources.
-func (c *Client) Close() error {
-	if c.fetcher != nil {
-		c.fetcher.Close()
-	}
-	for _, e := range c.engines {
-		_ = e.Close()
-	}
-	if c.transport != nil {
-		_ = c.transport.Close()
-	}
-	return nil
-}
+// Close is a no-op. Tap never owns or closes agent-browser sessions.
+func (c *Client) Close() error { return nil }
 
-// RunScript executes a site script by name with the given arguments.
-// It tries QuickJS first, then falls back to the browser (unless --browser is set).
+// RunScript opens the script's domain in the active agent-browser session and
+// evaluates the site program there.
 func (c *Client) RunScript(ctx context.Context, name string, args map[string]string) (any, error) {
 	if c.registry == nil {
 		return nil, fmt.Errorf("no sites directory configured")
 	}
-
 	s, ok := c.registry.Get(name)
 	if !ok {
 		return nil, &ScriptNotFoundError{Name: name, Available: c.scriptNames()}
 	}
-
 	if s.Source == script.ScriptSourceOverride {
 		fmt.Fprintf(os.Stderr, "Using local script: %s\n", name)
 	}
 	if args == nil {
 		args = make(map[string]string)
 	}
-
-	// Validate required args
 	for argName, def := range s.Meta.Args {
 		if def.Required {
-			if _, ok := args[argName]; !ok {
+			if _, exists := args[argName]; !exists {
 				return nil, fmt.Errorf("missing required arg: %s (%s)", argName, def.Description)
 			}
 		}
 	}
-
-	if err := s.Meta.ValidateEnv(); err != nil {
-		return nil, err
-	}
-
-	engines := c.enginesByRuntime(s.Meta.Runtime)
-	if len(engines) == 0 {
-		return nil, fmt.Errorf("no engines available for runtime: %q", s.Meta.Runtime)
-	}
-
 	if c.opts.timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, c.opts.timeout)
 		defer cancel()
 	}
 
-	return engine.RunScript(ctx, engines, s, args, engine.RunOpts{Headers: s.Meta.ResolveHeaders()})
+	navigationURL := "about:blank"
+	if s.Meta.Domain != "" {
+		navigationURL = "https://" + s.Meta.Domain
+	}
+	headers := s.Meta.ResolveHeaders()
+	program, err := siteProgram(s, args, headers)
+	if err != nil {
+		return nil, err
+	}
+	return c.browser.OpenAndEval(ctx, navigationURL, program, headers)
 }
 
-func (c *Client) enginesByRuntime(runtime string) []engine.Engine {
-	if c.opts.forceBrowser {
-		return c.browserEngines()
-	}
-	switch runtime {
-	case "http":
-		var out []engine.Engine
-		for _, e := range c.engines {
-			if e.Name() == "QuickJS" {
-				out = append(out, e)
-			}
-		}
-		return out
-	case "browser", "lightpanda":
-		return c.browserEngines()
-	default: // "auto", "", or unknown
-		return c.engines
-	}
-}
-
-func (c *Client) browserEngines() []engine.Engine {
-	var out []engine.Engine
-	for _, e := range c.engines {
-		if e.Name() == "Browser" {
-			out = append(out, e)
-		}
-	}
-	return out
-}
-
-// Fetch retrieves a URL and extracts clean content using go-defuddle.
+// Fetch extracts a URL through agent-browser. An empty URL reads the active tab
+// without navigating or creating a browser session.
 func (c *Client) Fetch(ctx context.Context, url string, opts *fetch.Options) (*fetch.Result, error) {
 	if opts == nil {
 		opts = &fetch.Options{Markdown: true}
-	}
-	if c.opts.forceBrowser {
-		opts.UseBrowser = true
-	}
-	if opts.PauseFunc == nil {
-		opts.PauseFunc = c.opts.pauseFn
 	}
 	if c.opts.timeout > 0 {
 		var cancel context.CancelFunc
@@ -214,16 +115,26 @@ func (c *Client) Fetch(ctx context.Context, url string, opts *fetch.Options) (*f
 	return c.fetcher.Fetch(ctx, url, opts)
 }
 
-// Login opens a browser to the given URL and keeps it open until pauseFn
-// returns. Cookies are persisted in the Chrome profile directory so that
-// subsequent script runs are authenticated.
-func (c *Client) Login(ctx context.Context, url string, pauseFn transport.PauseFunc) error {
-	if c.opts.timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, c.opts.timeout)
-		defer cancel()
+func siteProgram(s *script.Script, args, headers map[string]string) (string, error) {
+	argsJSON, err := json.Marshal(args)
+	if err != nil {
+		return "", fmt.Errorf("marshal script args: %w", err)
 	}
-	return c.transport.BrowseInteractive(ctx, url, pauseFn)
+	headersJSON, err := json.Marshal(headers)
+	if err != nil {
+		return "", fmt.Errorf("marshal script headers: %w", err)
+	}
+	return fmt.Sprintf(`(async () => {
+  const __tapArgs = %s;
+  const __tapHeaders = %s;
+  const __tapNativeFetch = globalThis.fetch.bind(globalThis);
+  const fetch = (input, init = {}) => {
+    const headers = new Headers(init.headers || {});
+    for (const [name, value] of Object.entries(__tapHeaders)) headers.set(name, value);
+    return __tapNativeFetch(input, {...init, headers});
+  };
+  return await (%s)(__tapArgs);
+})()`, argsJSON, headersJSON, s.Body), nil
 }
 
 // ListScripts returns all available scripts sorted by name.
@@ -234,7 +145,7 @@ func (c *Client) ListScripts() []*script.Script {
 	return c.registry.List()
 }
 
-// ListScriptsOverrides returns only scripts loaded from the local override directory.
+// ListScriptsOverrides returns scripts loaded from the local override directory.
 func (c *Client) ListScriptsOverrides() []*script.Script {
 	if c.registry == nil {
 		return nil
@@ -242,7 +153,7 @@ func (c *Client) ListScriptsOverrides() []*script.Script {
 	return c.registry.ListOverrides()
 }
 
-// GetScript returns a script by name.
+// GetScript returns a script by its path-derived name.
 func (c *Client) GetScript(name string) (*script.Script, bool) {
 	if c.registry == nil {
 		return nil, false
@@ -250,7 +161,6 @@ func (c *Client) GetScript(name string) (*script.Script, bool) {
 	return c.registry.Get(name)
 }
 
-// scriptNames returns all registered script names for error suggestions.
 func (c *Client) scriptNames() []string {
 	scripts := c.ListScripts()
 	names := make([]string, len(scripts))
@@ -260,7 +170,7 @@ func (c *Client) scriptNames() []string {
 	return names
 }
 
-// ScriptNotFoundError is returned when a script name doesn't match any registered script.
+// ScriptNotFoundError is returned when a script name is absent.
 type ScriptNotFoundError struct {
 	Name      string
 	Available []string
@@ -270,7 +180,7 @@ func (e *ScriptNotFoundError) Error() string {
 	return fmt.Sprintf("script not found: %s", e.Name)
 }
 
-// Suggestions returns script names similar to the requested name, ranked by relevance.
+// Suggestions returns similar script names ranked by relevance.
 func (e *ScriptNotFoundError) Suggestions(max int) []string {
 	type scored struct {
 		name  string
@@ -278,11 +188,10 @@ func (e *ScriptNotFoundError) Suggestions(max int) []string {
 	}
 	var candidates []scored
 	for _, name := range e.Available {
-		if s := matchScore(e.Name, name); s > 0 {
-			candidates = append(candidates, scored{name, s})
+		if score := matchScore(e.Name, name); score > 0 {
+			candidates = append(candidates, scored{name, score})
 		}
 	}
-	// Sort by score descending
 	for i := 0; i < len(candidates); i++ {
 		for j := i + 1; j < len(candidates); j++ {
 			if candidates[j].score > candidates[i].score {
@@ -297,31 +206,23 @@ func (e *ScriptNotFoundError) Suggestions(max int) []string {
 	return result
 }
 
-// matchScore returns a relevance score (0 = no match, higher = better).
 func matchScore(query, target string) int {
 	score := 0
-
-	// Exact substring match is strong
 	if strings.Contains(target, query) {
 		score += 10
 	}
 	if strings.Contains(query, target) {
 		score += 8
 	}
-
-	// Same site prefix is strong (e.g., "twiter/search" → "twitter/search")
 	qSite, qAction := splitSlash(query)
 	tSite, tAction := splitSlash(target)
-
 	if qSite != "" && tSite != "" {
 		if qSite == tSite {
 			score += 20
 		} else if editDistance(qSite, tSite) <= 2 {
-			score += 15 // close typo in site name
+			score += 15
 		}
 	}
-
-	// Action part match
 	if qAction != "" && tAction != "" {
 		if qAction == tAction {
 			score += 10
@@ -329,51 +230,43 @@ func matchScore(query, target string) int {
 			score += 5
 		}
 	}
-
-	// Low edit distance on full name
-	d := editDistance(query, target)
-	if d <= 3 {
-		score += (4 - d) * 3
+	if distance := editDistance(query, target); distance <= 3 {
+		score += (4 - distance) * 3
 	}
-
 	return score
 }
 
-func splitSlash(s string) (string, string) {
-	if i := strings.IndexByte(s, '/'); i >= 0 {
-		return s[:i], s[i+1:]
+func splitSlash(value string) (string, string) {
+	if i := strings.IndexByte(value, '/'); i >= 0 {
+		return value[:i], value[i+1:]
 	}
-	return s, ""
+	return value, ""
 }
 
-// editDistance computes the Levenshtein distance between two strings.
 func editDistance(a, b string) int {
-	la, lb := len(a), len(b)
-	if la == 0 {
-		return lb
+	if len(a) == 0 {
+		return len(b)
 	}
-	if lb == 0 {
-		return la
+	if len(b) == 0 {
+		return len(a)
 	}
-
-	prev := make([]int, lb+1)
-	curr := make([]int, lb+1)
-	for j := 0; j <= lb; j++ {
-		prev[j] = j
+	previous := make([]int, len(b)+1)
+	current := make([]int, len(b)+1)
+	for j := range previous {
+		previous[j] = j
 	}
-
-	for i := 1; i <= la; i++ {
-		curr[0] = i
-		for j := 1; j <= lb; j++ {
+	for i := 1; i <= len(a); i++ {
+		current[0] = i
+		for j := 1; j <= len(b); j++ {
 			cost := 1
 			if a[i-1] == b[j-1] {
 				cost = 0
 			}
-			curr[j] = min3(curr[j-1]+1, prev[j]+1, prev[j-1]+cost)
+			current[j] = min3(current[j-1]+1, previous[j]+1, previous[j-1]+cost)
 		}
-		prev, curr = curr, prev
+		previous, current = current, previous
 	}
-	return prev[lb]
+	return previous[len(b)]
 }
 
 func min3(a, b, c int) int {

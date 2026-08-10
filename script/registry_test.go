@@ -31,24 +31,6 @@ func TestNewRegistry(t *testing.T) {
 	if s.Meta.Domain != "mcp.exa.ai" {
 		t.Errorf("domain = %q, want %q", s.Meta.Domain, "mcp.exa.ai")
 	}
-	if s.Meta.Runtime != "http" {
-		t.Errorf("runtime = %q, want %q", s.Meta.Runtime, "http")
-	}
-	if len(s.Meta.Env) != 1 {
-		t.Errorf("env count = %d, want 1", len(s.Meta.Env))
-	} else {
-		def, ok := s.Meta.Env["EXA_API_KEY"]
-		if !ok {
-			t.Error("env missing EXA_API_KEY")
-		} else {
-			if def.Required {
-				t.Error("env[EXA_API_KEY].required = true, want false")
-			}
-			if def.Description != "API key for Exa search (increases rate limit)" {
-				t.Errorf("env[EXA_API_KEY].description = %q, want %q", def.Description, "API key for Exa search (increases rate limit)")
-			}
-		}
-	}
 	if len(s.Meta.Headers) != 1 {
 		t.Errorf("headers count = %d, want 1", len(s.Meta.Headers))
 	} else if s.Meta.Headers["X-API-Key"] != "${EXA_API_KEY}" {
@@ -56,6 +38,29 @@ func TestNewRegistry(t *testing.T) {
 	}
 	if s.Source != ScriptSourceCache {
 		t.Errorf("source = %d, want ScriptSourceCache (%d)", s.Source, ScriptSourceCache)
+	}
+}
+
+func TestRegistryNameComesFromPath(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "wrong-meta", "actual.js")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := `/* @meta {"name":"ignored/name","description":"test","domain":"example.com"} */
+async function () { return 1 }`
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	reg, err := NewRegistry(Source{Path: dir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := reg.Get("wrong-meta/actual"); !ok {
+		t.Fatal("path-derived name not registered")
+	}
+	if _, ok := reg.Get("ignored/name"); ok {
+		t.Fatal("metadata name must be ignored")
 	}
 }
 

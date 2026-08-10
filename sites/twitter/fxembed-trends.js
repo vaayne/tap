@@ -1,15 +1,18 @@
 /* @meta
 {
-  "name": "twitter/fxembed-trends",
   "description": "Fetch X / Twitter trending topics via FxEmbed",
   "domain": "api.fxtwitter.com",
   "args": {
-    "type": {"required": false, "description": "Explore timeline kind: trending"},
-    "count": {"required": false, "description": "Number of trends, max 50"}
+    "type": {
+      "required": false,
+      "description": "Explore timeline kind: trending"
+    },
+    "count": {
+      "required": false,
+      "description": "Number of trends, max 50"
+    }
   },
-  "runtime": "http",
-  "readOnly": true,
-  "example": "tap site twitter/fxembed-trends count=20"
+  "readOnly": true
 }
 */
 

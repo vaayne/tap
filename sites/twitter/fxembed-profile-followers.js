@@ -1,16 +1,22 @@
 /* @meta
 {
-  "name": "twitter/fxembed-profile-followers",
   "description": "List X / Twitter user followers via FxEmbed",
   "domain": "api.fxtwitter.com",
   "args": {
-    "handle": {"required": true, "description": "Username without @, or numeric user id as id:123"},
-    "count": {"required": false, "description": "Page size, 1-100"},
-    "cursor": {"required": false, "description": "Pagination cursor"}
+    "handle": {
+      "required": true,
+      "description": "Username without @, or numeric user id as id:123"
+    },
+    "count": {
+      "required": false,
+      "description": "Page size, 1-100"
+    },
+    "cursor": {
+      "required": false,
+      "description": "Pagination cursor"
+    }
   },
-  "runtime": "http",
-  "readOnly": true,
-  "example": "tap site twitter/fxembed-profile-followers handle=LiuVaayne count=5"
+  "readOnly": true
 }
 */
 

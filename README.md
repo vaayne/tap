@@ -1,205 +1,149 @@
 # 🚰 Tap
 
-Tap into any website from your terminal.
+Reusable site programs and web extraction powered by
+[agent-browser](https://github.com/vercel-labs/agent-browser).
+
+Tap owns website knowledge: script discovery, metadata, arguments, environment
+expansion, headers, and readable extraction. agent-browser owns Chrome,
+sessions, profiles, tabs, CDP, interaction, and network tooling.
 
 ## Install
 
+Install the matching native agent-browser binary from
+[GitHub Releases](https://github.com/vercel-labs/agent-browser/releases/latest),
+then install Chrome:
+
 ```bash
-curl -fsSL https://raw.githubusercontent.com/vaayne/tap/main/scripts/install.sh | sh
+install -m 0755 agent-browser-<platform>-<arch> ~/.local/bin/agent-browser
+agent-browser install
 ```
 
-Or with Go:
+Release assets include `darwin-arm64`, `darwin-x64`, `linux-arm64`,
+`linux-x64`, musl Linux variants, and `win32-x64.exe`. Homebrew and npm remain
+fallbacks:
 
 ```bash
+brew install agent-browser       # macOS
+# or: npm install -g agent-browser
+```
+
+Then install Tap:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/vaayne/tap/main/scripts/install.sh | sh
+# or
 go install github.com/vaayne/tap/cmd/tap@latest
 ```
 
-Upgrade later with:
-
-```bash
-tap upgrade
-```
-
-Browser features use Chrome by default. Check dependencies with `tap doctor`.
+Verify both with `tap doctor`.
 
 ## Quick start
 
-### Structured data from site scripts
+### Discover, inspect, execute
 
 ```bash
 tap site list
-tap site hackernews/top
-tap site run github/repo repo=vaayne/tap
-tap site search weather
+tap site search github
+tap site info exa/search
+tap site exa/search query="agent-browser" count=5
 ```
 
-Scripts auto-sync from [tap.vaayne.com](https://tap.vaayne.com) into the local cache. Local overrides at `~/.config/tap/sites/{site}/{script}.js` take precedence.
+Scripts auto-sync from [tap.vaayne.com](https://tap.vaayne.com) into
+`~/.cache/tap/sites/`. Local overrides at
+`~/.config/tap/sites/{site}/{script}.js` take precedence.
 
-### Readable content from any URL
+### Extract readable content
 
 ```bash
 tap fetch https://example.com/article
 tap fetch --json https://example.com/article
-tap fetch -b https://example.com/app --wait-selector '.content'
 ```
 
-### Use a visible browser for auth when needed
+With no URL, Tap extracts the current agent-browser tab without navigating:
 
 ```bash
-tap attach chrome
-tap browser open https://github.com/login --show
-tap site -b github/notifications
-tap fetch -b https://github.com/notifications
+agent-browser open https://example.com/article
+tap fetch
 ```
 
-### Reuse your existing Chrome
+### Continue with arbitrary interaction
 
-Chrome must already expose DevTools.
+Tap does not wrap browser automation commands. Use agent-browser directly:
 
 ```bash
-tap attach chrome
-tap attach status
-tap browser open https://example.com
-tap browser snapshot --interactive
-tap browser click '#submit'
-tap browser click @e1
-tap browser text
+agent-browser snapshot -i
+agent-browser click @e3
+agent-browser network requests --filter api
 ```
 
-You can also attach explicitly:
+## Sessions
+
+Tap never creates, names, persists, or closes browser sessions. It inherits
+agent-browser's environment unchanged:
 
 ```bash
-tap attach chrome --browser-url http://127.0.0.1:9222
-tap attach chrome --port-file ~/Library/Application\ Support/Google/Chrome/DevToolsActivePort
+export AGENT_BROWSER_SESSION=my-task
+
+agent-browser open https://github.com
+tap site github/notifications
+tap fetch
+agent-browser snapshot -i
 ```
 
-### Browser workflow
+Without `AGENT_BROWSER_SESSION`, agent-browser's default session is used.
 
-```bash
-tap browser open https://news.ycombinator.com
-tap browser open https://github.com --new-tab
-tap browser tabs
-tap browser switch tab-2
-tap browser screenshot --output github.png
-tap browser status
+## Site format
+
+The script name comes from its path. For example,
+`sites/exa/search.js` is `exa/search`:
+
+```javascript
+/* @meta
+{
+  "description": "Search the web with Exa",
+  "domain": "mcp.exa.ai",
+  "args": {
+    "query": {"required": true},
+    "count": {}
+  },
+  "headers": {
+    "X-API-Key": "${EXA_API_KEY}"
+  }
+}
+*/
+
+async function(args) {
+  // fetch(...) runs in agent-browser; metadata headers are merged into requests.
+}
 ```
 
-### Attached Chrome workflow
-
-```bash
-tap attach chrome
-tap attach status --json
-tap browser evaluate 'document.title'
-tap browser screenshot
-```
-
-If the attached state becomes stale, rerun `tap attach chrome`.
+Environment variables are inferred from `${VAR}` references. A header is
+omitted when one of its referenced variables is unset. Resolved headers are
+applied before navigation and cleared after script execution.
 
 ## Command map
 
 ```text
 tap
-├── site        structured extraction from known sites
-├── fetch       clean readable content from arbitrary URLs
-├── browser     open pages and automate the current browser context
-├── attach      connect tap to an existing Chrome browser
-├── status      show the active browser context and current tab
-├── doctor      dependency and environment checks
-├── upgrade     update tap
-└── completion  generate shell completion scripts
+├── site       discover, inspect, sync, and execute site programs
+├── fetch      extract a URL or the current agent-browser tab
+└── doctor     check the agent-browser runtime dependency
 ```
 
-## Shell completion
-
-Tap can generate shell completion scripts for bash, zsh, fish, and pwsh.
-
-```bash
-# Bash
-source <(tap completion bash)
-
-# Zsh
-source <(tap completion zsh)
-
-# Fish
-mkdir -p ~/.config/fish/completions
-tap completion fish > ~/.config/fish/completions/tap.fish
-
-# PowerShell / pwsh
-tap completion pwsh > ~/.config/powershell/tap.ps1
-```
-
-Persistent install paths commonly used by package managers and dotfiles:
-
-```bash
-# Bash
-mkdir -p ~/.local/share/bash-completion/completions
-tap completion bash > ~/.local/share/bash-completion/completions/tap
-
-# Zsh
-mkdir -p ~/.zfunc
-tap completion zsh > ~/.zfunc/_tap
-```
-
-## Common browser-backed flags
-
-These show up on the relevant commands instead of only in global help:
-
-| Flag | Description |
-| --- | --- |
-| `--browser`, `-b` | Force browser execution and reuse the resolved browser context |
-| `--show` | Run the browser visibly |
-| `--wait` | Wait a fixed duration after navigation |
-| `--wait-selector` | Wait for a CSS selector |
-| `--wait-js` | Wait for a JS expression |
-| `--timeout` | Set execution timeout |
-| `--browser-url` | One-shot DevTools override |
-| `--profile-dir` | One-shot profile override |
-| `--lightpanda`, `--lp` | Use Lightpanda instead of Chrome |
-
-Compatibility aliases still work:
-- `--ws-url` -> `--browser-url`
-- `--delay` -> `--wait`
-- `--no-headless` -> `--show`
-
-## Advanced browser commands
-
-The browser command still includes lower-level tools when needed:
-
-```bash
-tap browser evaluate ...
-tap browser snapshot
-tap browser forms
-tap browser cookies ...
-tap browser network ...
-```
-
-## Lightpanda
-
-| Backend | Platforms | Best for |
-| --- | --- | --- |
-| Chrome | macOS, Linux, Windows | Full browser automation, auth, network interception |
-| Lightpanda | macOS, Linux | Fast headless rendering without auth-heavy flows |
-
-Install or update Lightpanda with:
-
-```bash
-tap doctor --install
-```
-
-## Docs
-
-- [docs/cli.md](docs/cli.md) — full auto-generated command reference (`mise run docs` to regenerate)
-- [docs/browser.md](docs/browser.md) — browser UX and reference
-- [docs/network.md](docs/network.md) — network interception reference
-- [web/README.md](web/README.md) — web app docs
+`upgrade`, `skill`, `docs`, and `completion` remain maintenance commands.
 
 ## Agent skill
 
-Tap ships with a built-in agent skill that gives coding agents web access, site scripts, and browser automation.
+Tap ships the `tap-web` skill:
 
 ```bash
 npx skills add vaayne/tap
+# or
+tap skill install
 ```
+
+Its escalation order is `tap site` → `tap fetch` → `agent-browser read` →
+agent-browser snapshot/interaction.
 
 ## Go library
 
@@ -208,13 +152,24 @@ go get github.com/vaayne/tap
 ```
 
 ```go
-client, _ := tap.New()
-defer client.Close()
+client, err := tap.New(ctx, tap.WithSitesDir("./sites"))
+if err != nil {
+    log.Fatal(err)
+}
 
-result, _ := client.RunScript(ctx, "hackernews/top", nil)
-content, _ := client.Fetch(ctx, "https://example.com", &fetch.Options{Markdown: true})
-fmt.Println(content.Markdown)
+result, err := client.RunScript(ctx, "exa/search", map[string]string{
+    "query": "agent-browser",
+})
+content, err := client.Fetch(ctx, "", &fetch.Options{Markdown: true})
 ```
+
+The library uses the same inherited agent-browser session and does not close it.
+
+## Docs
+
+- [docs/cli.md](docs/cli.md) — generated CLI reference
+- [skills/tap-web/references/script-development.md](skills/tap-web/references/script-development.md) — site script development
+- [web/README.md](web/README.md) — registry web app
 
 ## License
 

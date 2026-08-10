@@ -1,14 +1,14 @@
 /* @meta
 {
-  "name": "twitter/fxembed-profile-about",
   "description": "Fetch X / Twitter About Account stats via FxEmbed",
   "domain": "api.fxtwitter.com",
   "args": {
-    "handle": {"required": true, "description": "Username without @, or numeric user id as id:123"}
+    "handle": {
+      "required": true,
+      "description": "Username without @, or numeric user id as id:123"
+    }
   },
-  "runtime": "http",
-  "readOnly": true,
-  "example": "tap site twitter/fxembed-profile-about handle=LiuVaayne"
+  "readOnly": true
 }
 */
 

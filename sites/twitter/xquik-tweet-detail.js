@@ -1,21 +1,18 @@
 /* @meta
 {
-  "name": "twitter/xquik-tweet-detail",
   "description": "Fetch tweet detail by ID via Xquik",
   "domain": "xquik.com",
   "args": {
-    "id": {"required": true, "description": "Tweet ID"}
-  },
-  "runtime": "http",
-  "env": {
-    "XQUIK_API_KEY": {"required": true, "description": "API key for Xquik"}
+    "id": {
+      "required": true,
+      "description": "Tweet ID"
+    }
   },
   "headers": {
     "x-api-key": "${XQUIK_API_KEY}",
     "xquik-api-contract": "2026-04-29"
   },
-  "readOnly": true,
-  "example": "tap site twitter/xquik-tweet-detail '2019264360682778716'"
+  "readOnly": true
 }
 */
 

@@ -72,6 +72,34 @@ chmod +x "${INSTALL_DIR}/tap"
 
 echo "Installed tap ${VERSION} to ${INSTALL_DIR}/tap"
 
+# agent-browser is Tap's runtime dependency. Keep ownership with its own
+# installer rather than downloading or versioning it inside Tap.
+if ! command -v agent-browser >/dev/null 2>&1; then
+  echo ""
+  echo "Tap requires agent-browser:"
+  case "${OS}/${ARCH}" in
+    darwin/arm64) AB_ASSET="agent-browser-darwin-arm64" ;;
+    darwin/amd64) AB_ASSET="agent-browser-darwin-x64" ;;
+    linux/arm64) AB_ASSET="agent-browser-linux-arm64" ;;
+    linux/amd64) AB_ASSET="agent-browser-linux-x64" ;;
+    windows/amd64) AB_ASSET="agent-browser-win32-x64.exe" ;;
+    *) AB_ASSET="" ;;
+  esac
+  if [ -n "$AB_ASSET" ]; then
+    AB_TARGET="${INSTALL_DIR}/agent-browser"
+    if [ "$OS" = "windows" ]; then
+      AB_TARGET="${AB_TARGET}.exe"
+    fi
+    echo "  curl -fsSL https://github.com/vercel-labs/agent-browser/releases/latest/download/${AB_ASSET} -o ${AB_TARGET}"
+    echo "  chmod +x ${AB_TARGET}"
+    echo "  ${AB_TARGET} install"
+  else
+    echo "  https://github.com/vercel-labs/agent-browser/releases/latest"
+  fi
+  echo ""
+  echo "Fallback: npm install -g agent-browser && agent-browser install"
+fi
+
 # Check if install dir is in PATH
 case ":${PATH}:" in
   *":${INSTALL_DIR}:"*) ;;

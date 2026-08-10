@@ -2,46 +2,69 @@ package fetch
 
 import (
 	"context"
+	"strings"
 	"testing"
-
-	"github.com/vaayne/tap/transport"
 )
 
-func TestFetch_ParseHTML(t *testing.T) {
-	tp, err := transport.New(context.Background(), transport.Config{})
-	if err != nil {
-		t.Fatalf("New transport: %v", err)
-	}
-	f, err := New(tp)
-	if err != nil {
-		t.Fatalf("New failed: %v", err)
-	}
-	defer f.Close()
+type fakeBrowser struct {
+	active  bool
+	url     string
+	opened  string
+	script  string
+	result  any
+	openErr error
+}
 
-	// Test with a real URL
-	result, err := f.Fetch(context.Background(), "https://example.com", &Options{Markdown: true})
-	if err != nil {
-		t.Fatalf("Fetch failed: %v", err)
-	}
+func (f *fakeBrowser) Open(_ context.Context, url string) error {
+	f.opened = url
+	return f.openErr
+}
+func (f *fakeBrowser) Eval(_ context.Context, script string) (any, error) {
+	f.script = script
+	return f.result, nil
+}
+func (f *fakeBrowser) CurrentURL(context.Context) (string, error) { return f.url, nil }
+func (f *fakeBrowser) HasActiveSession(context.Context) (bool, error) {
+	return f.active, nil
+}
 
-	if result.Title == "" && result.Content == "" && result.Markdown == "" {
-		t.Error("expected some content from example.com")
+func TestFetchURLNavigatesAndExtracts(t *testing.T) {
+	browser := &fakeBrowser{result: map[string]any{
+		"title":           "Example",
+		"content":         "<article>Hello</article>",
+		"contentMarkdown": "Hello",
+		"wordCount":       1,
+	}}
+	result, err := New(browser).Fetch(context.Background(), "https://example.com", &Options{Markdown: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if browser.opened != "https://example.com" {
+		t.Fatalf("opened %q", browser.opened)
+	}
+	if result.Markdown != "Hello" || result.Content == "" {
+		t.Fatalf("unexpected result: %#v", result)
+	}
+	if !strings.Contains(browser.script, "globalThis.Defuddle") {
+		t.Fatal("Defuddle browser bundle was not evaluated")
 	}
 }
 
-func TestFetch_InvalidURL(t *testing.T) {
-	tp, err := transport.New(context.Background(), transport.Config{})
-	if err != nil {
-		t.Fatalf("New transport: %v", err)
+func TestFetchCurrentTabDoesNotLaunchSession(t *testing.T) {
+	browser := &fakeBrowser{}
+	_, err := New(browser).Fetch(context.Background(), "", nil)
+	if err == nil || !strings.Contains(err.Error(), "no active") {
+		t.Fatalf("expected no-active-session error, got %v", err)
 	}
-	f, err := New(tp)
-	if err != nil {
-		t.Fatalf("New failed: %v", err)
+	if browser.opened != "" {
+		t.Fatalf("unexpected navigation: %s", browser.opened)
 	}
-	defer f.Close()
+}
 
-	_, err = f.Fetch(context.Background(), "://bad-url", nil)
-	if err == nil {
-		t.Error("expected error for invalid URL")
+func TestFetchCurrentTabRejectsBlankPage(t *testing.T) {
+	browser := &fakeBrowser{active: true, url: "about:blank"}
+	_, err := New(browser).Fetch(context.Background(), "", nil)
+	if err == nil || !strings.Contains(err.Error(), "no readable page") {
+		t.Fatalf("expected blank-page error, got %v", err)
 	}
 }

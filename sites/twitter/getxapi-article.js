@@ -1,19 +1,16 @@
 /* @meta
 {
-  "name": "twitter/getxapi-article",
   "description": "Fetch X / Twitter article by tweet ID via getxapi.com",
   "domain": "api.getxapi.com",
   "args": {
-    "id": {"required": true, "description": "Tweet / article ID"}
-  },
-  "runtime": "http",
-  "env": {
-    "GET_X_API_KEY": {"required": true, "description": "API key for getxapi.com"}
+    "id": {
+      "required": true,
+      "description": "Tweet / article ID"
+    }
   },
   "headers": {
     "Authorization": "Bearer ${GET_X_API_KEY}"
-  },
-  "example": "tap site twitter/getxapi-article '1905545699552375179'"
+  }
 }
 */
 

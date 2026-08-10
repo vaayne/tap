@@ -1,18 +1,30 @@
 /* @meta
 {
-  "name": "twitter/fxembed-conversation",
   "description": "Fetch an unrolled X / Twitter thread and replies by ID via FxEmbed",
   "domain": "api.fxtwitter.com",
   "args": {
-    "id": {"required": true, "description": "Tweet / post ID"},
-    "ranking_mode": {"required": false, "description": "Reply ranking mode: likes or recency"},
-    "cursor": {"required": false, "description": "Pagination cursor"},
-    "about_account": {"required": false, "description": "Truthy value to include account metadata when available"},
-    "lang": {"required": false, "description": "Target language for inline translations, e.g. en, es, zh-cn"}
+    "id": {
+      "required": true,
+      "description": "Tweet / post ID"
+    },
+    "ranking_mode": {
+      "required": false,
+      "description": "Reply ranking mode: likes or recency"
+    },
+    "cursor": {
+      "required": false,
+      "description": "Pagination cursor"
+    },
+    "about_account": {
+      "required": false,
+      "description": "Truthy value to include account metadata when available"
+    },
+    "lang": {
+      "required": false,
+      "description": "Target language for inline translations, e.g. en, es, zh-cn"
+    }
   },
-  "runtime": "http",
-  "readOnly": true,
-  "example": "tap site twitter/fxembed-conversation id=20 ranking_mode=likes"
+  "readOnly": true
 }
 */
 

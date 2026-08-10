@@ -1,16 +1,22 @@
 /* @meta
 {
-  "name": "twitter/fxembed-thread",
   "description": "Fetch an unrolled X / Twitter thread by ID via FxEmbed",
   "domain": "api.fxtwitter.com",
   "args": {
-    "id": {"required": true, "description": "Tweet / post ID"},
-    "about_account": {"required": false, "description": "Truthy value to include account metadata when available"},
-    "lang": {"required": false, "description": "Target language for inline translations, e.g. en, es, zh-cn"}
+    "id": {
+      "required": true,
+      "description": "Tweet / post ID"
+    },
+    "about_account": {
+      "required": false,
+      "description": "Truthy value to include account metadata when available"
+    },
+    "lang": {
+      "required": false,
+      "description": "Target language for inline translations, e.g. en, es, zh-cn"
+    }
   },
-  "runtime": "http",
-  "readOnly": true,
-  "example": "tap site twitter/fxembed-thread id=20"
+  "readOnly": true
 }
 */
 

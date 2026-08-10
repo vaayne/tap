@@ -19,8 +19,8 @@ func siteCmd() *cli.Command {
 		ShellComplete: completeSiteRoot,
 		Description: `Run site-specific JavaScript scripts that extract structured data from websites.
 
-Scripts are organized as site/action (e.g. hackernews/top, google/search) and
-execute in QuickJS with automatic browser fallback when cookies or DOM are needed.
+Scripts are organized as site/action and execute in the active agent-browser
+session selected by AGENT_BROWSER_SESSION.
 
 Scripts auto-sync from the remote catalog every 24 hours into ~/.cache/tap/sites/.
 Local overrides in ~/.config/tap/sites/ take precedence over cached scripts.
@@ -28,19 +28,18 @@ Local overrides in ~/.config/tap/sites/ take precedence over cached scripts.
 Examples:
   tap site list                              List all available scripts
   tap site hackernews/search query=golang    Run a script with arguments
-  tap site -b twitter/search query=go        Run with browser cookies (auth)
   tap site info hackernews/search            Show script details and args
   tap site search "weather"                  Search the online catalog
   tap site sync                              Force-refresh the script cache
   tap site hackernews/top -f json            Output as JSON`,
-		Flags: append([]cli.Flag{
+		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:    "format",
 				Aliases: []string{"f"},
 				Usage:   "Output format: json, pretty (default), raw",
 				Value:   formatPretty,
 			},
-		}, browserClientFlags(true)...),
+		},
 		Commands: []*cli.Command{
 			siteRunCmd(),
 			siteListCmd(),
@@ -61,14 +60,14 @@ func siteRunCmd() *cli.Command {
 		Usage:         "Run a site script",
 		ArgsUsage:     "<script-name> [key=value ...]",
 		ShellComplete: completeSiteScripts,
-		Flags: append([]cli.Flag{
+		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:    "format",
 				Aliases: []string{"f"},
 				Usage:   "Output format: json, pretty (default), raw",
 				Value:   formatPretty,
 			},
-		}, browserClientFlags(true)...),
+		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			configureLogging(cmd)
 			return runSiteScript(ctx, cmd, cmd.Args().Slice())
@@ -91,11 +90,7 @@ func runSiteScript(ctx context.Context, cmd *cli.Command, rawArgs []string) erro
 	defer func() { _ = client.Close() }()
 
 	if cmd.Bool("verbose") {
-		mode := "auto (QuickJS → Browser)"
-		if cmd.Bool("browser") {
-			mode = "browser"
-		}
-		log.Printf("Running: %s [engine=%s]", scriptName, mode)
+		log.Printf("Running: %s [runtime=agent-browser]", scriptName)
 	}
 
 	result, err := client.RunScript(ctx, scriptName, scriptArgs)
@@ -146,14 +141,9 @@ func siteListCmd() *cli.Command {
 					if _, after, ok := strings.Cut(actionName, "/"); ok {
 						actionName = after
 					}
-					runtimeBadge := ""
-					if s.Meta.Runtime != "" && s.Meta.Runtime != "auto" {
-						runtimeBadge = dim(color, " ["+s.Meta.Runtime+"]")
-					}
-					fmt.Printf("  %-24s %s%s%s\n",
+					fmt.Printf("  %-24s %s%s\n",
 						green(color, actionName),
 						s.Meta.Description,
-						runtimeBadge,
 						argHints,
 					)
 				}
@@ -196,32 +186,10 @@ func siteInfoCmd() *cli.Command {
 
 			fmt.Printf("  %s  %s\n", bold(color, "Domain:"), s.Meta.Domain)
 
-			if s.Meta.Runtime != "" && s.Meta.Runtime != "auto" {
-				fmt.Printf("  %s  %s\n", bold(color, "Runtime:"), s.Meta.Runtime)
-			}
-
-			if s.Meta.Example != "" {
-				fmt.Printf("  %s %s\n", bold(color, "Example:"), s.Meta.Example)
-			}
-
-			if len(s.Meta.Env) > 0 {
+			if envNames := s.Meta.EnvNames(); len(envNames) > 0 {
 				fmt.Printf("\n  %s\n", bold(color, "Env:"))
-				envNames := make([]string, 0, len(s.Meta.Env))
-				for name := range s.Meta.Env {
-					envNames = append(envNames, name)
-				}
-				sort.Strings(envNames)
 				for _, envName := range envNames {
-					def := s.Meta.Env[envName]
-					req := dim(color, "optional")
-					if def.Required {
-						req = yellow(color, "required")
-					}
-					fmt.Printf("    %-16s %s  %s\n",
-						green(color, envName),
-						dim(color, "("+req+")"),
-						def.Description,
-					)
+					fmt.Printf("    %s\n", green(color, envName))
 				}
 			}
 

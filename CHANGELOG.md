@@ -1,5 +1,25 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **Tap 1.0 runtime boundary** — agent-browser is now the sole browser runtime;
+  Tap inherits `AGENT_BROWSER_SESSION` and no longer owns Chrome, CDP, profiles,
+  tabs, or session state.
+- Site names now derive from `{site}/{action}.js`; metadata no longer declares
+  `name`, `runtime`, or `env`.
+- `tap fetch` now runs embedded Defuddle in agent-browser and accepts no URL to
+  extract the active tab.
+- Installation guidance now prefers agent-browser's native GitHub Release
+  binary; Homebrew and npm remain fallback installation methods.
+
+### Removed
+
+- QuickJS, chromedp, Lightpanda, the internal transport/browser runtimes, and
+  their dependencies.
+- `tap browser`, `tap attach`, and `tap status`; use agent-browser directly.
+
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/),

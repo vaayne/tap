@@ -1,17 +1,26 @@
 /* @meta
 {
-  "name": "twitter/fxembed-status-quotes",
   "description": "List quote posts for an X / Twitter post via FxEmbed",
   "domain": "api.fxtwitter.com",
   "args": {
-    "id": {"required": true, "description": "Tweet / post ID"},
-    "count": {"required": false, "description": "Page size, 1-100"},
-    "cursor": {"required": false, "description": "Pagination cursor"},
-    "lang": {"required": false, "description": "Target language for inline translations, e.g. en, es, zh-cn"}
+    "id": {
+      "required": true,
+      "description": "Tweet / post ID"
+    },
+    "count": {
+      "required": false,
+      "description": "Page size, 1-100"
+    },
+    "cursor": {
+      "required": false,
+      "description": "Pagination cursor"
+    },
+    "lang": {
+      "required": false,
+      "description": "Target language for inline translations, e.g. en, es, zh-cn"
+    }
   },
-  "runtime": "http",
-  "readOnly": true,
-  "example": "tap site twitter/fxembed-status-quotes id=20 count=20"
+  "readOnly": true
 }
 */
 

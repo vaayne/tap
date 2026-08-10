@@ -2,148 +2,115 @@ package tap
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"os"
 	"path/filepath"
-	"slices"
+	"runtime"
+	"strings"
 	"testing"
-
-	"github.com/vaayne/tap/engine"
 )
 
-func testSitesDir(t *testing.T) string {
-	t.Helper()
-	dir := os.Getenv("TAP_SITES_DIR")
-	if dir == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			t.Skip("cannot determine home dir")
-		}
-		dir = filepath.Join(home, ".cache", "tap", "sites")
-	}
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		t.Skipf("sites dir %s does not exist, run 'tap site sync' first", dir)
-	}
-	return dir
-}
-
-func TestNew(t *testing.T) {
-	dir := testSitesDir(t)
-	client, err := New(context.Background(), WithSitesDir(dir))
-	if err != nil {
-		t.Fatalf("New failed: %v", err)
-	}
-	defer func() { _ = client.Close() }()
-
-	scripts := client.ListScripts()
-	if len(scripts) == 0 {
-		t.Fatal("expected scripts, got none")
-	}
-
-	s, ok := client.GetScript("v2ex/hot")
-	if !ok {
-		t.Fatal("v2ex/hot not found")
-	}
-	if s.Meta.Domain != "www.v2ex.com" {
-		t.Errorf("domain = %q, want %q", s.Meta.Domain, "www.v2ex.com")
-	}
-}
-
-func TestNew_NoSitesDir(t *testing.T) {
+func TestNewWithoutSites(t *testing.T) {
 	client, err := New(context.Background())
 	if err != nil {
-		t.Fatalf("New failed: %v", err)
+		t.Fatal(err)
 	}
-	defer func() { _ = client.Close() }()
-
 	if client.ListScripts() != nil {
-		t.Error("expected nil scripts without sites dir")
+		t.Fatal("expected no registry")
 	}
 }
 
-func TestRunScript_NotFound(t *testing.T) {
-	dir := testSitesDir(t)
-	client, err := New(context.Background(), WithSitesDir(dir))
-	if err != nil {
-		t.Fatalf("New failed: %v", err)
-	}
-	defer func() { _ = client.Close() }()
-
-	_, err = client.RunScript(context.Background(), "nonexistent/script", nil)
-	if err == nil {
-		t.Error("expected error for nonexistent script")
+func TestRunScriptValidatesRequiredArgsBeforeBrowser(t *testing.T) {
+	client := testClient(t, `/* @meta
+{"description":"search","domain":"example.com","args":{"query":{"required":true,"description":"query"}}}
+*/
+async function(args) { return args; }`)
+	_, err := client.RunScript(context.Background(), "test/run", nil)
+	if err == nil || !strings.Contains(err.Error(), "missing required arg") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
-func TestRunScript_MissingRequiredArg(t *testing.T) {
-	dir := testSitesDir(t)
-	client, err := New(context.Background(), WithSitesDir(dir))
-	if err != nil {
-		t.Fatalf("New failed: %v", err)
+func TestRunScriptUsesAgentBrowserAndExpandsHeaders(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell fixture is Unix-only")
 	}
-	defer func() { _ = client.Close() }()
-
-	// twitter/search requires "query"
-	_, err = client.RunScript(context.Background(), "twitter/search", nil)
-	if err == nil {
-		t.Error("expected error for missing required arg")
+	t.Setenv("API_KEY", "test-key")
+	client := testClient(t, `/* @meta
+{"description":"search","domain":"example.com","args":{"query":{"required":true}},"headers":{"X-Key":"${API_KEY}"}}
+*/
+async function(args) { return {query: args.query}; }`)
+	result, err := client.RunScript(context.Background(), "test/run", map[string]string{"query": "hello"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.(map[string]any)["ok"] != true {
+		t.Fatalf("unexpected result: %#v", result)
+	}
+	args, err := os.ReadFile(os.Getenv("ARGS_FILE"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(args), "set") {
+		t.Fatalf("site headers were not cleared: %s", args)
+	}
+	stdin, err := os.ReadFile(os.Getenv("STDIN_FILE"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var commands [][]string
+	if err := json.Unmarshal(stdin, &commands); err != nil {
+		t.Fatal(err)
+	}
+	if len(commands) != 2 || commands[0][2] != "--headers" {
+		t.Fatalf("unexpected orchestration: %#v", commands)
+	}
+	decoded, err := base64.StdEncoding.DecodeString(commands[1][2])
+	if err != nil {
+		t.Fatal(err)
+	}
+	program := string(decoded)
+	for _, want := range []string{`"query":"hello"`, `"X-Key":"test-key"`, "globalThis.fetch.bind"} {
+		if !strings.Contains(program, want) {
+			t.Fatalf("program missing %q", want)
+		}
 	}
 }
 
-func TestEnginesByRuntime(t *testing.T) {
-	quickjs := engine.NewQuickJS(nil)
-	browser := engine.NewBrowser(nil, nil)
-
-	tests := []struct {
-		name         string
-		engines      []engine.Engine
-		forceBrowser bool
-		runtime      string
-		want         []string
-	}{
-		{"normal auto", []engine.Engine{quickjs, browser}, false, "auto", []string{"QuickJS", "Browser"}},
-		{"normal empty", []engine.Engine{quickjs, browser}, false, "", []string{"QuickJS", "Browser"}},
-		{"normal http", []engine.Engine{quickjs, browser}, false, "http", []string{"QuickJS"}},
-		{"normal browser", []engine.Engine{quickjs, browser}, false, "browser", []string{"Browser"}},
-		{"normal lightpanda", []engine.Engine{quickjs, browser}, false, "lightpanda", []string{"Browser"}},
-		{"normal unknown", []engine.Engine{quickjs, browser}, false, "unknown", []string{"QuickJS", "Browser"}},
-		{"forceBrowser http", []engine.Engine{quickjs, browser}, true, "http", []string{"Browser"}},
-		{"forceBrowser browser", []engine.Engine{quickjs, browser}, true, "browser", []string{"Browser"}},
-		{"forceBrowser auto", []engine.Engine{quickjs, browser}, true, "auto", []string{"Browser"}},
-		{"empty http", []engine.Engine{}, false, "http", []string{}},
-		{"empty browser", []engine.Engine{}, false, "browser", []string{}},
+func testClient(t *testing.T, content string) *Client {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("shell fixture is Unix-only")
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			c := &Client{
-				engines: tt.engines,
-				opts:    options{forceBrowser: tt.forceBrowser},
-			}
-			got := c.enginesByRuntime(tt.runtime)
-			gotNames := make([]string, len(got))
-			for i, e := range got {
-				gotNames[i] = e.Name()
-			}
-			if !slices.Equal(gotNames, tt.want) {
-				t.Errorf("enginesByRuntime(%q) = %v, want %v", tt.runtime, gotNames, tt.want)
-			}
-		})
+	dir := t.TempDir()
+	scriptPath := filepath.Join(dir, "test", "run.js")
+	if err := os.MkdirAll(filepath.Dir(scriptPath), 0o755); err != nil {
+		t.Fatal(err)
 	}
-}
-
-func TestFetch(t *testing.T) {
-	client, err := New(context.Background())
+	if err := os.WriteFile(scriptPath, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	argsFile := filepath.Join(dir, "args")
+	stdinFile := filepath.Join(dir, "stdin")
+	bin := filepath.Join(dir, "agent-browser")
+	fixture := `#!/bin/sh
+printf '%s\n' "$@" > "$ARGS_FILE"
+if [ "$1" = "batch" ]; then
+  cat > "$STDIN_FILE"
+  printf '%s' '[{"success":true,"result":{}},{"success":true,"result":{"result":{"ok":true}}}]'
+else
+  printf '%s' '{"success":true,"data":{},"error":null}'
+fi
+`
+	if err := os.WriteFile(bin, []byte(fixture), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("ARGS_FILE", argsFile)
+	t.Setenv("STDIN_FILE", stdinFile)
+	client, err := New(context.Background(), WithSitesDir(dir), WithAgentBrowserBinary(bin))
 	if err != nil {
-		t.Fatalf("New failed: %v", err)
+		t.Fatal(err)
 	}
-	defer func() { _ = client.Close() }()
-
-	result, err := client.Fetch(context.Background(), "https://example.com", nil)
-	if err != nil {
-		t.Fatalf("Fetch failed: %v", err)
-	}
-
-	if result.Title == "" && result.Content == "" && result.Markdown == "" {
-		t.Error("expected some content")
-	}
+	return client
 }

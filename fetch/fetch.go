@@ -1,140 +1,123 @@
-// Package fetch provides URL content extraction using go-defuddle.
-// It fetches a web page via HTTP (with optional browser fallback) and
-// extracts clean content (HTML or Markdown).
+// Package fetch extracts clean content from the active agent-browser page.
 package fetch
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"log"
+	"strings"
 
-	defuddle "github.com/vaayne/go-defuddle"
-	"github.com/vaayne/tap/transport"
+	"github.com/vaayne/tap/agentbrowser"
+	"github.com/vaayne/tap/assets"
 )
 
-// Result holds the extracted content from a web page.
+// Browser is the agent-browser surface needed for extraction.
+type Browser interface {
+	Open(context.Context, string) error
+	Eval(context.Context, string) (any, error)
+	CurrentURL(context.Context) (string, error)
+	HasActiveSession(context.Context) (bool, error)
+}
+
+// Result holds content extracted by Defuddle in the browser page.
 type Result struct {
-	// Title is the page title.
-	Title string `json:"title"`
-	// Description is the meta description.
+	Title       string `json:"title"`
 	Description string `json:"description"`
-	// Domain is the hostname.
-	Domain string `json:"domain"`
-	// Author is the author name.
-	Author string `json:"author"`
-	// Published is the publish date.
-	Published string `json:"published"`
-	// Content is the extracted main content as clean HTML.
-	Content string `json:"content"`
-	// Markdown is the content converted to Markdown.
-	Markdown string `json:"markdown,omitempty"`
-	// WordCount is the word count of extracted content.
-	WordCount int `json:"wordCount"`
+	Domain      string `json:"domain"`
+	Author      string `json:"author"`
+	Published   string `json:"published"`
+	Content     string `json:"content"`
+	Markdown    string `json:"markdown,omitempty"`
+	WordCount   int    `json:"wordCount"`
 }
 
-// Fetcher extracts clean content from web pages.
-type Fetcher struct {
-	parser    *defuddle.Parser
-	transport *transport.Transport
-}
-
-// New creates a new Fetcher backed by the given transport. Call Close() when done.
-func New(tp *transport.Transport) (*Fetcher, error) {
-	parser, err := defuddle.NewParser()
-	if err != nil {
-		return nil, fmt.Errorf("new parser: %w", err)
-	}
-	return &Fetcher{
-		parser:    parser,
-		transport: tp,
-	}, nil
-}
-
-// Close releases resources.
-func (f *Fetcher) Close() {
-	if f.parser != nil {
-		f.parser.Close()
-	}
-}
-
-// Options controls fetch behavior.
+// Options controls fetch output.
 type Options struct {
-	// Markdown converts extracted HTML to Markdown.
 	Markdown bool
-	// UseBrowser forces browser-based fetching (level 2).
-	UseBrowser bool
-	// PauseFunc runs after browser navigation before HTML extraction.
-	PauseFunc transport.PauseFunc
 }
 
-// Fetch retrieves a URL and extracts clean content.
-// It tries HTTP first, falling back to browser if the result is poor.
+// Fetcher extracts the active browser document. It does not own or close the
+// browser session.
+type Fetcher struct {
+	browser Browser
+}
+
+func New(browser Browser) *Fetcher {
+	return &Fetcher{browser: browser}
+}
+
+// Fetch navigates when url is non-empty. With an empty URL it reads the current
+// tab and refuses to create a browser session implicitly.
 func (f *Fetcher) Fetch(ctx context.Context, url string, opts *Options) (*Result, error) {
-	if opts == nil {
-		opts = &Options{Markdown: true}
-	}
-
-	defOpts := &defuddle.Options{
-		Markdown: opts.Markdown,
-	}
-
-	// If browser is forced, skip HTTP.
-	if opts.UseBrowser {
-		return f.fetchViaBrowser(ctx, url, opts, defOpts)
-	}
-
-	// Level 1: try direct HTTP.
-	html, err := f.transport.GetHTML(ctx, url)
-	if err == nil {
-		result, parseErr := f.parse(html, url, defOpts)
-		if parseErr == nil && hasContent(result) {
-			return result, nil
+	if url == "" {
+		active, err := f.browser.HasActiveSession(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("check current agent-browser session: %w", err)
 		}
-		if parseErr != nil {
-			log.Printf("http fetch parse failed: %v, trying browser", parseErr)
-		} else {
-			log.Printf("http fetch returned poor content, trying browser")
+		if !active {
+			return nil, fmt.Errorf("no active agent-browser session; open a page first")
 		}
-	} else {
-		log.Printf("http fetch failed: %v, trying browser", err)
+		current, err := f.browser.CurrentURL(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("get current agent-browser tab: %w", err)
+		}
+		if current == "" || current == "about:blank" {
+			return nil, fmt.Errorf("current agent-browser tab has no readable page")
+		}
+	} else if err := f.browser.Open(ctx, url); err != nil {
+		return nil, fmt.Errorf("open page: %w", err)
 	}
 
-	// Level 2: fallback to browser.
-	return f.fetchViaBrowser(ctx, url, opts, defOpts)
-}
-
-func (f *Fetcher) fetchViaBrowser(ctx context.Context, url string, opts *Options, defOpts *defuddle.Options) (*Result, error) {
-	html, err := f.transport.BrowseHTMLWithPause(ctx, url, opts.PauseFunc)
+	value, err := f.browser.Eval(ctx, extractionScript())
 	if err != nil {
-		return nil, fmt.Errorf("browser fetch: %w", err)
+		return nil, fmt.Errorf("extract page with Defuddle: %w", err)
 	}
-	return f.parse(html, url, defOpts)
-}
-
-// ParseHTML extracts clean content from raw HTML without fetching.
-func (f *Fetcher) ParseHTML(html, url string, opts *defuddle.Options) (*Result, error) {
-	return f.parse(html, url, opts)
-}
-
-func (f *Fetcher) parse(html, url string, opts *defuddle.Options) (*Result, error) {
-	dr, err := f.parser.Parse(html, url, opts)
+	data, err := json.Marshal(value)
 	if err != nil {
-		return nil, fmt.Errorf("defuddle parse: %w", err)
+		return nil, fmt.Errorf("marshal Defuddle result: %w", err)
 	}
-
-	return &Result{
-		Title:       dr.Title,
-		Description: dr.Description,
-		Domain:      dr.Domain,
-		Author:      dr.Author,
-		Published:   dr.Published,
-		Content:     dr.Content,
-		Markdown:    dr.Markdown,
-		WordCount:   dr.WordCount,
-	}, nil
+	var raw struct {
+		Title           string `json:"title"`
+		Description     string `json:"description"`
+		Domain          string `json:"domain"`
+		Author          string `json:"author"`
+		Published       string `json:"published"`
+		Content         string `json:"content"`
+		ContentMarkdown string `json:"contentMarkdown"`
+		WordCount       int    `json:"wordCount"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return nil, fmt.Errorf("decode Defuddle result: %w", err)
+	}
+	result := &Result{
+		Title:       raw.Title,
+		Description: raw.Description,
+		Domain:      raw.Domain,
+		Author:      raw.Author,
+		Published:   raw.Published,
+		Content:     raw.Content,
+		Markdown:    raw.ContentMarkdown,
+		WordCount:   raw.WordCount,
+	}
+	if opts != nil && !opts.Markdown {
+		result.Markdown = ""
+	}
+	return result, nil
 }
 
-// hasContent checks if a result has meaningful extracted content.
-func hasContent(r *Result) bool {
-	return r.Content != "" || r.Markdown != ""
+func extractionScript() string {
+	var script strings.Builder
+	script.Grow(len(assets.DefuddleBrowser) + 256)
+	script.WriteString(assets.DefuddleBrowser)
+	script.WriteString(`
+;(async () => {
+  const result = await new globalThis.Defuddle(document, {
+    separateMarkdown: true
+  }).parseAsync();
+  return result;
+})()
+`)
+	return script.String()
 }
+
+var _ Browser = (*agentbrowser.Client)(nil)
