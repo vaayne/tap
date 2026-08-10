@@ -1,17 +1,26 @@
 /* @meta
 {
-  "name": "twitter/fxembed-status",
   "description": "Fetch an X / Twitter post by ID via FxEmbed",
   "domain": "api.fxtwitter.com",
   "args": {
-    "id": {"required": true, "description": "Tweet / post ID"},
-    "about_account": {"required": false, "description": "Truthy value to include account metadata when available"},
-    "lang": {"required": false, "description": "Target language for inline translations, e.g. en, es, zh-cn"},
-    "format": {"required": false, "description": "Return format: json or markdown"}
+    "id": {
+      "required": true,
+      "description": "Tweet / post ID"
+    },
+    "about_account": {
+      "required": false,
+      "description": "Truthy value to include account metadata when available"
+    },
+    "lang": {
+      "required": false,
+      "description": "Target language for inline translations, e.g. en, es, zh-cn"
+    },
+    "format": {
+      "required": false,
+      "description": "Return format: json or markdown"
+    }
   },
-  "runtime": "http",
-  "readOnly": true,
-  "example": "tap site twitter/fxembed-status id=20 about_account=1"
+  "readOnly": true
 }
 */
 

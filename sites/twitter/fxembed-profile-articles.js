@@ -1,17 +1,26 @@
 /* @meta
 {
-  "name": "twitter/fxembed-profile-articles",
   "description": "List X / Twitter user articles via FxEmbed",
   "domain": "api.fxtwitter.com",
   "args": {
-    "handle": {"required": true, "description": "Username without @, or numeric user id as id:123"},
-    "count": {"required": false, "description": "Page size, 1-100"},
-    "cursor": {"required": false, "description": "Pagination cursor"},
-    "lang": {"required": false, "description": "Target language for inline translations, e.g. en, es, zh-cn"}
+    "handle": {
+      "required": true,
+      "description": "Username without @, or numeric user id as id:123"
+    },
+    "count": {
+      "required": false,
+      "description": "Page size, 1-100"
+    },
+    "cursor": {
+      "required": false,
+      "description": "Pagination cursor"
+    },
+    "lang": {
+      "required": false,
+      "description": "Target language for inline translations, e.g. en, es, zh-cn"
+    }
   },
-  "runtime": "http",
-  "readOnly": true,
-  "example": "tap site twitter/fxembed-profile-articles handle=LiuVaayne count=5"
+  "readOnly": true
 }
 */
 

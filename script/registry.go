@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 )
 
 // Source describes one script source for the registry.
@@ -73,9 +74,14 @@ func (r *Registry) scanDir(dir string, source ScriptSource) error {
 			return nil
 		}
 
+		name, err := scriptName(dir, path)
+		if err != nil {
+			return err
+		}
+		s.Meta.Name = name
 		s.Path = path
 		s.Source = source
-		r.scripts[s.Meta.Name] = s
+		r.scripts[name] = s
 		return nil
 	})
 }
@@ -103,11 +109,29 @@ func (r *Registry) scanFS(fsys fs.FS, root string, source ScriptSource) error {
 			return nil
 		}
 
+		name, err := scriptName(root, path)
+		if err != nil {
+			return err
+		}
+		s.Meta.Name = name
 		s.Path = path
 		s.Source = source
-		r.scripts[s.Meta.Name] = s
+		r.scripts[name] = s
 		return nil
 	})
+}
+
+func scriptName(root, path string) (string, error) {
+	rel, err := filepath.Rel(root, path)
+	if err != nil {
+		return "", fmt.Errorf("derive script name for %s: %w", path, err)
+	}
+	rel = filepath.ToSlash(rel)
+	name := strings.TrimSuffix(rel, filepath.Ext(rel))
+	if name == "." || name == "" || strings.HasPrefix(name, "../") {
+		return "", fmt.Errorf("invalid script path: %s", path)
+	}
+	return name, nil
 }
 
 // Get returns a script by its meta name.

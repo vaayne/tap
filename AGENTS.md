@@ -2,11 +2,12 @@
 
 ## Project
 
-Go CLI and library for running JS scripts against websites (QuickJS + Chrome CDP fallback) and extracting clean content from URLs via go-defuddle.
+Go CLI and library for running reusable site scripts and extracting readable
+content through agent-browser. Tap does not own a browser runtime.
 
 ## Stack
 
-Go 1.26+, urfave/cli v3, QuickJS (fastschema/qjs), chromedp, go-defuddle, mise.
+Go 1.26+, urfave/cli v3, agent-browser subprocess API, embedded Defuddle browser bundle, mise.
 
 ## Commands
 
@@ -23,7 +24,7 @@ mise run tidy     # go mod tidy
 - Standard Go conventions, `gofmt`, `golangci-lint`.
 - Always check error returns (including `resp.Body.Close()`).
 - Functional options pattern (see `options.go`).
-- Focused packages: `transport/`, `engine/`, `fetch/`, `cmd/tap/`.
+- Focused packages: `agentbrowser/`, `script/`, `fetch/`, `cmd/tap/`.
 
 ## Commits
 
@@ -35,11 +36,10 @@ Emoji-prefixed Conventional Commits: `✨ feat:`, `🐛 fix:`, `♻️ refactor:
 
 ```
 tap.go / options.go   → Client API + functional options
-transport/            → Shared HTTP + CDP browser layer
-browser/              → Persistent sessions, tabs, network interception
-engine/               → QuickJS + browser fallback
-fetch/                → URL → clean content (go-defuddle)
-cmd/tap/              → CLI (site, fetch, sync, browser)
+agentbrowser/         → Thin subprocess client; never owns sessions
+script/               → Site metadata parser and path-derived registry
+fetch/                → Active browser document → clean content (embedded Defuddle)
+cmd/tap/              → CLI (site, fetch, doctor, maintenance)
 web/                  → Web UI — TanStack Start + Cloudflare Workers + D1
 ```
 
@@ -72,7 +72,7 @@ User-facing docs live in three places. Keep them in sync when making changes:
 | Location | Purpose | Update when |
 |---|---|---|
 | `README.md` | Project overview, quick start, links to docs | New features, commands, or doc files |
-| `docs/` | Full reference docs (`browser.md`, `network.md`) | Command changes, new flags, behavior changes |
+| `docs/` | Generated CLI reference | Command changes, new flags, behavior changes |
 | `web/` | Web UI source — TanStack Start + Cloudflare Workers | API route changes, D1 schema changes |
 | `skills/tap-web/` | Agent skill (`SKILL.md` + `references/`) | Command changes, new capabilities |
 

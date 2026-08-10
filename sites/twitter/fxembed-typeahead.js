@@ -1,16 +1,22 @@
 /* @meta
 {
-  "name": "twitter/fxembed-typeahead",
   "description": "Search X / Twitter typeahead suggestions via FxEmbed",
   "domain": "api.fxtwitter.com",
   "args": {
-    "q": {"required": true, "description": "Prefix or query string"},
-    "result_type": {"required": false, "description": "Comma-separated suggestion kinds: events, users, topics"},
-    "src": {"required": false, "description": "Upstream src hint, default search_box"}
+    "q": {
+      "required": true,
+      "description": "Prefix or query string"
+    },
+    "result_type": {
+      "required": false,
+      "description": "Comma-separated suggestion kinds: events, users, topics"
+    },
+    "src": {
+      "required": false,
+      "description": "Upstream src hint, default search_box"
+    }
   },
-  "runtime": "http",
-  "readOnly": true,
-  "example": "tap site twitter/fxembed-typeahead q=LiuVaayne"
+  "readOnly": true
 }
 */
 

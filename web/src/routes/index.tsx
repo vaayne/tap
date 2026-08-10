@@ -2,7 +2,6 @@ import { createFileRoute, Link } from "@tanstack/react-router"
 import {
   Terminal,
   Zap,
-  Globe,
   Download,
   ArrowRight,
   Code,
@@ -35,7 +34,7 @@ function HomePage() {
             <div className="mb-6 inline-flex items-center gap-2 rounded-full border bg-background px-4 py-1.5 text-sm">
               <Zap className="size-3.5 text-yellow-500" />
               <span className="text-muted-foreground">
-                QuickJS first, browser fallback when needed
+                Reusable website knowledge, one browser runtime
               </span>
             </div>
 
@@ -46,9 +45,8 @@ function HomePage() {
             </h1>
 
             <p className="mx-auto mb-8 max-w-2xl text-lg text-muted-foreground">
-              A Go library and CLI that runs JavaScript scripts against real
-              websites — fast via QuickJS, with full browser fallback. Also
-              extracts clean content from any URL.
+              Discover and run reusable site programs, then extract clean
+              content from URLs or the current agent-browser tab.
             </p>
 
             <div className="flex flex-wrap items-center justify-center gap-3">
@@ -83,7 +81,7 @@ function HomePage() {
               Get started in seconds
             </h2>
             <p className="text-muted-foreground">
-              Install the CLI or use as a Go library
+              Install agent-browser, then add the Tap CLI
             </p>
           </div>
 
@@ -92,12 +90,12 @@ function HomePage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
                   <Download className="size-4" />
-                  CLI
+                  agent-browser runtime
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <pre className="overflow-x-auto rounded-lg bg-muted p-3 text-sm font-mono">
-                  go install github.com/vaayne/tap/cmd/tap@latest
+                  npm install -g agent-browser
                 </pre>
               </CardContent>
             </Card>
@@ -105,12 +103,12 @@ function HomePage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
                   <Code className="size-4" />
-                  Library
+                  Tap CLI
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <pre className="overflow-x-auto rounded-lg bg-muted p-3 text-sm font-mono">
-                  go get github.com/vaayne/tap
+                  go install github.com/vaayne/tap/cmd/tap@latest
                 </pre>
               </CardContent>
             </Card>
@@ -126,41 +124,39 @@ function HomePage() {
               How it works
             </h2>
             <p className="text-muted-foreground">
-              Two commands, one shared transport layer
+              Tap provides knowledge; agent-browser provides execution
             </p>
           </div>
 
           <div className="mx-auto max-w-4xl">
             <pre className="overflow-x-auto rounded-xl border bg-muted/50 p-6 text-xs sm:text-sm font-mono leading-relaxed text-center">
-{`                ┌─────────────────────────────────┐
-                │       Shared Transport Layer     │
-                │  Level 1: HTTP  │  Level 2: CDP  │
-                └────────┬────────┴───────┬────────┘
-                         │                │
-          ┌──────────────┴──┐    ┌────────┴──────────┐
-          │    tap site     │    │    tap fetch       │
-          │  QuickJS → CDP  │    │  HTTP → CDP        │
-          │  → structured   │    │  → defuddle        │
-          │    JSON         │    │  → markdown/HTML   │
-          └─────────────────┘    └───────────────────┘`}
+{`          ┌────────────────────────────────────┐
+          │              Tap                   │
+          │ sites registry · metadata · fetch  │
+          └─────────────────┬──────────────────┘
+                            │ subprocess
+          ┌─────────────────▼──────────────────┐
+          │          agent-browser             │
+          │ sessions · tabs · CDP · interaction│
+          └────────────────────────────────────┘`}
             </pre>
           </div>
 
           <div className="mx-auto mt-10 grid max-w-4xl gap-6 sm:grid-cols-3">
             <FeatureCard
               icon={<Layers className="size-5" />}
-              title="Transport Layer"
-              description="Shared HTTP client and headless Chrome (CDP), configured once and used by all consumers."
+              title="Sites Registry"
+              description="Discover, inspect, sync, and execute reusable website programs by a stable path-derived name."
             />
             <FeatureCard
               icon={<Terminal className="size-5" />}
               title="Site Scripts"
-              description="Predefined recipes that fetch structured data. QuickJS first, Chrome fallback for pages needing cookies or DOM."
+              description="Metadata resolves arguments and environment-backed headers before evaluating each script in agent-browser."
             />
             <FeatureCard
               icon={<FileText className="size-5" />}
               title="Content Extraction"
-              description="Generic clean content from any URL via go-defuddle. Direct HTTP first, browser for JS-rendered pages."
+              description="Embedded Defuddle extracts HTML and Markdown from a URL or the active authenticated tab."
             />
           </div>
         </div>
@@ -193,6 +189,7 @@ function HomePage() {
               commands={[
                 "tap fetch https://example.com/article",
                 "tap fetch --json https://example.com/article",
+                "agent-browser open https://example.com/account && tap fetch",
               ]}
             />
           </div>
@@ -204,7 +201,7 @@ function HomePage() {
         <div className="mx-auto grid max-w-6xl grid-cols-3 divide-x px-4">
           <StatItem value={totalScripts} label="Scripts" />
           <StatItem value={totalSites} label="Sites" />
-          <StatItem value="Go" label="Language" />
+          <StatItem value="agent-browser" label="Runtime" />
         </div>
       </section>
 
@@ -238,7 +235,7 @@ function HomePage() {
         <div className="mx-auto max-w-6xl px-4 py-12 text-center">
           <h2 className="mb-3 text-xl font-bold">Standing on the shoulders of giants</h2>
           <p className="mb-6 text-muted-foreground">
-            Based on{" "}
+            Powered by{" "}
             <a
               href="https://github.com/epiral/bb-sites"
               target="_blank"
@@ -247,14 +244,14 @@ function HomePage() {
             >
               bb-sites
             </a>
-            {" "}and fully compatible with{" "}
+            {" "}with browser execution from{" "}
             <a
-              href="https://github.com/epiral/bb-browser"
+              href="https://github.com/vercel-labs/agent-browser"
               target="_blank"
               rel="noopener noreferrer"
               className="underline underline-offset-4 hover:text-foreground"
             >
-              bb-browser
+              agent-browser
             </a>
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
@@ -271,11 +268,11 @@ function HomePage() {
             <Badge variant="secondary" className="gap-1.5 px-3 py-1">
               <ExternalLink className="size-3" />
               <a
-                href="https://github.com/epiral/bb-browser"
+                href="https://github.com/vercel-labs/agent-browser"
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                epiral/bb-browser
+                vercel-labs/agent-browser
               </a>
             </Badge>
             <Badge variant="secondary" className="gap-1.5 px-3 py-1">

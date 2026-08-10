@@ -15,7 +15,12 @@ See field-level docs on the `Meta` struct in `script/parser.go`.
 
 ## Key rules
 
-- `env` + `headers` handle auth — **never re-read env vars inside the function body** (`args.MY_API_KEY` is always undefined). Meta headers are resolved via `tap.go:165` and injected into every `fetch()` at `engine/quickjs.go:131`, before any JS-level headers.
+- `headers` handles auth. Environment variables are inferred from `${VAR}`
+  references and expanded before execution; unresolved headers are omitted.
+- `name`, `runtime`, and `env` are not metadata fields. The file path determines
+  the script name and agent-browser is the only runtime.
+- Never read secrets from `args`; metadata headers are merged into script
+  `fetch()` calls by Tap's browser-side wrapper.
 - Return `{error: 'message'}` on failure; any other JSON value is success
 
 ## After adding

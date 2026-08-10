@@ -11,8 +11,8 @@ $XDG_CONFIG_HOME/tap/site-notes/{domain}.md
 
 ## What to log
 
-- whether the site works with `tap site`, `tap fetch`, or requires `tap browser`
-- whether auth needs `tap attach chrome` + `tap browser open <login-url> --show`
+- whether the site works with `tap site`, `tap fetch`, or requires agent-browser
+- whether auth needs a headed agent-browser session
 - working API endpoints and params
 - WAF / anti-bot behavior
 - reliable selectors
@@ -25,12 +25,12 @@ $XDG_CONFIG_HOME/tap/site-notes/{domain}.md
 Last updated: 2026-04-07
 
 ## Access pattern
-- Needs browser cookies (`tap site -b ...`)
-- Visible auth flow: `tap attach chrome` then `tap browser open https://example.com/login --show`
+- Needs cookies from the current `AGENT_BROWSER_SESSION`
+- Visible auth flow: `agent-browser --headed open https://example.com/login`
 
 ## Working endpoints
 - `GET /api/v1/data?q=foo`
-- Best extraction: `tap browser network wait --url-pattern "*/api/v1/*" --body`
+- Best inspection: `agent-browser network requests --filter /api/v1/`
 
 ## Broken
 - `GET /old/api` returns 403 since 2026-04-01

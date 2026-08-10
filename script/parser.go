@@ -5,18 +5,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"regexp"
 	"sort"
 	"strings"
 )
 
+var envReferencePattern = regexp.MustCompile(`\$\{([A-Za-z_][A-Za-z0-9_]*)\}`)
+
 // ArgDef describes a single argument for a script.
 type ArgDef struct {
-	Required    bool   `json:"required"`
-	Description string `json:"description"`
-}
-
-// EnvDef describes a single environment variable dependency for a script.
-type EnvDef struct {
 	Required    bool   `json:"required"`
 	Description string `json:"description"`
 }
@@ -32,8 +29,9 @@ const (
 
 // Meta holds the metadata extracted from a script's @meta block.
 type Meta struct {
-	// Name is the script identifier in "site/action" form and must match the file path.
-	Name string `json:"name"`
+	// Name is derived from the script's relative path by Registry. It is not part
+	// of the 1.0 metadata format.
+	Name string `json:"-"`
 	// Description is a short human-readable summary shown in `tap site list`.
 	Description string `json:"description"`
 	// Domain is the primary API domain, used for display only.
@@ -43,26 +41,14 @@ type Meta struct {
 	Args map[string]ArgDef `json:"args"`
 	// ReadOnly marks scripts that only read data and never mutate state.
 	ReadOnly bool `json:"readOnly"`
-	// Example is a sample CLI invocation shown by `tap site info`.
-	Example string `json:"example"`
 	// Capabilities is reserved for future capability declarations.
 	Capabilities []string `json:"capabilities"`
-	// Runtime controls which execution engine is used:
-	//   "http"    — QuickJS only (fast, no browser); use for plain API calls.
-	//   "browser" — CDP browser only; use when cookies or DOM access is needed.
-	//   "auto"    — tries QuickJS first, falls back to browser (default).
-	// See Client.enginesByRuntime in tap.go.
-	Runtime string `json:"runtime"`
 	// AuthRequired indicates the script needs browser-based authentication.
 	AuthRequired bool `json:"authRequired"`
 	// Headers are HTTP headers injected into every fetch() call made by the script.
 	// Values may reference environment variables with ${VAR} syntax; headers whose
 	// variable is unset are omitted entirely. See ResolveHeaders.
 	Headers map[string]string `json:"headers"`
-	// Env declares environment variables the script depends on. Required variables
-	// are validated before execution. Values are surfaced to the script via Headers
-	// interpolation — not via args. See ValidateEnv.
-	Env map[string]EnvDef `json:"env"`
 }
 
 // Script represents a parsed site script with metadata and function body.
@@ -121,23 +107,6 @@ func parseMeta(content string) (*Meta, error) {
 	return &meta, nil
 }
 
-// ValidateEnv checks that all required environment variables are set.
-func (m *Meta) ValidateEnv() error {
-	var missing []string
-	for name, def := range m.Env {
-		if def.Required {
-			if _, ok := os.LookupEnv(name); !ok {
-				missing = append(missing, fmt.Sprintf("%s (%s)", name, def.Description))
-			}
-		}
-	}
-	sort.Strings(missing)
-	if len(missing) > 0 {
-		return fmt.Errorf("missing required environment variables: %s", strings.Join(missing, ", "))
-	}
-	return nil
-}
-
 // ResolveHeaders copies Headers and interpolates ${ENV_VAR} values via os.Getenv.
 // Headers referencing unset environment variables are skipped entirely.
 func (m *Meta) ResolveHeaders() map[string]string {
@@ -149,6 +118,22 @@ func (m *Meta) ResolveHeaders() map[string]string {
 		}
 		result[k] = expanded
 	}
+	return result
+}
+
+// EnvNames returns environment variables inferred from header templates.
+func (m *Meta) EnvNames() []string {
+	names := make(map[string]struct{})
+	for _, value := range m.Headers {
+		for _, match := range envReferencePattern.FindAllStringSubmatch(value, -1) {
+			names[match[1]] = struct{}{}
+		}
+	}
+	result := make([]string, 0, len(names))
+	for name := range names {
+		result = append(result, name)
+	}
+	sort.Strings(result)
 	return result
 }
 

@@ -18,11 +18,11 @@ export const Route = createRootRoute({
         name: "viewport",
         content: "width=device-width, initial-scale=1",
       },
-      { title: "tap — Tap into any website from your terminal" },
+      { title: "tap — Reusable site programs for agent-browser" },
       {
         name: "description",
         content:
-          "A Go CLI and library that runs JavaScript scripts against real websites. 100+ scripts across 40+ sites. QuickJS first, browser fallback.",
+          "Reusable site programs and readable web extraction powered by agent-browser.",
       },
     ],
     links: [{ rel: "stylesheet", href: appCss }],

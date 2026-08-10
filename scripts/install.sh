@@ -72,6 +72,15 @@ chmod +x "${INSTALL_DIR}/tap"
 
 echo "Installed tap ${VERSION} to ${INSTALL_DIR}/tap"
 
+# agent-browser is Tap's runtime dependency. Keep ownership with its own
+# installer rather than downloading or versioning it inside Tap.
+if ! command -v agent-browser >/dev/null 2>&1; then
+  echo ""
+  echo "Tap requires agent-browser:"
+  echo "  npm install -g agent-browser"
+  echo "  agent-browser install"
+fi
+
 # Check if install dir is in PATH
 case ":${PATH}:" in
   *":${INSTALL_DIR}:"*) ;;

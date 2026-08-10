@@ -1,20 +1,17 @@
 /* @meta
 {
-  "name": "twitter/post-tweet",
   "description": "Post a tweet via the official X API",
   "domain": "api.x.com",
   "args": {
-    "text": {"required": true, "description": "Tweet text"}
-  },
-  "runtime": "http",
-  "env": {
-    "X_ACCESS_TOKEN": {"required": true, "description": "User access token for the X API"}
+    "text": {
+      "required": true,
+      "description": "Tweet text"
+    }
   },
   "headers": {
     "Authorization": "Bearer ${X_ACCESS_TOKEN}"
   },
-  "readOnly": false,
-  "example": "tap site twitter/post-tweet 'Hello from the X API!'"
+  "readOnly": false
 }
 */
 

@@ -1,14 +1,14 @@
 /* @meta
 {
-  "name": "weixin/article",
   "description": "Fetch WeChat MP article by URL — title, author, content, images (HTTP-only, no browser)",
   "domain": "mp.weixin.qq.com",
   "args": {
-    "url": {"required": true, "description": "WeChat article URL or short ID, e.g. https://mp.weixin.qq.com/s/xxxxx"}
+    "url": {
+      "required": true,
+      "description": "WeChat article URL or short ID, e.g. https://mp.weixin.qq.com/s/xxxxx"
+    }
   },
-  "runtime": "http",
-  "readOnly": true,
-  "example": "tap site weixin/article url=https://mp.weixin.qq.com/s/DJtp4QUJtJHCnNU9yarsww"
+  "readOnly": true
 }
 */
 

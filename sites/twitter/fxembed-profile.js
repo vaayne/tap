@@ -1,15 +1,18 @@
 /* @meta
 {
-  "name": "twitter/fxembed-profile",
   "description": "Fetch an X / Twitter user profile via FxEmbed",
   "domain": "api.fxtwitter.com",
   "args": {
-    "handle": {"required": true, "description": "Username without @, or numeric user id as id:123"},
-    "about_account": {"required": false, "description": "Truthy value to include account metadata when available"}
+    "handle": {
+      "required": true,
+      "description": "Username without @, or numeric user id as id:123"
+    },
+    "about_account": {
+      "required": false,
+      "description": "Truthy value to include account metadata when available"
+    }
   },
-  "runtime": "http",
-  "readOnly": true,
-  "example": "tap site twitter/fxembed-profile handle=X about_account=1"
+  "readOnly": true
 }
 */
 

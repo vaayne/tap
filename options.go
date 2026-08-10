@@ -2,27 +2,18 @@ package tap
 
 import (
 	"time"
-
-	"github.com/vaayne/tap/transport"
 )
 
 // options holds the resolved configuration for a Client.
 type options struct {
 	sitesDir         string
 	localOverrideDir string
-	wsURL            string
-	profileDir       string
-	forceBrowser     bool
-	headless         bool
-	browserType      transport.BrowserType
-	pauseFn          transport.PauseFunc
+	agentBrowser     string
 	timeout          time.Duration
 }
 
 func defaultOptions() options {
-	return options{
-		headless: true,
-	}
+	return options{}
 }
 
 // Option configures a Client.
@@ -44,48 +35,11 @@ func WithSitesDir(dir string) Option {
 	}
 }
 
-// WithWSURL sets the remote CDP WebSocket URL.
-// If empty, a local Chrome is launched.
-func WithWSURL(url string) Option {
+// WithAgentBrowserBinary overrides the agent-browser executable. The default
+// is TAP_AGENT_BROWSER, then agent-browser from PATH.
+func WithAgentBrowserBinary(binary string) Option {
 	return func(o *options) {
-		o.wsURL = url
-	}
-}
-
-// WithProfileDir sets the Chrome user data directory for persistent cookies/storage.
-// Defaults to ~/.cache/tap/chrome-profile-$USER.
-func WithProfileDir(dir string) Option {
-	return func(o *options) {
-		o.profileDir = dir
-	}
-}
-
-// WithForceBrowser skips QuickJS and runs scripts directly in Chrome.
-func WithForceBrowser(force bool) Option {
-	return func(o *options) {
-		o.forceBrowser = force
-	}
-}
-
-// WithHeadless sets whether Chrome runs in headless mode (default: true).
-func WithHeadless(headless bool) Option {
-	return func(o *options) {
-		o.headless = headless
-	}
-}
-
-// WithPause sets a function that is called after browser navigation,
-// allowing the user to interact (login, solve CAPTCHAs) before script execution.
-func WithPause(fn transport.PauseFunc) Option {
-	return func(o *options) {
-		o.pauseFn = fn
-	}
-}
-
-// WithBrowserType selects the browser backend ("chrome" or "lightpanda").
-func WithBrowserType(bt transport.BrowserType) Option {
-	return func(o *options) {
-		o.browserType = bt
+		o.agentBrowser = binary
 	}
 }
 

@@ -1,20 +1,20 @@
 /* @meta
 {
-  "name": "exa/search",
   "description": "Exa web search via MCP endpoint (title, url, text)",
   "domain": "mcp.exa.ai",
   "args": {
-    "query": {"required": true, "description": "Search query"},
-    "count": {"required": false, "description": "Number of results (default 10)"}
-  },
-  "runtime": "http",
-  "env": {
-    "EXA_API_KEY": {"required": false, "description": "API key for Exa search (increases rate limit)"}
+    "query": {
+      "required": true,
+      "description": "Search query"
+    },
+    "count": {
+      "required": false,
+      "description": "Number of results (default 10)"
+    }
   },
   "headers": {
     "X-API-Key": "${EXA_API_KEY}"
-  },
-  "example": "tap site exa/search \"vaayne\""
+  }
 }
 */
 

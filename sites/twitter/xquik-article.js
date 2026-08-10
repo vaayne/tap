@@ -1,21 +1,18 @@
 /* @meta
 {
-  "name": "twitter/xquik-article",
   "description": "Fetch X / Twitter article by tweet ID via Xquik",
   "domain": "xquik.com",
   "args": {
-    "id": {"required": true, "description": "Tweet / article ID"}
-  },
-  "runtime": "http",
-  "env": {
-    "XQUIK_API_KEY": {"required": true, "description": "API key for Xquik"}
+    "id": {
+      "required": true,
+      "description": "Tweet / article ID"
+    }
   },
   "headers": {
     "x-api-key": "${XQUIK_API_KEY}",
     "xquik-api-contract": "2026-04-29"
   },
-  "readOnly": true,
-  "example": "tap site twitter/xquik-article '1905545699552375179'"
+  "readOnly": true
 }
 */
 

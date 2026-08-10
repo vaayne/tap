@@ -1,20 +1,38 @@
 /* @meta
 {
-  "name": "twitter/fxembed-profile-statuses",
   "description": "List X / Twitter user statuses via FxEmbed",
   "domain": "api.fxtwitter.com",
   "args": {
-    "handle": {"required": true, "description": "Username without @, or numeric user id as id:123"},
-    "count": {"required": false, "description": "Page size, 1-100"},
-    "cursor": {"required": false, "description": "Pagination cursor"},
-    "since": {"required": false, "description": "Unix timestamp; returns posts newer than this when no cursor is provided"},
-    "with_replies": {"required": false, "description": "Truthy value to include replies"},
-    "groupthreads": {"required": false, "description": "Truthy value to group conversation rows"},
-    "lang": {"required": false, "description": "Target language for inline translations, e.g. en, es, zh-cn"}
+    "handle": {
+      "required": true,
+      "description": "Username without @, or numeric user id as id:123"
+    },
+    "count": {
+      "required": false,
+      "description": "Page size, 1-100"
+    },
+    "cursor": {
+      "required": false,
+      "description": "Pagination cursor"
+    },
+    "since": {
+      "required": false,
+      "description": "Unix timestamp; returns posts newer than this when no cursor is provided"
+    },
+    "with_replies": {
+      "required": false,
+      "description": "Truthy value to include replies"
+    },
+    "groupthreads": {
+      "required": false,
+      "description": "Truthy value to group conversation rows"
+    },
+    "lang": {
+      "required": false,
+      "description": "Target language for inline translations, e.g. en, es, zh-cn"
+    }
   },
-  "runtime": "http",
-  "readOnly": true,
-  "example": "tap site twitter/fxembed-profile-statuses handle=LiuVaayne count=5"
+  "readOnly": true
 }
 */
 
