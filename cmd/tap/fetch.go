@@ -20,7 +20,7 @@ With no URL, extract the active tab without navigating or creating a session.
 Examples:
   tap fetch https://example.com/article          Clean Markdown output
   tap fetch --json https://example.com/article   Full metadata as JSON
-	 tap fetch                                      Extract current tab`,
+  tap fetch                                       Extract current tab`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:  "json",

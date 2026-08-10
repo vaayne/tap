@@ -79,7 +79,7 @@ func (c *Client) Path() (string, error) {
 	}
 	path, err := exec.LookPath(c.Binary)
 	if err != nil {
-		return "", fmt.Errorf("agent-browser not found; install its native binary from https://github.com/vercel-labs/agent-browser/releases/latest, then run 'agent-browser install': %w", err)
+		return "", fmt.Errorf("agent-browser not found; rerun Tap's installer or install its native binary from https://github.com/vercel-labs/agent-browser/releases/latest: %w", err)
 	}
 	return path, nil
 }

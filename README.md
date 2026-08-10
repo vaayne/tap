@@ -40,6 +40,9 @@ go install github.com/vaayne/tap/cmd/tap@latest
 
 Verify both with `tap doctor`.
 
+See [Installation](docs/install.md) for the platform matrix, checksum
+verification, offline-transfer caveat, runtime resolution, and upgrade paths.
+
 ## Quick start
 
 ### Discover, inspect, execute
@@ -170,6 +173,7 @@ The library uses the same inherited agent-browser session and does not close it.
 
 ## Docs
 
+- [docs/install.md](docs/install.md) — installation, full bundles, and upgrades
 - [docs/cli.md](docs/cli.md) — generated CLI reference
 - [skills/tap-web/references/script-development.md](skills/tap-web/references/script-development.md) — site script development
 - [web/README.md](web/README.md) — registry web app

@@ -106,7 +106,7 @@ With no URL, extract the active tab without navigating or creating a session.
 Examples:
   tap fetch https://example.com/article          Clean Markdown output
   tap fetch --json https://example.com/article   Full metadata as JSON
-	 tap fetch                                      Extract current tab
+  tap fetch                                       Extract current tab
 
 **Flags:**
 
@@ -117,6 +117,10 @@ Examples:
 ## tap doctor
 
 **Usage:** Check Tap and its agent-browser runtime dependency
+
+Checks the resolved agent-browser executable and its Chrome runtime.
+When agent-browser is missing, rerun Tap's default installer to bootstrap it.
+--fix delegates runtime repair to an executable that is already installed.
 
 **Flags:**
 

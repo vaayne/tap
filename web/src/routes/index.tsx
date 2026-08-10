@@ -4,7 +4,6 @@ import {
   Zap,
   Download,
   ArrowRight,
-  Code,
   FileText,
   Layers,
   Github,
@@ -81,35 +80,35 @@ function HomePage() {
               Get started in seconds
             </h2>
             <p className="text-muted-foreground">
-              Install agent-browser, then add the Tap CLI
+              One command bootstraps Tap and its native browser runtime
             </p>
           </div>
 
-          <div className="mx-auto grid max-w-3xl gap-4 sm:grid-cols-2">
+          <div className="mx-auto max-w-4xl">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
                   <Download className="size-4" />
-                  agent-browser runtime
+                  Tap + agent-browser
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <pre className="overflow-x-auto rounded-lg bg-muted p-3 text-sm font-mono">
-                  npm install -g agent-browser
+              <CardContent className="space-y-3">
+                <pre className="overflow-x-auto rounded-lg bg-muted p-3 text-sm font-mono whitespace-pre-wrap break-all">
+                  curl -fsSL https://raw.githubusercontent.com/vaayne/tap/main/scripts/install.sh | sh
                 </pre>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Code className="size-4" />
-                  Tap CLI
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <pre className="overflow-x-auto rounded-lg bg-muted p-3 text-sm font-mono">
-                  go install github.com/vaayne/tap/cmd/tap@latest
-                </pre>
+                <p className="text-sm text-muted-foreground">
+                  Downloads pinned native binaries, verifies SHA-256, and keeps
+                  agent-browser as a separate CLI. {" "}
+                  <a
+                    href="https://github.com/vaayne/tap/releases/latest"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline underline-offset-4 hover:text-foreground"
+                  >
+                    Full bundles
+                  </a>{" "}
+                  are available for offline transfer.
+                </p>
               </CardContent>
             </Card>
           </div>
