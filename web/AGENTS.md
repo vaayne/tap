@@ -28,7 +28,7 @@ pnpm build      # production build
 pnpm preview    # preview build locally
 pnpm test       # run tests
 pnpm cf-typegen # regenerate wrangler/cloudflare types
-pnpm deploy     # deploy to Cloudflare Workers
+pnpm run deploy # deploy to Cloudflare Workers
 ```
 
 ## Architecture

@@ -55,7 +55,7 @@ pnpm build      # production build
 pnpm preview    # preview built app
 pnpm test       # vitest
 pnpm cf-typegen # regenerate Cloudflare types
-pnpm deploy     # build and deploy with wrangler
+pnpm run deploy # build and deploy with wrangler
 ```
 
 ## Data model
