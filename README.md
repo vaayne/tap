@@ -119,21 +119,15 @@ The script name comes from its path. For example,
 */
 
 async function(args) {
-  // fetch(...) must stay on https://mcp.exa.ai; metadata headers are merged
-  // only after Tap verifies that exact origin.
+  // fetch(...) runs in agent-browser. Metadata headers are merged only into
+  // requests targeting the declared domain; browser CORS/CSP still applies.
 }
 ```
 
 Environment variables are inferred from `${VAR}` references. A header is
 omitted when one of its referenced variables is unset. Resolved headers are
-applied before navigation and cleared after script execution.
-
-`domain` is Tap's default exact HTTPS execution host. Cross-origin fetches are
-rejected. `startPath` is optional and must be a path on the execution domain;
-use it when the root redirects away from the required origin.
-
-For imported catalogs whose `domain` has different semantics, Tap's ingestion
-layer may add `executionDomain` while preserving the source metadata.
+injected into same-domain script fetches and are never installed as
+browser-wide navigation headers.
 
 ## Command map
 

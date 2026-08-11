@@ -10,17 +10,6 @@ permissions:
   contents: read
 
 jobs:
-  catalog:
-    name: Catalog compatibility
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-      - name: Test bb-sites compatibility layer
-        run: node --test .github/scripts/sync-bb-sites.test.mjs
-
   lint:
     name: Lint
     runs-on: ubuntu-latest

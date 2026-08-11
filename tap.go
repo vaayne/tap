@@ -89,13 +89,19 @@ func (c *Client) RunScript(ctx context.Context, name string, args map[string]str
 		defer cancel()
 	}
 
-	navigationURL := s.Meta.ExecutionURL()
+	navigationURL := "about:blank"
+	if s.Meta.Domain != "" {
+		navigationURL = "https://" + s.Meta.Domain
+	}
 	headers := s.Meta.ResolveHeaders()
 	program, err := siteProgram(s, args, headers)
 	if err != nil {
 		return nil, err
 	}
-	return c.browser.OpenAndEval(ctx, navigationURL, program, headers)
+	// Metadata headers are injected by the generated fetch wrapper only after
+	// resolving the request URL. Do not install them as browser-wide navigation
+	// headers, where redirects and cross-origin requests could inherit them.
+	return c.browser.OpenAndEval(ctx, navigationURL, program, nil)
 }
 
 // Fetch extracts a URL through agent-browser. An empty URL reads the active tab
@@ -121,30 +127,27 @@ func siteProgram(s *script.Script, args, headers map[string]string) (string, err
 	if err != nil {
 		return "", fmt.Errorf("marshal script headers: %w", err)
 	}
-	originJSON, err := json.Marshal(s.Meta.Origin())
+	domainJSON, err := json.Marshal(s.Meta.Domain)
 	if err != nil {
-		return "", fmt.Errorf("marshal script origin: %w", err)
+		return "", fmt.Errorf("marshal script domain: %w", err)
 	}
 	return fmt.Sprintf(`(async () => {
   const __tapArgs = %s;
   const __tapHeaders = %s;
-  const __tapOrigin = %s;
-  if (location.origin !== __tapOrigin) {
-    throw new Error("Tap execution origin mismatch: expected " + __tapOrigin + ", got " + location.origin);
-  }
+  const __tapDomain = %s;
+  const __tapHeaderOrigin = __tapDomain ? "https://" + __tapDomain : null;
   const __tapNativeFetch = globalThis.fetch.bind(globalThis);
   const fetch = (input, init = {}) => {
     const url = new URL(input instanceof Request ? input.url : String(input), location.href);
-    if (url.origin !== __tapOrigin) {
-      throw new Error("Tap cross-origin fetch blocked: " + url.origin + " (declared origin: " + __tapOrigin + ")");
-    }
     const headers = new Headers(input instanceof Request ? input.headers : undefined);
     new Headers(init.headers || {}).forEach((value, name) => headers.set(name, value));
-    for (const [name, value] of Object.entries(__tapHeaders)) headers.set(name, value);
+    if (url.origin === __tapHeaderOrigin) {
+      for (const [name, value] of Object.entries(__tapHeaders)) headers.set(name, value);
+    }
     return __tapNativeFetch(input, {...init, headers});
   };
   return await (%s)(__tapArgs);
-})()`, argsJSON, headersJSON, originJSON, s.Body), nil
+})()`, argsJSON, headersJSON, domainJSON, s.Body), nil
 }
 
 // ListScripts returns all available scripts sorted by name.

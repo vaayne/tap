@@ -9,23 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
-- Site script `domain` metadata is now validated and enforced as the exact
-  HTTPS execution origin. Cross-origin `fetch()` calls are blocked before
-  configured headers can be attached.
-
-### Added
-
-- Site scripts may declare a same-origin `startPath` when the domain root does
-  not provide a stable execution page.
-- bb-sites imports support guarded Tap-specific metadata normalization without
-  modifying or vendoring upstream scripts.
+- Metadata headers are injected only into fetches targeting the script's
+  declared domain. Cross-origin fetches remain governed by browser CORS/CSP and
+  never receive Tap-configured credentials.
 
 ### Fixed
 
 - Structured agent-browser batch failures are now preserved instead of being
   reduced to an opaque `exit status 1` error.
-- Tap-owned scripts without redundant metadata `name` fields are now included
-  by the catalog sync job using their path-derived names.
 
 ## [1.0.0] - 2026-08-11
 

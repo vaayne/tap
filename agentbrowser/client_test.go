@@ -215,7 +215,7 @@ func TestOpenAndEvalReturnsStructuredBatchFailure(t *testing.T) {
 	bin := filepath.Join(t.TempDir(), "agent-browser")
 	script := `#!/bin/sh
 cat >/dev/null
-printf '%s' '[{"success":true,"result":{}},{"success":false,"result":null,"error":"Evaluation error: Tap cross-origin fetch blocked"}]'
+printf '%s' '[{"success":true,"result":{}},{"success":false,"result":null,"error":"Evaluation error: TypeError: Failed to fetch"}]'
 exit 1
 `
 	if err := os.WriteFile(bin, []byte(script), 0o755); err != nil {
@@ -226,7 +226,7 @@ exit 1
 	if err == nil {
 		t.Fatal("expected batch failure")
 	}
-	if !strings.Contains(err.Error(), "Tap cross-origin fetch blocked") {
+	if !strings.Contains(err.Error(), "TypeError: Failed to fetch") {
 		t.Fatalf("error = %q, want structured evaluation error", err)
 	}
 	if strings.Contains(err.Error(), "exit status 1") {

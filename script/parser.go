@@ -4,8 +4,6 @@ package script
 import (
 	"encoding/json"
 	"fmt"
-	"net"
-	"net/url"
 	"os"
 	"regexp"
 	"sort"
@@ -36,14 +34,8 @@ type Meta struct {
 	Name string `json:"-"`
 	// Description is a short human-readable summary shown in `tap site list`.
 	Description string `json:"description"`
-	// Domain is the script's catalog host and the default HTTPS execution host.
+	// Domain is the primary API domain, used for display only.
 	Domain string `json:"domain"`
-	// ExecutionDomain is a Tap-specific execution host override used by source
-	// compatibility adapters. Site fetches are restricted to this exact origin.
-	ExecutionDomain string `json:"executionDomain"`
-	// StartPath is an optional same-origin navigation target. It is useful when
-	// a domain root redirects away from the execution origin.
-	StartPath string `json:"startPath"`
 	// Args declares the named arguments the script accepts. Each key maps to an
 	// ArgDef describing whether it is required and what it represents.
 	Args map[string]ArgDef `json:"args"`
@@ -53,7 +45,7 @@ type Meta struct {
 	Capabilities []string `json:"capabilities"`
 	// AuthRequired indicates the script needs browser-based authentication.
 	AuthRequired bool `json:"authRequired"`
-	// Headers are HTTP headers injected into every fetch() call made by the script.
+	// Headers are HTTP headers injected into fetch() calls targeting Domain.
 	// Values may reference environment variables with ${VAR} syntax; headers whose
 	// variable is unset are omitted entirely. See ResolveHeaders.
 	Headers map[string]string `json:"headers"`
@@ -73,9 +65,6 @@ func Parse(content string) (*Script, error) {
 	meta, err := parseMeta(content)
 	if err != nil {
 		return nil, fmt.Errorf("parse meta: %w", err)
-	}
-	if err := meta.validate(); err != nil {
-		return nil, fmt.Errorf("validate meta: %w", err)
 	}
 
 	body, err := parseBody(content)
@@ -116,76 +105,6 @@ func parseMeta(content string) (*Meta, error) {
 	}
 
 	return &meta, nil
-}
-
-func (m *Meta) validate() error {
-	if m.Domain == "" {
-		return fmt.Errorf("domain is required")
-	}
-	if err := validateDomain("domain", m.Domain); err != nil {
-		return err
-	}
-	if m.ExecutionDomain != "" {
-		if err := validateDomain("executionDomain", m.ExecutionDomain); err != nil {
-			return err
-		}
-	}
-	domain := m.effectiveExecutionDomain()
-	if m.StartPath != "" {
-		start, err := url.Parse(m.StartPath)
-		if err != nil || !strings.HasPrefix(m.StartPath, "/") || start.IsAbs() || start.Host != "" || start.Fragment != "" {
-			return fmt.Errorf("startPath must be an absolute path on execution domain %q: %q", domain, m.StartPath)
-		}
-	}
-	return nil
-}
-
-func validateDomain(field, domain string) error {
-	if domain != strings.ToLower(domain) || strings.TrimSpace(domain) != domain {
-		return fmt.Errorf("%s must be a lowercase hostname: %q", field, domain)
-	}
-	if net.ParseIP(domain) != nil {
-		return fmt.Errorf("%s must be a hostname, not an IP address: %q", field, domain)
-	}
-	if len(domain) > 253 {
-		return fmt.Errorf("%s exceeds 253 characters", field)
-	}
-	labels := strings.Split(domain, ".")
-	if len(labels) < 2 {
-		return fmt.Errorf("%s must be a fully qualified hostname: %q", field, domain)
-	}
-	for _, label := range labels {
-		if len(label) == 0 || len(label) > 63 || label[0] == '-' || label[len(label)-1] == '-' {
-			return fmt.Errorf("invalid %s label in %q", field, domain)
-		}
-		for _, char := range label {
-			if (char < 'a' || char > 'z') && (char < '0' || char > '9') && char != '-' {
-				return fmt.Errorf("invalid character in %s %q", field, domain)
-			}
-		}
-	}
-	return nil
-}
-
-func (m *Meta) effectiveExecutionDomain() string {
-	if m.ExecutionDomain != "" {
-		return m.ExecutionDomain
-	}
-	return m.Domain
-}
-
-// Origin returns the exact origin available to site fetches.
-func (m *Meta) Origin() string {
-	return "https://" + m.effectiveExecutionDomain()
-}
-
-// ExecutionURL returns the same-origin page Tap opens before evaluation.
-func (m *Meta) ExecutionURL() string {
-	path := m.StartPath
-	if path == "" {
-		path = "/"
-	}
-	return m.Origin() + path
 }
 
 // ResolveHeaders copies Headers and interpolates ${ENV_VAR} values via os.Getenv.

@@ -52,8 +52,8 @@ async function(args) { return {query: args.query}; }`)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(args), "set") {
-		t.Fatalf("site headers were not cleared: %s", args)
+	if strings.Contains(string(args), "set") {
+		t.Fatalf("site headers leaked into browser session: %s", args)
 	}
 	stdin, err := os.ReadFile(os.Getenv("STDIN_FILE"))
 	if err != nil {
@@ -63,7 +63,7 @@ async function(args) { return {query: args.query}; }`)
 	if err := json.Unmarshal(stdin, &commands); err != nil {
 		t.Fatal(err)
 	}
-	if len(commands) != 2 || commands[0][2] != "--headers" {
+	if len(commands) != 2 || len(commands[0]) != 2 {
 		t.Fatalf("unexpected orchestration: %#v", commands)
 	}
 	decoded, err := base64.StdEncoding.DecodeString(commands[1][2])
@@ -71,17 +71,13 @@ async function(args) { return {query: args.query}; }`)
 		t.Fatal(err)
 	}
 	program := string(decoded)
-	for _, want := range []string{
-		`"query":"hello"`,
-		`"X-Key":"test-key"`,
-		`"https://example.com"`,
-		"Tap execution origin mismatch",
-		"Tap cross-origin fetch blocked",
-		"globalThis.fetch.bind",
-	} {
+	for _, want := range []string{`"query":"hello"`, `"X-Key":"test-key"`, `"example.com"`, "url.origin === __tapHeaderOrigin", "globalThis.fetch.bind"} {
 		if !strings.Contains(program, want) {
 			t.Fatalf("program missing %q", want)
 		}
+	}
+	if strings.Contains(program, "cross-origin fetch blocked") {
+		t.Fatal("Tap must not block cross-origin fetches")
 	}
 }
 
