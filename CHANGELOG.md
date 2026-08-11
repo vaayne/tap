@@ -1,6 +1,19 @@
 # Changelog
 
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/),
+and this project adheres to [Semantic Versioning](https://semver.org/).
+
 ## [Unreleased]
+
+## [1.0.0] - 2026-08-11
+
+### Added
+
+- The default installer now bootstraps a pinned, checksummed agent-browser
+  binary and Chrome runtime. Releases also publish optional full offline
+  bundles containing both Tap and agent-browser.
 
 ### Changed
 
@@ -11,9 +24,6 @@
   `name`, `runtime`, or `env`.
 - `tap fetch` now runs embedded Defuddle in agent-browser and accepts no URL to
   extract the active tab.
-- The default installer now bootstraps a pinned, checksummed agent-browser
-  binary and Chrome runtime. Releases also publish optional full offline
-  bundles containing both Tap and agent-browser.
 
 ### Removed
 
@@ -21,12 +31,12 @@
   their dependencies.
 - `tap browser`, `tap attach`, and `tap status`; use agent-browser directly.
 
-All notable changes to this project will be documented in this file.
+### Fixed
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/),
-and this project adheres to [Semantic Versioning](https://semver.org/).
-
-## [Unreleased]
+- `tap fetch` no longer depends on site discovery or synchronization, so it
+  remains usable when the remote registry is unavailable.
+- Web builds now use a locked, compatible Cloudflare toolchain and deploy from
+  GitHub Actions with reproducible dependencies.
 
 ## [0.4.10] - 2026-06-12
 
@@ -356,7 +366,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - CI workflows for lint, test, and release
 - GoReleaser configuration for cross-platform builds
 
-[Unreleased]: https://github.com/vaayne/tap/compare/v0.4.10...HEAD
+[Unreleased]: https://github.com/vaayne/tap/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/vaayne/tap/compare/v0.4.10...v1.0.0
 [0.4.10]: https://github.com/vaayne/tap/compare/v0.4.9...v0.4.10
 [0.4.9]: https://github.com/vaayne/tap/compare/v0.4.8...v0.4.9
 [0.4.8]: https://github.com/vaayne/tap/compare/v0.4.7...v0.4.8
