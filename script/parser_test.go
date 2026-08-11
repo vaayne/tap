@@ -1,6 +1,7 @@
 package script
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -70,11 +71,65 @@ func TestParse_UnclosedMeta(t *testing.T) {
 func TestParse_NoBody(t *testing.T) {
 	_, err := Parse(`/* @meta
 {
-  "description": "empty"
+  "description": "empty",
+  "domain": "example.com"
 }
 */`)
 	if err == nil {
 		t.Error("expected error for missing body")
+	}
+}
+
+func TestParse_RejectsInvalidDomain(t *testing.T) {
+	tests := []struct {
+		name   string
+		domain string
+	}{
+		{name: "missing"},
+		{name: "scheme", domain: "https://example.com"},
+		{name: "path", domain: "example.com/api"},
+		{name: "port", domain: "example.com:8443"},
+		{name: "uppercase", domain: "Example.com"},
+		{name: "IP address", domain: "127.0.0.1"},
+		{name: "single label", domain: "localhost"},
+		{name: "leading hyphen", domain: "-api.example.com"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			content := `/* @meta
+{"description":"invalid domain","domain":"` + tt.domain + `","args":{}}
+*/
+async function(args) { return args; }`
+			_, err := Parse(content)
+			if err == nil || !strings.Contains(err.Error(), "domain") {
+				t.Fatalf("Parse() error = %v, want domain validation error", err)
+			}
+		})
+	}
+}
+
+func TestParse_ValidatesStartPath(t *testing.T) {
+	valid := `/* @meta
+{"description":"valid path","domain":"example.com","startPath":"/api/bootstrap?format=json","args":{}}
+*/
+async function(args) { return args; }`
+	script, err := Parse(valid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := script.Meta.ExecutionURL(); got != "https://example.com/api/bootstrap?format=json" {
+		t.Fatalf("ExecutionURL() = %q", got)
+	}
+
+	for _, path := range []string{"api", "https://other.example/api", "//other.example/api", "/api#fragment"} {
+		content := `/* @meta
+{"description":"invalid path","domain":"example.com","startPath":"` + path + `","args":{}}
+*/
+async function(args) { return args; }`
+		_, err := Parse(content)
+		if err == nil || !strings.Contains(err.Error(), "startPath") {
+			t.Fatalf("Parse(startPath=%q) error = %v", path, err)
+		}
 	}
 }
 

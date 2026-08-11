@@ -119,13 +119,18 @@ The script name comes from its path. For example,
 */
 
 async function(args) {
-  // fetch(...) runs in agent-browser; metadata headers are merged into requests.
+  // fetch(...) must stay on https://mcp.exa.ai; metadata headers are merged
+  // only after Tap verifies that exact origin.
 }
 ```
 
 Environment variables are inferred from `${VAR}` references. A header is
 omitted when one of its referenced variables is unset. Resolved headers are
 applied before navigation and cleared after script execution.
+
+`domain` is the exact HTTPS execution host, not a display label. Cross-origin
+fetches are rejected. `startPath` is optional and must be a path on that domain;
+use it when the domain root redirects away from the required origin.
 
 ## Command map
 

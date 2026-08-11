@@ -25,6 +25,7 @@ JS
 {
   "description": "Search example.com",
   "domain": "example.com",
+  "startPath": "/app",
   "args": {
     "query": {"required": true, "description": "Search query"}
   },
@@ -45,8 +46,13 @@ async function(args) {
 `name`, `runtime`, and `env` are not metadata fields. Environment variables are
 inferred from `${VAR}` references in headers. Unresolved headers are omitted.
 
-Metadata headers are applied before domain navigation, merged into every script
-`fetch()` call, then cleared so credentials do not linger in the shared session.
+`domain` is required and defines the exact HTTPS execution origin. Every script
+`fetch()` must resolve to that origin; Tap rejects cross-origin requests before
+attaching metadata headers. `startPath` is optional and must stay on `domain`.
+Use it when the domain root redirects away from the execution origin.
+
+Metadata headers are applied before navigation, merged into same-origin script
+`fetch()` calls, then cleared so credentials do not linger in the shared session.
 
 ## Errors
 

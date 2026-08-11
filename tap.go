@@ -89,10 +89,7 @@ func (c *Client) RunScript(ctx context.Context, name string, args map[string]str
 		defer cancel()
 	}
 
-	navigationURL := "about:blank"
-	if s.Meta.Domain != "" {
-		navigationURL = "https://" + s.Meta.Domain
-	}
+	navigationURL := s.Meta.ExecutionURL()
 	headers := s.Meta.ResolveHeaders()
 	program, err := siteProgram(s, args, headers)
 	if err != nil {
@@ -124,17 +121,30 @@ func siteProgram(s *script.Script, args, headers map[string]string) (string, err
 	if err != nil {
 		return "", fmt.Errorf("marshal script headers: %w", err)
 	}
+	originJSON, err := json.Marshal(s.Meta.Origin())
+	if err != nil {
+		return "", fmt.Errorf("marshal script origin: %w", err)
+	}
 	return fmt.Sprintf(`(async () => {
   const __tapArgs = %s;
   const __tapHeaders = %s;
+  const __tapOrigin = %s;
+  if (location.origin !== __tapOrigin) {
+    throw new Error("Tap execution origin mismatch: expected " + __tapOrigin + ", got " + location.origin);
+  }
   const __tapNativeFetch = globalThis.fetch.bind(globalThis);
   const fetch = (input, init = {}) => {
-    const headers = new Headers(init.headers || {});
+    const url = new URL(input instanceof Request ? input.url : String(input), location.href);
+    if (url.origin !== __tapOrigin) {
+      throw new Error("Tap cross-origin fetch blocked: " + url.origin + " (declared origin: " + __tapOrigin + ")");
+    }
+    const headers = new Headers(input instanceof Request ? input.headers : undefined);
+    new Headers(init.headers || {}).forEach((value, name) => headers.set(name, value));
     for (const [name, value] of Object.entries(__tapHeaders)) headers.set(name, value);
     return __tapNativeFetch(input, {...init, headers});
   };
   return await (%s)(__tapArgs);
-})()`, argsJSON, headersJSON, s.Body), nil
+})()`, argsJSON, headersJSON, originJSON, s.Body), nil
 }
 
 // ListScripts returns all available scripts sorted by name.

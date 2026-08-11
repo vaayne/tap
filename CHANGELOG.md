@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- Site script `domain` metadata is now validated and enforced as the exact
+  HTTPS execution origin. Cross-origin `fetch()` calls are blocked before
+  configured headers can be attached.
+
+### Added
+
+- Site scripts may declare a same-origin `startPath` when the domain root does
+  not provide a stable execution page.
+
+### Fixed
+
+- Structured agent-browser batch failures are now preserved instead of being
+  reduced to an opaque `exit status 1` error.
+
 ## [1.0.0] - 2026-08-11
 
 ### Added

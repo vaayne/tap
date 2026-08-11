@@ -48,6 +48,15 @@ type batchResult struct {
 	Error   json.RawMessage `json:"error"`
 }
 
+type batchCommandError struct {
+	index   int
+	message string
+}
+
+func (e *batchCommandError) Error() string {
+	return fmt.Sprintf("agent-browser batch command %d: %s", e.index, e.message)
+}
+
 // New creates a thin client. Binary lookup remains lazy so registry-only
 // commands such as `tap site list` work even before agent-browser is installed.
 func New(binary string) *Client {
@@ -152,22 +161,43 @@ func (c *Client) OpenAndEval(ctx context.Context, url, script string, headers ma
 		defer cancel()
 		_, cleanupErr = c.runJSON(cleanupCtx, nil, "set", "headers", "{}", "--json")
 	}
+	var value any
+	var resultErr error
+	if len(bytes.TrimSpace(out)) > 0 {
+		value, resultErr = decodeBatch(out, len(commands))
+	}
+	var commandErr *batchCommandError
+	if resultErr != nil && (batchErr == nil || errors.As(resultErr, &commandErr)) {
+		// agent-browser batch --json writes structured command failures to
+		// stdout and exits non-zero. Prefer that actionable error over status 1.
+		return nil, errors.Join(resultErr, cleanupErr)
+	}
 	if batchErr != nil || cleanupErr != nil {
 		return nil, errors.Join(batchErr, cleanupErr)
 	}
+	if resultErr != nil {
+		return nil, resultErr
+	}
+	if len(bytes.TrimSpace(out)) == 0 {
+		return nil, fmt.Errorf("agent-browser batch returned empty output")
+	}
+	return value, nil
+}
+
+func decodeBatch(out []byte, want int) (any, error) {
 	var results []batchResult
 	if err := json.Unmarshal(out, &results); err != nil {
 		return nil, fmt.Errorf("decode agent-browser batch: %w", err)
 	}
-	if len(results) != len(commands) {
-		return nil, fmt.Errorf("agent-browser batch returned %d results, want %d", len(results), len(commands))
+	if len(results) != want {
+		return nil, fmt.Errorf("agent-browser batch returned %d results, want %d", len(results), want)
 	}
 	for index, result := range results {
 		if !result.Success {
-			return nil, fmt.Errorf("agent-browser batch command %d: %s", index+1, decodeError(result.Error))
+			return nil, &batchCommandError{index: index + 1, message: decodeError(result.Error)}
 		}
 	}
-	return decodeEval(results[1].Result)
+	return decodeEval(results[want-1].Result)
 }
 
 func decodeEval(data json.RawMessage) (any, error) {
@@ -265,7 +295,7 @@ func (c *Client) run(ctx context.Context, stdin []byte, args ...string) ([]byte,
 		if message == "" {
 			message = err.Error()
 		}
-		return nil, stderr.Bytes(), fmt.Errorf("agent-browser %s: %s", strings.Join(args, " "), message)
+		return stdout.Bytes(), stderr.Bytes(), fmt.Errorf("agent-browser %s: %s", strings.Join(args, " "), message)
 	}
 	return stdout.Bytes(), stderr.Bytes(), nil
 }

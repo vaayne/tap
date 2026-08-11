@@ -4,6 +4,8 @@ package script
 import (
 	"encoding/json"
 	"fmt"
+	"net"
+	"net/url"
 	"os"
 	"regexp"
 	"sort"
@@ -34,8 +36,12 @@ type Meta struct {
 	Name string `json:"-"`
 	// Description is a short human-readable summary shown in `tap site list`.
 	Description string `json:"description"`
-	// Domain is the primary API domain, used for display only.
+	// Domain is the exact HTTPS execution host. Site fetches are restricted to
+	// this origin before configured headers are injected.
 	Domain string `json:"domain"`
+	// StartPath is an optional same-origin navigation target. It is useful when
+	// a domain root redirects away from the execution origin.
+	StartPath string `json:"startPath"`
 	// Args declares the named arguments the script accepts. Each key maps to an
 	// ArgDef describing whether it is required and what it represents.
 	Args map[string]ArgDef `json:"args"`
@@ -65,6 +71,9 @@ func Parse(content string) (*Script, error) {
 	meta, err := parseMeta(content)
 	if err != nil {
 		return nil, fmt.Errorf("parse meta: %w", err)
+	}
+	if err := meta.validate(); err != nil {
+		return nil, fmt.Errorf("validate meta: %w", err)
 	}
 
 	body, err := parseBody(content)
@@ -105,6 +114,57 @@ func parseMeta(content string) (*Meta, error) {
 	}
 
 	return &meta, nil
+}
+
+func (m *Meta) validate() error {
+	domain := m.Domain
+	if domain == "" {
+		return fmt.Errorf("domain is required")
+	}
+	if domain != strings.ToLower(domain) || strings.TrimSpace(domain) != domain {
+		return fmt.Errorf("domain must be a lowercase hostname: %q", domain)
+	}
+	if net.ParseIP(domain) != nil {
+		return fmt.Errorf("domain must be a hostname, not an IP address: %q", domain)
+	}
+	if len(domain) > 253 {
+		return fmt.Errorf("domain exceeds 253 characters")
+	}
+	labels := strings.Split(domain, ".")
+	if len(labels) < 2 {
+		return fmt.Errorf("domain must be a fully qualified hostname: %q", domain)
+	}
+	for _, label := range labels {
+		if len(label) == 0 || len(label) > 63 || label[0] == '-' || label[len(label)-1] == '-' {
+			return fmt.Errorf("invalid domain label in %q", domain)
+		}
+		for _, char := range label {
+			if (char < 'a' || char > 'z') && (char < '0' || char > '9') && char != '-' {
+				return fmt.Errorf("invalid character in domain %q", domain)
+			}
+		}
+	}
+	if m.StartPath != "" {
+		start, err := url.Parse(m.StartPath)
+		if err != nil || !strings.HasPrefix(m.StartPath, "/") || start.IsAbs() || start.Host != "" || start.Fragment != "" {
+			return fmt.Errorf("startPath must be an absolute path on domain %q: %q", domain, m.StartPath)
+		}
+	}
+	return nil
+}
+
+// Origin returns the exact origin available to site fetches.
+func (m *Meta) Origin() string {
+	return "https://" + m.Domain
+}
+
+// ExecutionURL returns the same-origin page Tap opens before evaluation.
+func (m *Meta) ExecutionURL() string {
+	path := m.StartPath
+	if path == "" {
+		path = "/"
+	}
+	return m.Origin() + path
 }
 
 // ResolveHeaders copies Headers and interpolates ${ENV_VAR} values via os.Getenv.

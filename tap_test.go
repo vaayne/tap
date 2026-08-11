@@ -71,7 +71,14 @@ async function(args) { return {query: args.query}; }`)
 		t.Fatal(err)
 	}
 	program := string(decoded)
-	for _, want := range []string{`"query":"hello"`, `"X-Key":"test-key"`, "globalThis.fetch.bind"} {
+	for _, want := range []string{
+		`"query":"hello"`,
+		`"X-Key":"test-key"`,
+		`"https://example.com"`,
+		"Tap execution origin mismatch",
+		"Tap cross-origin fetch blocked",
+		"globalThis.fetch.bind",
+	} {
 		if !strings.Contains(program, want) {
 			t.Fatalf("program missing %q", want)
 		}
