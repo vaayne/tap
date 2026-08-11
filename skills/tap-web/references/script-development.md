@@ -45,8 +45,9 @@ async function(args) {
 `name`, `runtime`, and `env` are not metadata fields. Environment variables are
 inferred from `${VAR}` references in headers. Unresolved headers are omitted.
 
-Metadata headers are applied before domain navigation, merged into every script
-`fetch()` call, then cleared so credentials do not linger in the shared session.
+Metadata headers are merged only into `fetch()` calls targeting the declared
+domain. Cross-origin requests are not blocked by Tap, but they never receive
+Tap-configured headers and remain subject to browser CORS/CSP.
 
 ## Errors
 

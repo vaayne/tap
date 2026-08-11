@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- Metadata headers are injected only into fetches targeting the script's
+  declared domain. Cross-origin fetches remain governed by browser CORS/CSP and
+  never receive Tap-configured credentials.
+
+### Fixed
+
+- Structured agent-browser batch failures are now preserved instead of being
+  reduced to an opaque `exit status 1` error.
+
 ## [1.0.0] - 2026-08-11
 
 ### Added

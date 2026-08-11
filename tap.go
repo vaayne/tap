@@ -98,7 +98,10 @@ func (c *Client) RunScript(ctx context.Context, name string, args map[string]str
 	if err != nil {
 		return nil, err
 	}
-	return c.browser.OpenAndEval(ctx, navigationURL, program, headers)
+	// Metadata headers are injected by the generated fetch wrapper only after
+	// resolving the request URL. Do not install them as browser-wide navigation
+	// headers, where redirects and cross-origin requests could inherit them.
+	return c.browser.OpenAndEval(ctx, navigationURL, program, nil)
 }
 
 // Fetch extracts a URL through agent-browser. An empty URL reads the active tab
@@ -124,17 +127,27 @@ func siteProgram(s *script.Script, args, headers map[string]string) (string, err
 	if err != nil {
 		return "", fmt.Errorf("marshal script headers: %w", err)
 	}
+	domainJSON, err := json.Marshal(s.Meta.Domain)
+	if err != nil {
+		return "", fmt.Errorf("marshal script domain: %w", err)
+	}
 	return fmt.Sprintf(`(async () => {
   const __tapArgs = %s;
   const __tapHeaders = %s;
+  const __tapDomain = %s;
+  const __tapHeaderOrigin = __tapDomain ? "https://" + __tapDomain : null;
   const __tapNativeFetch = globalThis.fetch.bind(globalThis);
   const fetch = (input, init = {}) => {
-    const headers = new Headers(init.headers || {});
-    for (const [name, value] of Object.entries(__tapHeaders)) headers.set(name, value);
+    const url = new URL(input instanceof Request ? input.url : String(input), location.href);
+    const headers = new Headers(input instanceof Request ? input.headers : undefined);
+    new Headers(init.headers || {}).forEach((value, name) => headers.set(name, value));
+    if (url.origin === __tapHeaderOrigin) {
+      for (const [name, value] of Object.entries(__tapHeaders)) headers.set(name, value);
+    }
     return __tapNativeFetch(input, {...init, headers});
   };
   return await (%s)(__tapArgs);
-})()`, argsJSON, headersJSON, s.Body), nil
+})()`, argsJSON, headersJSON, domainJSON, s.Body), nil
 }
 
 // ListScripts returns all available scripts sorted by name.

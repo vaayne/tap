@@ -208,6 +208,32 @@ fi
 	}
 }
 
+func TestOpenAndEvalReturnsStructuredBatchFailure(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell fixture is Unix-only")
+	}
+	bin := filepath.Join(t.TempDir(), "agent-browser")
+	script := `#!/bin/sh
+cat >/dev/null
+printf '%s' '[{"success":true,"result":{}},{"success":false,"result":null,"error":"Evaluation error: TypeError: Failed to fetch"}]'
+exit 1
+`
+	if err := os.WriteFile(bin, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := New(bin).OpenAndEval(context.Background(), "https://example.com", "1", nil)
+	if err == nil {
+		t.Fatal("expected batch failure")
+	}
+	if !strings.Contains(err.Error(), "TypeError: Failed to fetch") {
+		t.Fatalf("error = %q, want structured evaluation error", err)
+	}
+	if strings.Contains(err.Error(), "exit status 1") {
+		t.Fatalf("error leaked opaque process status: %q", err)
+	}
+}
+
 func mustRead(t *testing.T, path string) []byte {
 	t.Helper()
 	data, err := os.ReadFile(path)

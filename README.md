@@ -119,13 +119,15 @@ The script name comes from its path. For example,
 */
 
 async function(args) {
-  // fetch(...) runs in agent-browser; metadata headers are merged into requests.
+  // fetch(...) runs in agent-browser. Metadata headers are merged only into
+  // requests targeting the declared domain; browser CORS/CSP still applies.
 }
 ```
 
 Environment variables are inferred from `${VAR}` references. A header is
 omitted when one of its referenced variables is unset. Resolved headers are
-applied before navigation and cleared after script execution.
+injected into same-domain script fetches and are never installed as
+browser-wide navigation headers.
 
 ## Command map
 

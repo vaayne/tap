@@ -45,7 +45,7 @@ type Meta struct {
 	Capabilities []string `json:"capabilities"`
 	// AuthRequired indicates the script needs browser-based authentication.
 	AuthRequired bool `json:"authRequired"`
-	// Headers are HTTP headers injected into every fetch() call made by the script.
+	// Headers are HTTP headers injected into fetch() calls targeting Domain.
 	// Values may reference environment variables with ${VAR} syntax; headers whose
 	// variable is unset are omitted entirely. See ResolveHeaders.
 	Headers map[string]string `json:"headers"`
