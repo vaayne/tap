@@ -63,4 +63,7 @@ return {error: 'Missing argument: query'};
 return {error: 'HTTP 401', hint: 'Authenticate in the current agent-browser session'};
 ```
 
-Scripts are contributed upstream to [bb-sites](https://github.com/epiral/bb-sites).
+Tap imports scripts compatible with [bb-sites](https://github.com/epiral/bb-sites),
+but Tap's strict execution-origin policy is separate from the bb-sites contract.
+Tap-specific metadata normalization belongs in
+`.github/scripts/bb-sites-compat.json`, not in upstream scripts.

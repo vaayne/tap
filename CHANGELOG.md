@@ -17,11 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - Site scripts may declare a same-origin `startPath` when the domain root does
   not provide a stable execution page.
+- bb-sites imports support guarded Tap-specific metadata normalization without
+  modifying or vendoring upstream scripts.
 
 ### Fixed
 
 - Structured agent-browser batch failures are now preserved instead of being
   reduced to an opaque `exit status 1` error.
+- Tap-owned scripts without redundant metadata `name` fields are now included
+  by the catalog sync job using their path-derived names.
 
 ## [1.0.0] - 2026-08-11
 
