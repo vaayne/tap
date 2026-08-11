@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-08-11
+
 ### Changed
 
 - Metadata headers are injected only into fetches targeting the script's
@@ -377,7 +379,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - CI workflows for lint, test, and release
 - GoReleaser configuration for cross-platform builds
 
-[Unreleased]: https://github.com/vaayne/tap/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/vaayne/tap/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/vaayne/tap/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/vaayne/tap/compare/v0.4.10...v1.0.0
 [0.4.10]: https://github.com/vaayne/tap/compare/v0.4.9...v0.4.10
 [0.4.9]: https://github.com/vaayne/tap/compare/v0.4.8...v0.4.9
