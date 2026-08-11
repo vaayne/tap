@@ -17,7 +17,8 @@ import { basename, join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const metaPattern = /\/\*\s*@meta\s*\n([\s\S]*?)\*\//;
-const allowedCompatibilityFields = new Set(["domain", "startPath"]);
+const allowedMatchFields = new Set(["domain", "executionDomain", "startPath"]);
+const allowedSetFields = new Set(["executionDomain", "startPath"]);
 
 export function parseMeta(content) {
   const match = content.match(metaPattern);
@@ -31,7 +32,7 @@ export function parseMeta(content) {
 
 export function applyMetadataOverride(content, override) {
   for (const field of Object.keys(override)) {
-    if (!allowedCompatibilityFields.has(field)) {
+    if (!allowedSetFields.has(field)) {
       throw new Error(`unsupported compatibility field: ${field}`);
     }
   }
@@ -60,7 +61,7 @@ export function applyCompatibilityPolicy(content, policy) {
   const meta = parseMeta(content);
   if (!meta) throw new Error("cannot match invalid @meta block");
   for (const [field, expected] of Object.entries(policy.match)) {
-    if (!allowedCompatibilityFields.has(field)) {
+    if (!allowedMatchFields.has(field)) {
       throw new Error(`unsupported compatibility match field: ${field}`);
     }
     if (meta[field] !== expected) {

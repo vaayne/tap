@@ -6,7 +6,7 @@
         "domain": "news.ycombinator.com"
       },
       "set": {
-        "domain": "hacker-news.firebaseio.com",
+        "executionDomain": "hacker-news.firebaseio.com",
         "startPath": "/v0/topstories.json"
       }
     },
@@ -15,7 +15,7 @@
         "domain": "news.ycombinator.com"
       },
       "set": {
-        "domain": "hacker-news.firebaseio.com",
+        "executionDomain": "hacker-news.firebaseio.com",
         "startPath": "/v0/topstories.json"
       }
     }

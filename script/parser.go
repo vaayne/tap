@@ -36,9 +36,11 @@ type Meta struct {
 	Name string `json:"-"`
 	// Description is a short human-readable summary shown in `tap site list`.
 	Description string `json:"description"`
-	// Domain is the exact HTTPS execution host. Site fetches are restricted to
-	// this origin before configured headers are injected.
+	// Domain is the script's catalog host and the default HTTPS execution host.
 	Domain string `json:"domain"`
+	// ExecutionDomain is a Tap-specific execution host override used by source
+	// compatibility adapters. Site fetches are restricted to this exact origin.
+	ExecutionDomain string `json:"executionDomain"`
 	// StartPath is an optional same-origin navigation target. It is useful when
 	// a domain root redirects away from the execution origin.
 	StartPath string `json:"startPath"`
@@ -117,45 +119,64 @@ func parseMeta(content string) (*Meta, error) {
 }
 
 func (m *Meta) validate() error {
-	domain := m.Domain
-	if domain == "" {
+	if m.Domain == "" {
 		return fmt.Errorf("domain is required")
 	}
-	if domain != strings.ToLower(domain) || strings.TrimSpace(domain) != domain {
-		return fmt.Errorf("domain must be a lowercase hostname: %q", domain)
+	if err := validateDomain("domain", m.Domain); err != nil {
+		return err
 	}
-	if net.ParseIP(domain) != nil {
-		return fmt.Errorf("domain must be a hostname, not an IP address: %q", domain)
-	}
-	if len(domain) > 253 {
-		return fmt.Errorf("domain exceeds 253 characters")
-	}
-	labels := strings.Split(domain, ".")
-	if len(labels) < 2 {
-		return fmt.Errorf("domain must be a fully qualified hostname: %q", domain)
-	}
-	for _, label := range labels {
-		if len(label) == 0 || len(label) > 63 || label[0] == '-' || label[len(label)-1] == '-' {
-			return fmt.Errorf("invalid domain label in %q", domain)
-		}
-		for _, char := range label {
-			if (char < 'a' || char > 'z') && (char < '0' || char > '9') && char != '-' {
-				return fmt.Errorf("invalid character in domain %q", domain)
-			}
+	if m.ExecutionDomain != "" {
+		if err := validateDomain("executionDomain", m.ExecutionDomain); err != nil {
+			return err
 		}
 	}
+	domain := m.effectiveExecutionDomain()
 	if m.StartPath != "" {
 		start, err := url.Parse(m.StartPath)
 		if err != nil || !strings.HasPrefix(m.StartPath, "/") || start.IsAbs() || start.Host != "" || start.Fragment != "" {
-			return fmt.Errorf("startPath must be an absolute path on domain %q: %q", domain, m.StartPath)
+			return fmt.Errorf("startPath must be an absolute path on execution domain %q: %q", domain, m.StartPath)
 		}
 	}
 	return nil
 }
 
+func validateDomain(field, domain string) error {
+	if domain != strings.ToLower(domain) || strings.TrimSpace(domain) != domain {
+		return fmt.Errorf("%s must be a lowercase hostname: %q", field, domain)
+	}
+	if net.ParseIP(domain) != nil {
+		return fmt.Errorf("%s must be a hostname, not an IP address: %q", field, domain)
+	}
+	if len(domain) > 253 {
+		return fmt.Errorf("%s exceeds 253 characters", field)
+	}
+	labels := strings.Split(domain, ".")
+	if len(labels) < 2 {
+		return fmt.Errorf("%s must be a fully qualified hostname: %q", field, domain)
+	}
+	for _, label := range labels {
+		if len(label) == 0 || len(label) > 63 || label[0] == '-' || label[len(label)-1] == '-' {
+			return fmt.Errorf("invalid %s label in %q", field, domain)
+		}
+		for _, char := range label {
+			if (char < 'a' || char > 'z') && (char < '0' || char > '9') && char != '-' {
+				return fmt.Errorf("invalid character in %s %q", field, domain)
+			}
+		}
+	}
+	return nil
+}
+
+func (m *Meta) effectiveExecutionDomain() string {
+	if m.ExecutionDomain != "" {
+		return m.ExecutionDomain
+	}
+	return m.Domain
+}
+
 // Origin returns the exact origin available to site fetches.
 func (m *Meta) Origin() string {
-	return "https://" + m.Domain
+	return "https://" + m.effectiveExecutionDomain()
 }
 
 // ExecutionURL returns the same-origin page Tap opens before evaluation.

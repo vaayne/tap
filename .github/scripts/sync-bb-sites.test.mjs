@@ -27,7 +27,7 @@ async function(args) {
 
 test("metadata overrides preserve upstream code and unrelated fields", () => {
   const normalized = applyMetadataOverride(source, {
-    domain: "hacker-news.firebaseio.com",
+    executionDomain: "hacker-news.firebaseio.com",
     startPath: "/v0/topstories.json",
   });
   const meta = parseMeta(normalized);
@@ -35,7 +35,8 @@ test("metadata overrides preserve upstream code and unrelated fields", () => {
   assert.equal(meta.name, "hackernews/top");
   assert.equal(meta.description, "HN top stories");
   assert.deepEqual(meta.args, { count: { required: false } });
-  assert.equal(meta.domain, "hacker-news.firebaseio.com");
+  assert.equal(meta.domain, "news.ycombinator.com");
+  assert.equal(meta.executionDomain, "hacker-news.firebaseio.com");
   assert.equal(meta.startPath, "/v0/topstories.json");
   assert.match(
     normalized,
@@ -56,7 +57,7 @@ test("compatibility policy fails when upstream metadata changes", () => {
     () =>
       applyCompatibilityPolicy(source, {
         match: { domain: "already-fixed.example" },
-        set: { domain: "hacker-news.firebaseio.com" },
+        set: { executionDomain: "hacker-news.firebaseio.com" },
       }),
     /stale compatibility policy: expected domain="already-fixed.example", got "news.ycombinator.com"/,
   );
@@ -89,14 +90,15 @@ test("compatibility applies only to imported bb-sites, not Tap overrides", async
     "hackernews/top": {
       match: { domain: "news.ycombinator.com" },
       set: {
-        domain: "hacker-news.firebaseio.com",
+        executionDomain: "hacker-news.firebaseio.com",
         startPath: "/v0/topstories.json",
       },
     },
   };
   const imported = await discoverScripts(upstream, compatibility);
+  assert.equal(parseMeta(imported[0].content).domain, "news.ycombinator.com");
   assert.equal(
-    parseMeta(imported[0].content).domain,
+    parseMeta(imported[0].content).executionDomain,
     "hacker-news.firebaseio.com",
   );
 
@@ -112,7 +114,7 @@ test("stale compatibility entries fail the import", async () => {
     buildCatalog([root], {
       "missing/script": {
         match: { domain: "old.example.com" },
-        set: { domain: "new.example.com" },
+        set: { executionDomain: "new.example.com" },
       },
     }),
     /stale bb-sites compatibility entries: missing\/script/,

@@ -110,14 +110,14 @@ async function(args) { return args; }`
 
 func TestParse_ValidatesStartPath(t *testing.T) {
 	valid := `/* @meta
-{"description":"valid path","domain":"example.com","startPath":"/api/bootstrap?format=json","args":{}}
+{"description":"valid path","domain":"example.com","executionDomain":"api.example.com","startPath":"/api/bootstrap?format=json","args":{}}
 */
 async function(args) { return args; }`
 	script, err := Parse(valid)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := script.Meta.ExecutionURL(); got != "https://example.com/api/bootstrap?format=json" {
+	if got := script.Meta.ExecutionURL(); got != "https://api.example.com/api/bootstrap?format=json" {
 		t.Fatalf("ExecutionURL() = %q", got)
 	}
 
@@ -130,6 +130,17 @@ async function(args) { return args; }`
 		if err == nil || !strings.Contains(err.Error(), "startPath") {
 			t.Fatalf("Parse(startPath=%q) error = %v", path, err)
 		}
+	}
+}
+
+func TestParse_RejectsInvalidExecutionDomain(t *testing.T) {
+	content := `/* @meta
+{"description":"invalid execution domain","domain":"example.com","executionDomain":"https://api.example.com","args":{}}
+*/
+async function(args) { return args; }`
+	_, err := Parse(content)
+	if err == nil || !strings.Contains(err.Error(), "executionDomain") {
+		t.Fatalf("Parse() error = %v, want executionDomain validation error", err)
 	}
 }
 

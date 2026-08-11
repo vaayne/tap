@@ -128,9 +128,12 @@ Environment variables are inferred from `${VAR}` references. A header is
 omitted when one of its referenced variables is unset. Resolved headers are
 applied before navigation and cleared after script execution.
 
-`domain` is the exact HTTPS execution host, not a display label. Cross-origin
-fetches are rejected. `startPath` is optional and must be a path on that domain;
-use it when the domain root redirects away from the required origin.
+`domain` is Tap's default exact HTTPS execution host. Cross-origin fetches are
+rejected. `startPath` is optional and must be a path on the execution domain;
+use it when the root redirects away from the required origin.
+
+For imported catalogs whose `domain` has different semantics, Tap's ingestion
+layer may add `executionDomain` while preserving the source metadata.
 
 ## Command map
 
