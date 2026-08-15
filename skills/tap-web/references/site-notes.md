@@ -12,7 +12,7 @@ $XDG_CONFIG_HOME/tap/site-notes/{domain}.md
 ## What to log
 
 - whether the site works with `tap site`, `tap fetch`, or requires `tap browser`
-- whether auth needs a headed agent-browser session
+- whether auth needs a headed `tap browser` Chrome session
 - working API endpoints and params
 - WAF / anti-bot behavior
 - reliable selectors

@@ -112,6 +112,14 @@ tap browser network requests --filter api
 No browser commands are reimplemented by Tap, so new agent-browser commands are
 available immediately.
 
+```bash
+tap help browser       # Tap passthrough guide and common commands
+tap browser --help     # Full version-matched agent-browser help
+```
+
+When forwarded help shows a leading `agent-browser` executable, use
+`tap browser` in its place and leave the remaining arguments unchanged.
+
 ## Sessions
 
 Tap never creates, names, persists, or closes browser sessions. It inherits

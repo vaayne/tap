@@ -77,3 +77,24 @@ func TestBrowserCommandPreservesExitCode(t *testing.T) {
 		t.Fatalf("stderr = %q", stderr.String())
 	}
 }
+
+func TestBrowserHelpShowsTapCommandsAndUpstreamHelp(t *testing.T) {
+	app := newApp()
+	var output bytes.Buffer
+	app.Writer = &output
+	app.ErrWriter = &output
+
+	if err := app.Run(context.Background(), []string{"tap", "help", "browser"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, expected := range []string{
+		"tap browser open https://example.com",
+		"tap browser network requests --filter api",
+		"tap browser --engine lightpanda",
+		"tap browser --help",
+	} {
+		if !bytes.Contains(output.Bytes(), []byte(expected)) {
+			t.Fatalf("help missing %q:\n%s", expected, output.String())
+		}
+	}
+}

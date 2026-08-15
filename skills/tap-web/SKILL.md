@@ -45,7 +45,7 @@ Pass engine flags through for one browser command:
 tap browser --engine lightpanda open https://example.com
 ```
 
-agent-browser finds `lightpanda` on `PATH`. If it is elsewhere, set:
+The delegated runtime finds `lightpanda` on `PATH`. If it is elsewhere, set:
 
 ```bash
 export AGENT_BROWSER_EXECUTABLE_PATH=/path/to/lightpanda
@@ -104,8 +104,17 @@ tap browser skills get core --full
 When applying that guide, replace its leading `agent-browser` executable with
 `tap browser`; the remaining arguments are unchanged.
 
+For concise Tap-oriented help:
+
+```bash
+tap help browser
+```
+
 ## Hard rules
 
+- Use `tap browser` for every browser CLI invocation. Never invoke the
+  agent-browser executable directly; translate upstream examples as described
+  above.
 - Start with Lightpanda unless the task needs existing login state or another
   known Chrome-only capability. Fall back to Chrome after a concrete Lightpanda
   compatibility failure; do not repeatedly retry the same failing operation.

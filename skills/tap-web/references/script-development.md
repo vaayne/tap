@@ -55,7 +55,7 @@ Return a plain object with `error` and an optional `hint`:
 
 ```javascript
 return {error: 'Missing argument: query'};
-return {error: 'HTTP 401', hint: 'Authenticate in the current agent-browser session'};
+return {error: 'HTTP 401', hint: 'Authenticate in the current Tap browser session'};
 ```
 
 Scripts are contributed upstream to [bb-sites](https://github.com/epiral/bb-sites).
