@@ -76,6 +76,58 @@ printf '%s' '{"success":true,"data":{},"error":null}'
 	}
 }
 
+func TestRunPassesArgumentsWithoutShellAndReturnsData(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell fixture is Unix-only")
+	}
+	dir := t.TempDir()
+	argsFile := filepath.Join(dir, "args")
+	bin := filepath.Join(dir, "agent-browser")
+	script := `#!/bin/sh
+printf '%s\n' "$@" > "$ARGS_FILE"
+printf '%s' '{"success":true,"data":{"snapshot":"tree"},"error":null}'
+`
+	if err := os.WriteFile(bin, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("ARGS_FILE", argsFile)
+
+	data, err := New(bin).Run(context.Background(), "snapshot", "-i")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != `{"snapshot":"tree"}` {
+		t.Fatalf("data = %s", data)
+	}
+	assertFile(t, argsFile, "snapshot\n-i\n--json\n")
+}
+
+func TestRunRequiresCommand(t *testing.T) {
+	_, err := New("unused").Run(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "command required") {
+		t.Fatalf("error = %v, want command required", err)
+	}
+}
+
+func TestRunReturnsStructuredErrorFromNonzeroCommand(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell fixture is Unix-only")
+	}
+	bin := filepath.Join(t.TempDir(), "agent-browser")
+	script := `#!/bin/sh
+printf '%s' '{"success":false,"error":"Element not found: @missing"}'
+exit 1
+`
+	if err := os.WriteFile(bin, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := New(bin).Run(context.Background(), "click", "@missing")
+	if err == nil || err.Error() != "Element not found: @missing" {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func TestPathPrefersBundledSibling(t *testing.T) {
 	dir := t.TempDir()
 	name := "agent-browser"

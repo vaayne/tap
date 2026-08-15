@@ -5,9 +5,10 @@ metadata:
   version: "v1.0.1"
 description: >
   Discover and run reusable website programs with Tap, extract readable content
-  from URLs or the current tab, and escalate arbitrary browser work to
-  agent-browser. Use for web lookup, structured site data, readable extraction,
-  authenticated pages, browser interaction, screenshots, or network inspection.
+  from URLs or the current tab, run programmable browser workflows, and use
+  agent-browser directly for one-off interaction. Use for web lookup, structured
+  site data, readable extraction, authenticated pages, browser interaction,
+  screenshots, or network inspection.
 ---
 
 # tap-web
@@ -18,8 +19,8 @@ description: >
 |---|---|---|
 | 1 | `tap site` | Known structured operations |
 | 2 | `tap fetch` | Clean readable content from a URL or current tab |
-| 3 | `agent-browser read` | Lightweight rendered-page reading |
-| 4 | `agent-browser snapshot` and interaction | Arbitrary UI, auth, screenshots, network |
+| 3 | `tap run` | Workflows needing variables, loops, or branching |
+| 4 | Direct `agent-browser` commands | One-off UI, auth, screenshots, network |
 
 Stop at the first tier that answers the task.
 
@@ -38,6 +39,13 @@ tap fetch https://example.com/article
 agent-browser open https://example.com/account
 tap fetch
 
+# Programmable host-side workflow
+tap run <<'JS'
+await browser.open("https://example.com")
+const page = await browser.snapshot("-i")
+console.log(page.snapshot)
+JS
+
 # Arbitrary interaction belongs to agent-browser
 agent-browser snapshot -i
 agent-browser click @e3
@@ -54,8 +62,8 @@ agent-browser skills get core --full
 
 - Preserve `AGENT_BROWSER_SESSION`; Tap and agent-browser commands in one task
   must operate on the same inherited session.
-- Tap never manages sessions. Do not look for `tap browser`, `tap attach`, or
-  `tap status`; those commands do not exist in 1.0.
+- Tap never manages sessions. `tap run` delegates every browser command to
+  agent-browser; it does not provide a browser runtime.
 - `tap fetch` with no URL reads the current tab and must not navigate.
 - If execution fails because the runtime is unavailable, run `tap doctor` and
   report its remediation; do not install or repair dependencies without user

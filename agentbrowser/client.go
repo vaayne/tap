@@ -119,6 +119,16 @@ func (c *Client) Open(ctx context.Context, url string) error {
 	return err
 }
 
+// Run invokes one agent-browser command and returns its JSON data payload.
+// Arguments are passed directly to agent-browser without a shell.
+func (c *Client) Run(ctx context.Context, args ...string) (json.RawMessage, error) {
+	if len(args) == 0 {
+		return nil, fmt.Errorf("agent-browser command required")
+	}
+	args = append(append([]string(nil), args...), "--json")
+	return c.runJSON(ctx, nil, args...)
+}
+
 // Eval evaluates JavaScript through stdin, avoiding shell escaping and process
 // argument leaks for expanded site headers.
 func (c *Client) Eval(ctx context.Context, script string) (any, error) {
@@ -257,12 +267,12 @@ func (c *Client) HasActiveSession(ctx context.Context) (bool, error) {
 }
 
 func (c *Client) runJSON(ctx context.Context, stdin []byte, args ...string) (json.RawMessage, error) {
-	out, stderr, err := c.run(ctx, stdin, args...)
-	if err != nil {
-		return nil, err
-	}
+	out, stderr, runErr := c.run(ctx, stdin, args...)
 	var response envelope
 	if err := json.Unmarshal(out, &response); err != nil {
+		if runErr != nil {
+			return nil, runErr
+		}
 		return nil, fmt.Errorf("decode agent-browser response: %w", err)
 	}
 	if !response.Success {
@@ -274,6 +284,9 @@ func (c *Client) runJSON(ctx context.Context, stdin []byte, args ...string) (jso
 			message = "command failed"
 		}
 		return nil, errors.New(message)
+	}
+	if runErr != nil {
+		return nil, runErr
 	}
 	return response.Data, nil
 }
