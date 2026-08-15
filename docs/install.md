@@ -77,7 +77,7 @@ requires an existing compatible Chrome installation. Otherwise run this once
 when online:
 
 ```bash
-agent-browser install
+tap browser install
 ```
 
 Upstream does not currently publish a Windows arm64 agent-browser binary. Tap
@@ -113,7 +113,7 @@ Tap and agent-browser remain independently executable and upgradeable:
 
 ```bash
 tap upgrade
-agent-browser upgrade
+tap browser upgrade
 tap doctor
 ```
 

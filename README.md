@@ -28,7 +28,7 @@ curl -fsSL https://raw.githubusercontent.com/vaayne/tap/main/scripts/install.sh 
 
 Full archives are published for macOS, glibc/musl Linux, and Windows x64. They
 contain both CLIs and the agent-browser license for offline transfer; use an
-existing Chrome installation or run `agent-browser install` when online.
+existing Chrome installation or run `tap browser install` when online.
 Tap resolves the runtime in this order: `TAP_AGENT_BROWSER`, a sibling binary
 from a full bundle, then `agent-browser` on `PATH`.
 
@@ -69,7 +69,7 @@ tap fetch --json https://example.com/article
 With no URL, Tap extracts the current agent-browser tab without navigating:
 
 ```bash
-agent-browser open https://example.com/article
+tap browser open https://example.com/article
 tap fetch
 ```
 
@@ -100,13 +100,17 @@ when first used. Command results are the agent-browser JSON `data` payload.
 
 ### Continue with arbitrary interaction
 
-For one-off interaction, use agent-browser directly:
+For one-off interaction, `tap browser` transparently forwards every argument
+and standard stream to agent-browser:
 
 ```bash
-agent-browser snapshot -i
-agent-browser click @e3
-agent-browser network requests --filter api
+tap browser snapshot -i
+tap browser click @e3
+tap browser network requests --filter api
 ```
+
+No browser commands are reimplemented by Tap, so new agent-browser commands are
+available immediately.
 
 ## Sessions
 
@@ -116,10 +120,10 @@ agent-browser's environment unchanged:
 ```bash
 export AGENT_BROWSER_SESSION=my-task
 
-agent-browser open https://github.com
+tap browser open https://github.com
 tap site github/notifications
 tap fetch
-agent-browser snapshot -i
+tap browser snapshot -i
 ```
 
 Without `AGENT_BROWSER_SESSION`, agent-browser's default session is used.
@@ -162,6 +166,7 @@ tap
 ├── site       discover, inspect, sync, and execute site programs
 ├── fetch      extract a URL or the current agent-browser tab
 ├── run        execute a host-side JavaScript browser workflow
+├── browser    pass commands through to agent-browser
 └── doctor     check the agent-browser runtime dependency
 ```
 
@@ -178,7 +183,7 @@ tap skill install
 ```
 
 Its escalation order is `tap site` → `tap fetch` → `tap run` for programmable
-workflows → direct agent-browser interaction.
+workflows → `tap browser` for direct agent-browser interaction.
 
 ## Go library
 

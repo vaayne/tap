@@ -11,6 +11,7 @@ Quick start:
   tap fetch https://example.com
   tap fetch                              Extract the current agent-browser tab
   tap run workflow.js                    Run a JavaScript browser workflow
+  tap browser snapshot -i                Run any agent-browser command
   tap doctor                             Check the runtime dependency
 
 Tap inherits AGENT_BROWSER_SESSION and never creates, names, or closes sessions.
@@ -138,6 +139,24 @@ Examples:
   const results = await tap.site("exa/search", {query: "agent browser"})
   console.log(JSON.stringify(results))
   JS
+
+## tap browser
+
+**Usage:** Run an agent-browser command
+
+```
+tap browser [agent-browser args...]
+```
+
+Pass all arguments, input, output, environment, and exit status through to
+agent-browser. Tap resolves the same bundled, configured, or PATH executable
+used by its other commands and does not interpret browser commands.
+
+Examples:
+  tap browser --engine lightpanda open https://example.com
+  tap browser snapshot -i
+  tap browser click @e3
+  tap browser eval --stdin
 
 ## tap doctor
 

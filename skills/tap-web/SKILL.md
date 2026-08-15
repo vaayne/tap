@@ -5,10 +5,11 @@ metadata:
   version: "v1.0.1"
 description: >
   Discover and run reusable website programs with Tap, extract readable content
-  from URLs or the current tab, run programmable browser workflows, and use
-  agent-browser directly for one-off interaction. Prefer Lightpanda with Chrome
-  fallback. Use for web lookup, structured site data, readable extraction,
-  authenticated pages, browser interaction, screenshots, or network inspection.
+  from URLs or the current tab, run programmable browser workflows, and pass
+  one-off interaction through to agent-browser with tap browser. Prefer
+  Lightpanda with Chrome fallback. Use for web lookup, structured site data,
+  readable extraction, authenticated pages, browser interaction, screenshots,
+  or network inspection.
 ---
 
 # tap-web
@@ -20,7 +21,7 @@ description: >
 | 1 | `tap site` | Known structured operations |
 | 2 | `tap fetch` | Clean readable content from a URL or current tab |
 | 3 | `tap run` | Workflows needing variables, loops, or branching |
-| 4 | Direct `agent-browser` commands | One-off UI, auth, screenshots, network |
+| 4 | `tap browser` | One-off UI, auth, screenshots, network |
 
 Stop at the first tier that answers the task.
 
@@ -35,13 +36,13 @@ export AGENT_BROWSER_ENGINE=lightpanda
 tap site exa/search query="agent-browser" count=5
 tap fetch https://example.com
 tap run workflow.js
-agent-browser snapshot -i
+tap browser snapshot -i
 ```
 
-For one agent-browser command, the equivalent flag is:
+Pass engine flags through for one browser command:
 
 ```bash
-agent-browser --engine lightpanda open https://example.com
+tap browser --engine lightpanda open https://example.com
 ```
 
 agent-browser finds `lightpanda` on `PATH`. If it is elsewhere, set:
@@ -61,7 +62,7 @@ export AGENT_BROWSER_PROFILE=Default  # only when an existing profile is needed
 
 Do not mix engines in one active agent-browser session. Before falling back,
 close the Lightpanda browser or choose a different session, then keep Tap and
-all direct agent-browser commands on that Chrome session.
+all browser commands on that Chrome session.
 
 ## Recipes
 
@@ -75,7 +76,7 @@ tap site exa/search query="agent-browser" count=5
 tap fetch https://example.com/article
 
 # Extract an authenticated/current page without navigation
-agent-browser open https://example.com/account
+tap browser open https://example.com/account
 tap fetch
 
 # Programmable host-side workflow
@@ -88,27 +89,30 @@ await browser.open(search.results[0].url)
 console.log((await browser.snapshot("-i")).snapshot)
 JS
 
-# Arbitrary interaction belongs to agent-browser
-agent-browser snapshot -i
-agent-browser click @e3
-agent-browser snapshot -i
+# Arbitrary interaction passes through to agent-browser
+tap browser snapshot -i
+tap browser click @e3
+tap browser snapshot -i
 ```
 
 For agent-browser syntax, load its version-matched guide:
 
 ```bash
-agent-browser skills get core --full
+tap browser skills get core --full
 ```
+
+When applying that guide, replace its leading `agent-browser` executable with
+`tap browser`; the remaining arguments are unchanged.
 
 ## Hard rules
 
 - Start with Lightpanda unless the task needs existing login state or another
   known Chrome-only capability. Fall back to Chrome after a concrete Lightpanda
   compatibility failure; do not repeatedly retry the same failing operation.
-- Preserve `AGENT_BROWSER_SESSION`; Tap and agent-browser commands in one task
+- Preserve `AGENT_BROWSER_SESSION`; all Tap commands in one task
   must operate on the same inherited session and engine.
-- Tap never manages sessions. `tap run` delegates every browser command to
-  agent-browser; it does not provide a browser runtime.
+- Tap never manages sessions. `tap browser` is a transparent passthrough and
+  `tap run` delegates every browser command; neither provides a browser runtime.
 - `tap fetch` with no URL reads the current tab and must not navigate.
 - If execution fails because the runtime is unavailable, run `tap doctor` and
   report its remediation; do not install or repair dependencies without user
