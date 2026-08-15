@@ -11,6 +11,7 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/urfave/cli/v3"
+	"github.com/vaayne/tap"
 	"github.com/vaayne/tap/agentbrowser"
 )
 
@@ -18,6 +19,8 @@ type workflowBrowser interface {
 	Run(context.Context, ...string) (json.RawMessage, error)
 	Eval(context.Context, string) (any, error)
 }
+
+type workflowSiteFunc func(string, map[string]string) (any, error)
 
 func runCmd() *cli.Command {
 	return &cli.Command{
@@ -27,8 +30,8 @@ func runCmd() *cli.Command {
 		Description: `Execute JavaScript that drives the active agent-browser session.
 Read the workflow from a file, or from stdin when no file (or -) is given.
 
-The runtime exposes browser.cmd(...args), browser.eval(script), console.log(),
-and shortcuts for open and snapshot.
+The runtime exposes browser.cmd(...args), browser.eval(script),
+tap.site(name, args), console.log(), and shortcuts for open and snapshot.
 
 Examples:
   tap run workflow.js
@@ -36,6 +39,8 @@ Examples:
   await browser.open("https://example.com")
   const page = await browser.snapshot("-i")
   console.log(page.snapshot)
+  const results = await tap.site("exa/search", {query: "agent browser"})
+  console.log(JSON.stringify(results))
   JS`,
 		Action: runWorkflow,
 	}
@@ -70,7 +75,23 @@ func runWorkflow(ctx context.Context, cmd *cli.Command) error {
 		stderr = os.Stderr
 	}
 	browser := agentbrowser.New(cmd.String("agent-browser"))
-	return executeWorkflow(ctx, browser, source, filename, stdout, stderr)
+	var siteClient *tap.Client
+	defer func() {
+		if siteClient != nil {
+			_ = siteClient.Close()
+		}
+	}()
+	runSite := func(name string, args map[string]string) (any, error) {
+		if siteClient == nil {
+			var err error
+			siteClient, err = newClient(ctx, cmd)
+			if err != nil {
+				return nil, err
+			}
+		}
+		return siteClient.RunScript(ctx, name, args)
+	}
+	return executeWorkflow(ctx, browser, runSite, source, filename, stdout, stderr)
 }
 
 func readWorkflow(path string, stdin io.Reader) (source, filename string, err error) {
@@ -91,6 +112,7 @@ func readWorkflow(path string, stdin io.Reader) (source, filename string, err er
 func executeWorkflow(
 	ctx context.Context,
 	browser workflowBrowser,
+	runSite workflowSiteFunc,
 	source string,
 	filename string,
 	stdout io.Writer,
@@ -106,6 +128,9 @@ func executeWorkflow(
 		return err
 	}
 	if err := bindBrowser(vm, ctx, browser); err != nil {
+		return err
+	}
+	if err := bindTap(vm, runSite); err != nil {
 		return err
 	}
 	if _, err := vm.RunString(`
@@ -205,6 +230,56 @@ func bindBrowser(vm *goja.Runtime, ctx context.Context, browser workflowBrowser)
 		return fmt.Errorf("initialize browser: %w", err)
 	}
 	return nil
+}
+
+func bindTap(vm *goja.Runtime, runSite workflowSiteFunc) error {
+	object := vm.NewObject()
+	if err := object.Set("site", func(call goja.FunctionCall) goja.Value {
+		if len(call.Arguments) == 0 {
+			panic(vm.NewGoError(fmt.Errorf("tap.site requires a script name")))
+		}
+		name, ok := call.Argument(0).Export().(string)
+		if !ok || name == "" {
+			panic(vm.NewGoError(fmt.Errorf("tap.site requires a script name")))
+		}
+		args, err := workflowSiteArgs(call.Argument(1))
+		if err != nil {
+			panic(vm.NewGoError(err))
+		}
+		result, err := runSite(name, args)
+		if err != nil {
+			panic(vm.NewGoError(err))
+		}
+		return vm.ToValue(result)
+	}); err != nil {
+		return fmt.Errorf("initialize tap.site: %w", err)
+	}
+	if err := vm.Set("tap", object); err != nil {
+		return fmt.Errorf("initialize tap: %w", err)
+	}
+	return nil
+}
+
+func workflowSiteArgs(value goja.Value) (map[string]string, error) {
+	args := make(map[string]string)
+	if goja.IsUndefined(value) || goja.IsNull(value) {
+		return args, nil
+	}
+	object, ok := value.(*goja.Object)
+	if !ok || object.ClassName() != "Object" {
+		return nil, fmt.Errorf("tap.site args must be an object")
+	}
+	for _, name := range object.Keys() {
+		value := object.Get(name)
+		if goja.IsUndefined(value) {
+			continue
+		}
+		if _, nested := value.(*goja.Object); nested {
+			return nil, fmt.Errorf("tap.site arg %q must be a scalar", name)
+		}
+		args[name] = value.String()
+	}
+	return args, nil
 }
 
 func promiseError(value goja.Value) error {

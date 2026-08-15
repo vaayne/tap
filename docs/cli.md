@@ -126,8 +126,8 @@ tap run [script.js]
 Execute JavaScript that drives the active agent-browser session.
 Read the workflow from a file, or from stdin when no file (or -) is given.
 
-The runtime exposes browser.cmd(...args), browser.eval(script), console.log(),
-and shortcuts for open and snapshot.
+The runtime exposes browser.cmd(...args), browser.eval(script),
+tap.site(name, args), console.log(), and shortcuts for open and snapshot.
 
 Examples:
   tap run workflow.js
@@ -135,6 +135,8 @@ Examples:
   await browser.open("https://example.com")
   const page = await browser.snapshot("-i")
   console.log(page.snapshot)
+  const results = await tap.site("exa/search", {query: "agent browser"})
+  console.log(JSON.stringify(results))
   JS
 
 ## tap doctor

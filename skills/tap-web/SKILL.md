@@ -41,9 +41,12 @@ tap fetch
 
 # Programmable host-side workflow
 tap run <<'JS'
-await browser.open("https://example.com")
-const page = await browser.snapshot("-i")
-console.log(page.snapshot)
+const search = await tap.site("exa/search", {
+  query: "agent browser",
+  count: 5
+})
+await browser.open(search.results[0].url)
+console.log((await browser.snapshot("-i")).snapshot)
 JS
 
 # Arbitrary interaction belongs to agent-browser

@@ -83,12 +83,20 @@ tap run <<'JS'
 await browser.open("https://example.com")
 const page = await browser.snapshot("-i")
 console.log(page.snapshot)
+
+const results = await tap.site("exa/search", {
+  query: "agent browser",
+  count: 5
+})
+console.log(JSON.stringify(results))
 JS
 ```
 
 Use `browser.cmd(...args)` for any supported browser command,
 `browser.eval(js)` for page-side JavaScript, or the `open` and `snapshot`
-shortcuts. Command results are the agent-browser JSON `data` payload.
+shortcuts. `tap.site(name, args)` runs an existing reusable site program; scalar
+argument values are converted to strings. The site registry is loaded only
+when first used. Command results are the agent-browser JSON `data` payload.
 
 ### Continue with arbitrary interaction
 

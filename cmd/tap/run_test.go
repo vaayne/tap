@@ -44,6 +44,13 @@ func (b *fakeWorkflowBrowser) Eval(_ context.Context, script string) (any, error
 func TestExecuteWorkflowDrivesBrowserAndPrintsOutput(t *testing.T) {
 	browser := &fakeWorkflowBrowser{}
 	var stdout, stderr bytes.Buffer
+	var siteName string
+	var siteArgs map[string]string
+	runSite := func(name string, args map[string]string) (any, error) {
+		siteName = name
+		siteArgs = args
+		return map[string]any{"count": 2}, nil
+	}
 	source := `
 const opened = await browser.open("https://example.com");
 const page = await browser.snapshot("-i");
@@ -51,10 +58,11 @@ await browser.cmd("click", "@e1");
 await browser.cmd("fill", "#query", "tap");
 await browser.cmd("wait", 500);
 const title = await browser.eval("document.title");
-console.log(opened.url, page.snapshot, title);
+const site = await tap.site("test/run", {query: "tap", count: 2, exact: true, omitted: undefined});
+console.log(opened.url, page.snapshot, title, site.count);
 `
 
-	if err := executeWorkflow(context.Background(), browser, source, "workflow.js", &stdout, &stderr); err != nil {
+	if err := executeWorkflow(context.Background(), browser, runSite, source, "workflow.js", &stdout, &stderr); err != nil {
 		t.Fatal(err)
 	}
 	wantCommands := [][]string{
@@ -70,7 +78,14 @@ console.log(opened.url, page.snapshot, title);
 	if !reflect.DeepEqual(browser.evals, []string{"document.title"}) {
 		t.Fatalf("evals = %#v", browser.evals)
 	}
-	if stdout.String() != "https://example.com/ tree Example Domain\n" {
+	if siteName != "test/run" {
+		t.Fatalf("site name = %q", siteName)
+	}
+	wantSiteArgs := map[string]string{"query": "tap", "count": "2", "exact": "true"}
+	if !reflect.DeepEqual(siteArgs, wantSiteArgs) {
+		t.Fatalf("site args = %#v, want %#v", siteArgs, wantSiteArgs)
+	}
+	if stdout.String() != "https://example.com/ tree Example Domain 2\n" {
 		t.Fatalf("stdout = %q", stdout.String())
 	}
 	if stderr.Len() != 0 {
@@ -89,7 +104,7 @@ try {
 }
 `
 
-	if err := executeWorkflow(context.Background(), browser, source, "workflow.js", &stdout, &bytes.Buffer{}); err != nil {
+	if err := executeWorkflow(context.Background(), browser, unexpectedSite, source, "workflow.js", &stdout, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
 	if stdout.String() != "click failed\n" {
@@ -101,6 +116,7 @@ func TestExecuteWorkflowReportsRejectedPromise(t *testing.T) {
 	err := executeWorkflow(
 		context.Background(),
 		&fakeWorkflowBrowser{},
+		unexpectedSite,
 		`throw new Error("workflow failed");`,
 		"workflow.js",
 		&bytes.Buffer{},
@@ -109,6 +125,25 @@ func TestExecuteWorkflowReportsRejectedPromise(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "workflow failed") {
 		t.Fatalf("error = %v", err)
 	}
+}
+
+func TestExecuteWorkflowRejectsNestedSiteArgs(t *testing.T) {
+	err := executeWorkflow(
+		context.Background(),
+		&fakeWorkflowBrowser{},
+		unexpectedSite,
+		`await tap.site("test/run", {nested: {value: true}});`,
+		"workflow.js",
+		&bytes.Buffer{},
+		&bytes.Buffer{},
+	)
+	if err == nil || !strings.Contains(err.Error(), `arg "nested" must be a scalar`) {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func unexpectedSite(string, map[string]string) (any, error) {
+	return nil, errors.New("unexpected tap.site call")
 }
 
 func TestReadWorkflowFromStdin(t *testing.T) {

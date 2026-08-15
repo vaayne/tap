@@ -10,8 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 
 - `tap run` executes host-side JavaScript workflows from a file or stdin, with
-  a thin `browser.cmd()`/`browser.eval()` bridge to the inherited agent-browser
-  session.
+  a thin `browser.cmd()`/`browser.eval()` bridge to agent-browser and
+  `tap.site()` composition for existing reusable site programs.
 
 ### Fixed
 
