@@ -2,7 +2,7 @@
 name: tap-web
 metadata:
   author: vaayne/tap
-  version: "v1.0.1"
+  version: "v1.1.0"
 description: >
   Discover and run reusable website programs with Tap, extract readable content
   from URLs or the current tab, run programmable browser workflows, and pass

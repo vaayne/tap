@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-08-15
+
 ### Added
 
 - `tap run` executes host-side JavaScript workflows from a file or stdin, with
