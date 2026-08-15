@@ -4,16 +4,16 @@ Site scripts live at `{site}/{action}.js`; the relative path is their name.
 
 ## Workflow
 
-1. Use agent-browser to inspect the site or its network API.
-2. Test the request with `agent-browser eval --stdin`.
+1. Use `tap browser` to inspect the site or its network API.
+2. Test the request with `tap browser eval --stdin`.
 3. Write the script under `~/.config/tap/sites/{site}/{action}.js`.
 4. Run `tap --local-only site {site}/{action} key=value`.
 
 ```bash
-agent-browser open https://example.com
-agent-browser network requests --filter api
+tap browser open https://example.com
+tap browser network requests --filter api
 
-cat <<'JS' | agent-browser eval --stdin
+cat <<'JS' | tap browser eval --stdin
 fetch('/api/items?q=test', {credentials: 'include'}).then(r => r.json())
 JS
 ```
@@ -55,7 +55,7 @@ Return a plain object with `error` and an optional `hint`:
 
 ```javascript
 return {error: 'Missing argument: query'};
-return {error: 'HTTP 401', hint: 'Authenticate in the current agent-browser session'};
+return {error: 'HTTP 401', hint: 'Authenticate in the current Tap browser session'};
 ```
 
 Scripts are contributed upstream to [bb-sites](https://github.com/epiral/bb-sites).

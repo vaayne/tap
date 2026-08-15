@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -17,6 +18,10 @@ func main() {
 	_ = godotenv.Load()
 	configureHelpTemplates()
 	if err := newApp().Run(context.Background(), os.Args); err != nil {
+		var browserExit *browserExitError
+		if errors.As(err, &browserExit) {
+			os.Exit(browserExit.code)
+		}
 		if notFound, ok := err.(*tap.ScriptNotFoundError); ok {
 			fmt.Fprintf(os.Stderr, "Error: %s\n", notFound.Error())
 			if suggestions := notFound.Suggestions(5); len(suggestions) > 0 {
@@ -59,6 +64,7 @@ Quick start:
   tap fetch https://example.com
   tap fetch                              Extract the current agent-browser tab
   tap run workflow.js                    Run a JavaScript browser workflow
+  tap browser snapshot -i                Run any agent-browser command
   tap doctor                             Check the runtime dependency
 
 Tap inherits AGENT_BROWSER_SESSION and never creates, names, or closes sessions.`,
@@ -67,6 +73,7 @@ Tap inherits AGENT_BROWSER_SESSION and never creates, names, or closes sessions.
 			siteCmd(),
 			fetchCmd(),
 			runCmd(),
+			browserCmd(),
 			doctorCmd(),
 			upgradeCmd(),
 			skillCmd(),
