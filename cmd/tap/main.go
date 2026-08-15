@@ -46,18 +46,19 @@ func configureHelpTemplates() {
 func newApp() *cli.Command {
 	return &cli.Command{
 		Name:                            "tap",
-		Usage:                           "Reusable web extraction and site programs for agent-browser",
+		Usage:                           "Browser workflows, reusable site programs, and web extraction",
 		Version:                         version,
 		EnableShellCompletion:           true,
 		ConfigureShellCompletionCommand: configureCompletionCommand,
-		Description: `Tap discovers and runs reusable site programs in the active agent-browser
-session and extracts clean content from URLs or the current tab.
+		Description: `Tap runs host-side JavaScript workflows, discovers reusable site programs,
+and extracts clean content through the active agent-browser session.
 
 Quick start:
   tap site list
   tap site exa/search query="agent-browser" count=5
   tap fetch https://example.com
   tap fetch                              Extract the current agent-browser tab
+  tap run workflow.js                    Run a JavaScript browser workflow
   tap doctor                             Check the runtime dependency
 
 Tap inherits AGENT_BROWSER_SESSION and never creates, names, or closes sessions.`,
@@ -65,6 +66,7 @@ Tap inherits AGENT_BROWSER_SESSION and never creates, names, or closes sessions.
 		Commands: []*cli.Command{
 			siteCmd(),
 			fetchCmd(),
+			runCmd(),
 			doctorCmd(),
 			upgradeCmd(),
 			skillCmd(),

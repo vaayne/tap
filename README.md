@@ -1,11 +1,12 @@
 # 🚰 Tap
 
-Reusable site programs and web extraction powered by
+Reusable site programs, browser workflows, and web extraction powered by
 [agent-browser](https://github.com/vercel-labs/agent-browser).
 
-Tap owns website knowledge: script discovery, metadata, arguments, environment
-expansion, headers, and readable extraction. agent-browser owns Chrome,
-sessions, profiles, tabs, CDP, interaction, and network tooling.
+Tap owns host-side workflow execution and website knowledge: script discovery,
+metadata, arguments, environment expansion, headers, and readable extraction.
+agent-browser owns Chrome, sessions, profiles, tabs, CDP, interaction, and
+network tooling.
 
 ## Install
 
@@ -72,9 +73,34 @@ agent-browser open https://example.com/article
 tap fetch
 ```
 
+### Run a browser workflow
+
+`tap run` executes host-side JavaScript from a file or stdin. Browser commands
+still run through agent-browser in the inherited session:
+
+```bash
+tap run <<'JS'
+await browser.open("https://example.com")
+const page = await browser.snapshot("-i")
+console.log(page.snapshot)
+
+const results = await tap.site("exa/search", {
+  query: "agent browser",
+  count: 5
+})
+console.log(JSON.stringify(results))
+JS
+```
+
+Use `browser.cmd(...args)` for any supported browser command,
+`browser.eval(js)` for page-side JavaScript, or the `open` and `snapshot`
+shortcuts. `tap.site(name, args)` runs an existing reusable site program; scalar
+argument values are converted to strings. The site registry is loaded only
+when first used. Command results are the agent-browser JSON `data` payload.
+
 ### Continue with arbitrary interaction
 
-Tap does not wrap browser automation commands. Use agent-browser directly:
+For one-off interaction, use agent-browser directly:
 
 ```bash
 agent-browser snapshot -i
@@ -135,6 +161,7 @@ browser-wide navigation headers.
 tap
 ├── site       discover, inspect, sync, and execute site programs
 ├── fetch      extract a URL or the current agent-browser tab
+├── run        execute a host-side JavaScript browser workflow
 └── doctor     check the agent-browser runtime dependency
 ```
 
@@ -150,8 +177,8 @@ npx skills add vaayne/tap
 tap skill install
 ```
 
-Its escalation order is `tap site` → `tap fetch` → `agent-browser read` →
-agent-browser snapshot/interaction.
+Its escalation order is `tap site` → `tap fetch` → `tap run` for programmable
+workflows → direct agent-browser interaction.
 
 ## Go library
 

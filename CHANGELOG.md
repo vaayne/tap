@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `tap run` executes host-side JavaScript workflows from a file or stdin, with
+  a thin `browser.cmd()`/`browser.eval()` bridge to agent-browser and
+  `tap.site()` composition for existing reusable site programs.
+
+### Fixed
+
+- Structured agent-browser errors remain available to workflow `try/catch`
+  blocks when the subprocess exits nonzero.
+
 ## [1.0.1] - 2026-08-11
 
 ### Changed
